@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/beat-saber-modding-group/BSIPA-MetadataFileSchema/master/Schema.json",
+  "id": "MultiplayerChat",
+  "name": "Multiplayer Chat",
+  "version": "0.1.0",
+  "description": "End-to-end encrypted text chat for BeatTogether multiplayer. Chat is encrypted - only players in your lobby can read it. No server can see your messages.",
+  "author": "Butthead",
+  "gameVersion": "1.40.8",
+  "dependsOn": {
+    "BSIPA": "^4.2.0",
+    "BeatSaberMarkupLanguage": "^1.6.0",
+    "SiraUtil": "^3.0.0",
+    "MultiplayerCore": "^1.6.0"
+  },
+  "links": {
+    "project-home": "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat"
+  },
+  "files": [
+    "Plugins/MultiplayerChat.dll"
+  ]
+}
