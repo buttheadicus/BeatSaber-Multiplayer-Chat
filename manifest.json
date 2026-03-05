@@ -3,7 +3,7 @@
   "id": "MultiplayerChat",
   "name": "Multiplayer Chat",
   "version": "0.1.0",
-  "description": "End-to-end encrypted text chat for BeatTogether multiplayer. Chat is encrypted - only players in your lobby can read it. No server can see your messages.",
+  "description": "Chat with people in multiplayer with end to end encrypted chat!",
   "author": "Butthead",
   "gameVersion": "1.40.8",
   "dependsOn": {
