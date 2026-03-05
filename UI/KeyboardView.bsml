@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="5" spacing="2">
+    <text text="Type your message (QWERTY + numbers/symbols)" font-size="3.5" align="Center"/>
+    <string-setting id="ChatInput" text="Message" show-buttons="false"/>
+    <horizontal spacing="2">
+      <button text="Send" on-click="SubmitClicked"/>
+      <button text="Cancel" on-click="CancelClicked"/>
+    </horizontal>
+  </vertical>
+</bg>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="12" spacing="4">
+    <text text="Multiplayer Chat" font-size="4" align="Center"/>
+    <scrollable-container align-bottom="true" scroll-to-bottom-on-update="true" child-control-height="true" child-expand-height="true" child-control-width="true" child-expand-width="true">
+      <vertical id="ChatLogContent" child-expand-height="true" child-control-height="true" child-expand-width="true" child-control-width="true"/>
+    </scrollable-container>
+  </vertical>
+</bg>

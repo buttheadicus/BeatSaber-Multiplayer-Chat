@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical id="root_vertical" pad="5" spacing="3" flexible-height="1">
+    <text text="Select a player:" font-size="3" align="Center"/>
+    <scroll-view flexible-height="1" id="player_scroll">
+      <vertical id="player_list_content" spacing="2" child-expand-height="false" child-control-height="true"/>
+    </scroll-view>
+  </vertical>
+</bg>

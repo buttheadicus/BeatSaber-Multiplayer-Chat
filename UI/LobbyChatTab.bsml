@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="5" spacing="3">
+    <text text="Multiplayer Chat BETA v0.1.0" font-size="4" align="Center"/>
+    <text text="Created by: Butthead" font-size="3" align="Center"/>
+    <horizontal spacing="2">
+      <string-setting id="ChatInput" text="Message" show-buttons="false"/>
+      <button text="Send" on-click="SubmitClicked"/>
+    </horizontal>
+    <horizontal spacing="2">
+      <button text="Coming Soon!" on-click="MuteClicked"/>
+      <button id="DMButton" text="Coming Soon!" on-click="DMClicked"/>
+      <button text="Settings" on-click="SettingsClicked"/>
+    </horizontal>
+  </vertical>
+</bg>
