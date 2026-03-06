@@ -93,7 +93,8 @@ public class FloatingChatViewController : BSMLAutomaticViewController
             AddMessageToLog("", e.Message);
             return;
         }
-        var displayName = e.IsDM ? $"{e.UserName} (DM)" : e.UserName;
+        var name = TrimName(e.UserName ?? "", 15);
+        var displayName = e.IsDM ? $"{name} (DM)" : name;
         AddMessageToLog(displayName, e.Message);
     }
 
@@ -188,6 +189,13 @@ public class FloatingChatViewController : BSMLAutomaticViewController
     private static string EscapeRichText(string s)
     {
         return s.Replace("<", "&lt;").Replace(">", "&gt;");
+    }
+
+    private static string TrimName(string name, int maxLen)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (name.Length <= maxLen) return name;
+        return name.Substring(0, maxLen) + "...";
     }
 
     private void ScrollToBottom()

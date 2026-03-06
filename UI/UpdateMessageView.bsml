@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="10" spacing="5">
+    <text id="UpdateMessage" text="" font-size="6" align="Center" enable-auto-size="true" enable-word-wrapping="true"/>
+    <button text="Close" on-click="CloseClicked"/>
+  </vertical>
+</bg>

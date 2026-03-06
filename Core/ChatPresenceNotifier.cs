@@ -10,9 +10,13 @@ namespace MultiplayerChat.Core;
 /// <summary>
 /// Posts "USERNAME has chat! They can see your messages!" when players with the mod join.
 /// Batches names when we join a lobby; single message when someone joins us.
+/// Only announces each player once per session (avoids spam when returning from song).
 /// </summary>
 public class ChatPresenceNotifier : IInitializable, IDisposable
 {
+    private static readonly HashSet<string> _alreadyAnnouncedUserIds = new();
+    private static readonly object _announcedLock = new();
+
     [Inject] private readonly ChatManager _chatManager = null!;
     [Inject] private readonly ModPresenceManager _modPresence = null!;
     [Inject] private readonly CoroutineHost _coroutineHost = null!;
@@ -34,10 +38,23 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
 
     private void OnPlayerWithModAdded(object? sender, PlayerWithModEventArgs e)
     {
-        if (string.IsNullOrEmpty(e.UserName)) return;
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ChatPresenceNotifier: adding {e.UserName} to batch");
-        _pendingNames.Add(e.UserName);
+        if (string.IsNullOrEmpty(e.UserName) || string.IsNullOrEmpty(e.UserId)) return;
+        lock (_announcedLock)
+        {
+            if (_alreadyAnnouncedUserIds.Contains(e.UserId)) return;
+            _alreadyAnnouncedUserIds.Add(e.UserId);
+        }
+        var trimmed = TrimName(e.UserName, 15);
+        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ChatPresenceNotifier: adding {trimmed} to batch");
+        _pendingNames.Add(trimmed);
         ScheduleBatch();
+    }
+
+    private static string TrimName(string name, int maxLen)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (name.Length <= maxLen) return name;
+        return name.Substring(0, maxLen) + "...";
     }
 
     private void ScheduleBatch()

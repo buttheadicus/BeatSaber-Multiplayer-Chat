@@ -94,12 +94,17 @@
     <Reference Include="UnityEngine.TextRenderingModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\playerhaschat.png">
       <LogicalName>MultiplayerChat.Assets.playerhaschat.png</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="manifest.json" />
+    <EmbeddedResource Include="manifest.json">
+      <LogicalName>MultiplayerChat.manifest.json</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="UI\KeyboardView.bsml">
       <LogicalName>MultiplayerChat.UI.KeyboardView.bsml</LogicalName>
     </EmbeddedResource>
@@ -111,6 +116,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="UI\PlayerList.bsml">
       <LogicalName>MultiplayerChat.UI.PlayerList.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\UpdateMessageView.bsml">
+      <LogicalName>MultiplayerChat.UI.UpdateMessageView.bsml</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 </Project>

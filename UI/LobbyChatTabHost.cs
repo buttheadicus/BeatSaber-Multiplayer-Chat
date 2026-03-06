@@ -13,6 +13,9 @@ namespace MultiplayerChat.UI;
 public class LobbyChatTabHost : IInitializable, IDisposable
 {
     [Inject] private readonly ChatManager _chatManager = null!;
+    [Inject] private readonly ChatDMState _dmState = null!;
+    [Inject] private readonly ChatBubbleManager _chatBubbleManager = null!;
+    [Inject] private readonly DiContainer _container = null!;
 
     [UIComponent("ChatInput")]
     private StringSetting? _chatInput;
@@ -42,18 +45,31 @@ public class LobbyChatTabHost : IInitializable, IDisposable
     [UIAction("MuteClicked")]
     private void MuteClicked()
     {
-        // Coming Soon - beta placeholder
+        var fc = _container.Instantiate<PlayerListFlowCoordinator>();
+        fc.Present(BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator, PlayerListViewController.Mode.Mute);
     }
 
     [UIAction("DMClicked")]
     private void DMClicked()
     {
-        // Coming Soon - beta placeholder
+        if (_dmState.IsInDMMode)
+        {
+            _dmState.ClearDMTarget();
+            return;
+        }
+        var fc = _container.Instantiate<PlayerListFlowCoordinator>();
+        fc.Present(BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator, PlayerListViewController.Mode.DM);
     }
 
     [UIAction("SettingsClicked")]
     private void SettingsClicked()
     {
         // Placeholder - do nothing for now
+    }
+
+    [UIAction("ForceClearClicked")]
+    private void ForceClearClicked()
+    {
+        _chatBubbleManager.ForceClearChat();
     }
 }

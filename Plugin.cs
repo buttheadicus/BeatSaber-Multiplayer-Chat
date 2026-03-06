@@ -27,11 +27,12 @@ public class Plugin
         _harmony = new Harmony("MultiplayerChat");
         _harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-        // Main menu: keyboard/flow coordinator (TEXT CHAT only in lobby via FloorChatButton + GameplaySetup tab)
+        // Main menu: version check, update UI (FlowCoordinator + menu tab)
         zenjector.Install(Location.Menu, container =>
         {
-            container.Bind<KeyboardViewController>().FromNewComponentAsViewController().AsSingle();
-            container.Bind<KeyboardFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<UpdateMessageViewController>().FromNewComponentAsViewController().AsTransient();
+            container.Bind<UpdateFlowCoordinator>().FromNewComponentOnNewGameObject().AsTransient();
+            container.BindInterfacesAndSelfTo<VersionChecker>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         });
 
         zenjector.Install<MultiplayerLobbyInstaller>(container =>

@@ -12,6 +12,11 @@ public class KeyboardFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly KeyboardViewController _keyboardViewController = null!;
 
+    public void SetUpdateMessage(string? message)
+    {
+        _keyboardViewController.SetUpdateMessage(message);
+    }
+
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         if (firstActivation)

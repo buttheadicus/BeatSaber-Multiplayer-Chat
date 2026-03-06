@@ -6,6 +6,7 @@ using HMUI;
 using MultiplayerCore.Models;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Zenject;
 
@@ -56,7 +57,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             ShowStackedBubble("", e.Message);
             return;
         }
-        var displayName = e.IsDM ? $"{e.UserName} (DM)" : e.UserName;
+        var name = TrimName(e.UserName ?? "", 15);
+        var displayName = e.IsDM ? $"{name} (DM)" : name;
         ShowStackedBubble(displayName, e.Message);
     }
 
@@ -66,8 +68,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         {
             yield return new WaitForSeconds(0.5f);
             var inLobby = IsInLobby();
+            var inSong = IsInSong();
 
             if (_wasInLobby && !inLobby)
+                ClearChat();
+            if (inSong && _stackedBubbles.Count > 0)
                 ClearChat();
 
             _wasInLobby = inLobby;
@@ -91,6 +96,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     EnsureNametagIcons();
             }
         }
+    }
+
+    /// <summary>Force clear all chat bubbles (e.g. from user button).</summary>
+    public void ForceClearChat()
+    {
+        ClearChat();
     }
 
     private void ClearChat()
@@ -306,7 +317,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var bubble = CreateStackedBubble(root);
         if (bubble == null) return;
 
-        var safeName = string.IsNullOrEmpty(userName) ? "" : userName.Replace("<", "&lt;").Replace(">", "&gt;");
+        var trimmed = TrimName(userName ?? "", 15);
+        var safeName = string.IsNullOrEmpty(trimmed) ? "" : trimmed.Replace("<", "&lt;").Replace(">", "&gt;");
         var text = string.IsNullOrEmpty(userName)
             ? message
             : $"<color=#87CEEB>{safeName}</color>: {message}";
@@ -380,5 +392,22 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var alt = GameObject.Find("CenterStage");
         if (alt != null && alt.activeInHierarchy) return true;
         return false;
+    }
+
+    private static bool IsInSong()
+    {
+        try
+        {
+            var scene = SceneManager.GetActiveScene();
+            return scene.IsValid() && scene.name == "GameCore";
+        }
+        catch { return false; }
+    }
+
+    private static string TrimName(string name, int maxLen)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (name.Length <= maxLen) return name;
+        return name.Substring(0, maxLen) + "...";
     }
 }

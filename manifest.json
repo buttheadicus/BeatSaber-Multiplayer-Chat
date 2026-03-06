@@ -2,8 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/beat-saber-modding-group/BSIPA-MetadataFileSchema/master/Schema.json",
   "id": "MultiplayerChat",
   "name": "Multiplayer Chat",
-  "version": "0.1.0",
-  "description": "End-to-end encrypted text chat for BeatTogether multiplayer. Chat is encrypted - only players in your lobby can read it. No server can see your messages. Compatible with Beat Saber 1.40.1 through 1.40.8.",
+  "version": "0.1.2",
+  "description": "Chat with other players in multiplayer with end to end encrypted chats!",
   "author": "Butthead",
   "gameVersion": "1.40.1",
   "dependsOn": {

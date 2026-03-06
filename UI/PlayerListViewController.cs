@@ -8,6 +8,7 @@ using BeatSaberMarkupLanguage.ViewControllers;
 using HMUI;
 using MultiplayerChat.Core;
 using MultiplayerCore.Models;
+using MultiplayerCore.Networking;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -26,6 +27,7 @@ public class PlayerListViewController : BSMLAutomaticViewController
 
     [Inject] private readonly ChatMuteManager _muteManager = null!;
     [Inject] private readonly ChatDMState _dmState = null!;
+    [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
     [UIComponent("player_list_content")]
     private RectTransform? _contentRoot;
@@ -137,6 +139,16 @@ public class PlayerListViewController : BSMLAutomaticViewController
 
         EnsureContentLayout();
 
+        if (_mode == Mode.DM && _dmState.IsInDMMode)
+        {
+            var exitBtn = CreateLabelButton("← Exit DM", () =>
+            {
+                _dmState.ClearDMTarget();
+                _onDismiss?.Invoke();
+            });
+            exitBtn.transform.SetParent(_contentRoot, false);
+        }
+
         if (_players.Count == 0)
         {
             var msg = ChatManager.Instance == null ? "Not in lobby" : "No players in lobby";
@@ -146,8 +158,10 @@ public class PlayerListViewController : BSMLAutomaticViewController
             return;
         }
 
+        var localId = _sessionManager?.localPlayer?.userId;
         foreach (var p in _players)
         {
+            if (_mode == Mode.DM && p.userId == localId) continue; // Don't DM yourself
             var muted = _mode == Mode.Mute && _muteManager.IsMuted(p.userId);
             var label = muted ? $"{p.userName} (muted)" : p.userName;
             var btn = CreatePlayerButton(label, p);
@@ -241,6 +255,44 @@ public class PlayerListViewController : BSMLAutomaticViewController
 
         var le = go.AddComponent<LayoutElement>();
         le.preferredHeight = 24;
+        le.flexibleWidth = 1;
+
+        return go;
+    }
+
+    private GameObject CreateLabelButton(string label, Action onClick)
+    {
+        var go = new GameObject("LabelButton");
+        var rect = go.transform as RectTransform ?? go.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0, 1);
+        rect.anchorMax = new Vector2(1, 1);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.sizeDelta = new Vector2(0, 36);
+
+        var image = go.AddComponent<Image>();
+        image.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
+        image.color = new Color(0.2f, 0.15f, 0.25f, 0.95f);
+        image.raycastTarget = true;
+
+        var button = go.AddComponent<Button>();
+        button.targetGraphic = image;
+        button.onClick.AddListener(() => onClick());
+
+        var tmp = BeatSaberMarkupLanguage.BeatSaberUI.CreateText((RectTransform)go.transform, label, Vector2.zero, new Vector2(400, 36));
+        tmp.rectTransform.anchorMin = Vector2.zero;
+        tmp.rectTransform.anchorMax = Vector2.one;
+        tmp.rectTransform.offsetMin = new Vector2(8, 4);
+        tmp.rectTransform.offsetMax = new Vector2(-8, -4);
+        tmp.fontSize = 5;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color = new Color(0.9f, 0.6f, 0.6f);
+        tmp.raycastTarget = false;
+        tmp.transform.SetAsLastSibling();
+
+        var le = go.AddComponent<LayoutElement>();
+        le.preferredHeight = 36;
+        le.minHeight = 36;
+        le.minWidth = 100;
         le.flexibleWidth = 1;
 
         return go;

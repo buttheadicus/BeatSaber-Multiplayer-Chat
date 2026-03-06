@@ -171,7 +171,8 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
             AddMessage("", e.Message ?? "");
             return;
         }
-        var displayName = e.IsDM ? $"{e.UserName} (DM)" : e.UserName;
+        var name = TrimName(e.UserName ?? "", 15);
+        var displayName = e.IsDM ? $"{name} (DM)" : name;
         AddMessage(displayName, e.Message ?? "");
     }
 
@@ -250,4 +251,11 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
 
     private static string Escape(string s) =>
         s.Replace("<", "&lt;").Replace(">", "&gt;");
+
+    private static string TrimName(string name, int maxLen)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (name.Length <= maxLen) return name;
+        return name.Substring(0, maxLen) + "...";
+    }
 }
