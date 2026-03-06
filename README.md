@@ -9,6 +9,10 @@ End-to-end encrypted text chat for BeatTogether multiplayer. Chat messages are e
 - QWERTY keyboard – Full keyboard UI with letters, numbers, and symbols (`:;"'<,>.?/\|]}[{\`~!@#$%^&*()_+-=`).
 - Stacked chat bubbles – All messages appear in one area above the lobby header (HOST SETUP / CLIENT SETUP / QUICK PLAY LOBBY), stacking vertically with newest at bottom.
 
+## Plans
+
+- Voice Chat
+
 ## Requirements
 
 - Beat Saber 1.40.8
