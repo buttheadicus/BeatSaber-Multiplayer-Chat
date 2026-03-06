@@ -19,7 +19,7 @@ End-to-end encrypted text chat for BeatTogether multiplayer. Chat messages are e
 
 ## Requirements
 
-- Beat Saber 1.40.X
+- Beat Saber 1.40.X (all 1.40 versions)
 - [BSIPA](https://beatmods.com) 4.2.0+
 - [BeatSaberMarkupLanguage](https://beatmods.com) 1.6.0+
 - [SiraUtil](https://beatmods.com) 3.0.0+
