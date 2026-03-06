@@ -11,7 +11,11 @@ End-to-end encrypted text chat for BeatTogether multiplayer. Chat messages are e
 
 ## Plans
 
+- DM player
+- Mute/unmute player
 - Voice Chat
+- Voice chat deafen
+- Voice chat mute self
 
 ## Requirements
 
