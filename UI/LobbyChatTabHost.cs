@@ -45,7 +45,7 @@ public class LobbyChatTabHost : IInitializable, IDisposable
     [UIAction("MuteClicked")]
     private void MuteClicked()
     {
-        var fc = _container.Instantiate<PlayerListFlowCoordinator>();
+        var fc = _container.InstantiateComponentOnNewGameObject<PlayerListFlowCoordinator>();
         fc.Present(BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator, PlayerListViewController.Mode.Mute);
     }
 
@@ -57,7 +57,7 @@ public class LobbyChatTabHost : IInitializable, IDisposable
             _dmState.ClearDMTarget();
             return;
         }
-        var fc = _container.Instantiate<PlayerListFlowCoordinator>();
+        var fc = _container.InstantiateComponentOnNewGameObject<PlayerListFlowCoordinator>();
         fc.Present(BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator, PlayerListViewController.Mode.DM);
     }
 

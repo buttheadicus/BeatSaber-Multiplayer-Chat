@@ -98,10 +98,17 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    /// <summary>Force clear all chat bubbles (e.g. from user button).</summary>
+    /// <summary>Force clear all chat bubbles (e.g. from user button). Keeps root to avoid layout corruption.</summary>
     public void ForceClearChat()
     {
-        ClearChat();
+        foreach (var bubble in _stackedBubbles)
+        {
+            if (bubble != null && bubble.gameObject != null)
+                UnityEngine.Object.Destroy(bubble.gameObject);
+        }
+        _stackedBubbles.Clear();
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<RectTransform>() != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_lobbyHeaderRoot.GetComponent<RectTransform>());
     }
 
     private void ClearChat()
@@ -311,10 +318,14 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     {
         if (!IsInLobby()) return;
 
-        var root = _lobbyHeaderRoot ?? FindOrCreateLobbyHeaderChatRoot();
-        if (root == null) return;
+        if (_lobbyHeaderRoot == null)
+        {
+            var newRoot = FindOrCreateLobbyHeaderChatRoot();
+            if (newRoot == null) return;
+            _lobbyHeaderRoot = newRoot;
+        }
 
-        var bubble = CreateStackedBubble(root);
+        var bubble = CreateStackedBubble(_lobbyHeaderRoot);
         if (bubble == null) return;
 
         var trimmed = TrimName(userName ?? "", 15);
@@ -326,6 +337,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         bubble.Show(DisplayDuration, isStacked: true);
         bubble.transform.SetAsFirstSibling();
         _stackedBubbles.Insert(0, bubble);
+
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<RectTransform>() != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_lobbyHeaderRoot.GetComponent<RectTransform>());
 
         while (_stackedBubbles.Count > MaxVisibleBubbles)
         {

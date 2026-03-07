@@ -2,7 +2,7 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical pad="5" spacing="3">
-    <text text="Multiplayer Chat BETA v0.1.2" font-size="4" align="Center"/>
+    <text text="Multiplayer Chat BETA v0.1.3" font-size="4" align="Center"/>
     <text text="Created by: Butthead" font-size="3" align="Center"/>
     <button text="FORCE CLEAR CHAT" on-click="ForceClearClicked"/>
     <horizontal spacing="2">

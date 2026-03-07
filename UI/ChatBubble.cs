@@ -2,6 +2,7 @@ using System.Collections;
 using HMUI;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
