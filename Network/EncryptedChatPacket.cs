@@ -21,10 +21,16 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
     /// </summary>
     public string? TargetUserId;
 
+    /// <summary>
+    /// Sender's name color as 6-char hex (e.g. "87CEEB"). Used by other clients to display username in correct color.
+    /// </summary>
+    public string? NameColor;
+
     public override void Serialize(NetDataWriter writer)
     {
         writer.PutBytesWithLength(EncryptedPayload ?? Array.Empty<byte>());
         writer.Put(TargetUserId ?? "");
+        writer.Put(NormalizeHex(NameColor) ?? "");
     }
 
     public override void Deserialize(NetDataReader reader)
@@ -47,11 +53,18 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             }
             EncryptedPayload = payload;
             TargetUserId = null;
+            NameColor = null;
             if (reader.AvailableBytes > 0)
             {
                 var target = reader.GetString();
                 if (!string.IsNullOrEmpty(target))
                     TargetUserId = target;
+            }
+            if (reader.AvailableBytes > 0)
+            {
+                var color = reader.GetString();
+                if (!string.IsNullOrEmpty(color))
+                    NameColor = NormalizeHex(color);
             }
         }
         catch (Exception ex)
@@ -59,6 +72,16 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Failed to deserialize packet: {ex.Message}");
             EncryptedPayload = null;
             TargetUserId = null;
+            NameColor = null;
         }
+    }
+
+    private static string? NormalizeHex(string? hex)
+    {
+        if (string.IsNullOrEmpty(hex)) return null;
+        hex = hex.Trim();
+        if (hex.StartsWith("#")) hex = hex.Substring(1);
+        if (hex.Length > 6) hex = hex.Substring(0, 6);
+        return hex.Length == 6 ? hex : null;
     }
 }

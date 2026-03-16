@@ -27,12 +27,12 @@ public class Plugin
         _harmony = new Harmony("MultiplayerChat");
         _harmony.PatchAll(Assembly.GetExecutingAssembly());
 
-        // Main menu: version check, update UI (FlowCoordinator + menu tab)
+        // Main menu: version check, update tab only (Settings are in lobby chat tab)
         zenjector.Install(Location.Menu, container =>
         {
             container.Bind<UpdateMessageViewController>().FromNewComponentAsViewController().AsTransient();
-            container.Bind<UpdateFlowCoordinator>().FromNewComponentOnNewGameObject().AsTransient();
             container.BindInterfacesAndSelfTo<VersionChecker>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+            container.BindInterfacesAndSelfTo<SettingsMenuButton>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         });
 
         zenjector.Install<MultiplayerLobbyInstaller>(container =>
@@ -52,7 +52,8 @@ public class Plugin
         container.BindInterfacesAndSelfTo<ChatPresenceNotifier>().AsSingle().NonLazy();
         container.BindInterfacesAndSelfTo<ChatBubbleManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         container.BindInterfacesAndSelfTo<FloorChatButton>().FromNewComponentOnNewGameObject().AsSingle();
-        container.Bind<LobbyChatTabHost>().AsSingle();
+        container.Bind<SettingsViewController>().FromNewComponentAsViewController().AsTransient();
+        container.Bind<MultiplayerChatSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
         container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
         container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsTransient();
         container.BindInterfacesAndSelfTo<LobbyChatTabRegistrar>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();

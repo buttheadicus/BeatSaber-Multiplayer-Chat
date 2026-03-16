@@ -90,19 +90,19 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         if (_chatLogContent == null) return;
         if (e.IsSystem)
         {
-            AddMessageToLog("", e.Message);
+            AddMessageToLog("", e.Message, null);
             return;
         }
         var name = TrimName(e.UserName ?? "", 15);
         var displayName = e.IsDM ? $"{name} (DM)" : name;
-        AddMessageToLog(displayName, e.Message);
+        AddMessageToLog(displayName, e.Message, e.NameColor);
     }
 
-    private void AddMessageToLog(string userName, string message)
+    private void AddMessageToLog(string userName, string message, string? nameColorHex = null)
     {
         if (_chatLogContent == null) return;
 
-        var row = CreateMessageRow(userName, message);
+        var row = CreateMessageRow(userName, message, nameColorHex);
         row.transform.SetParent(_chatLogContent.transform, false);
         _messageRows.Add(row);
 
@@ -121,7 +121,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
     /// Creates a chatroom-style row (emulating BeatSaberPlus ChatMessageWidget).
     /// Explicit width, top-left anchored text, word wrap.
     /// </summary>
-    private GameObject CreateMessageRow(string userName, string message)
+    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null)
     {
         const float leftRightMargins = 4f;
         const float topDownMargins = 1f;
@@ -146,10 +146,10 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         textRect.sizeDelta = new Vector2(Mathf.Max(100f, contentWidth - (2 * leftRightMargins)), 100f);
 
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
-        var yellowHex = ColorUtility.ToHtmlStringRGB(UsernameColor);
+        var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
             ? EscapeRichText(message)
-            : $"<color=#{yellowHex}>{EscapeRichText(userName)}:</color> {EscapeRichText(message)}";
+            : $"<color=#{hex}>{EscapeRichText(userName)}:</color> {EscapeRichText(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;
         tmp.outlineColor = Color.white;
@@ -184,6 +184,18 @@ public class FloatingChatViewController : BSMLAutomaticViewController
             if (w > 10f) return w;
         }
         return 400f;
+    }
+
+    private static string ResolveNameColorHex(string? hex)
+    {
+        if (!string.IsNullOrEmpty(hex))
+        {
+            hex = hex.Trim();
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            if (hex.Length > 6) hex = hex.Substring(0, 6);
+            if (hex.Length == 6) return hex;
+        }
+        return ColorUtility.ToHtmlStringRGB(UsernameColor);
     }
 
     private static string EscapeRichText(string s)

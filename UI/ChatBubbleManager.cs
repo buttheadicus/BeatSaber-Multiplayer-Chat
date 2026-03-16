@@ -2,8 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using MultiplayerChat.Core;
+using MultiplayerChat.Settings;
 using HMUI;
 using MultiplayerCore.Models;
+using MultiplayerCore.Networking;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -18,13 +20,13 @@ namespace MultiplayerChat.UI;
 /// </summary>
 public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 {
-    private const float DisplayDuration = 15f;
     private const int MaxVisibleBubbles = 8;
     private const float BubbleHeight = 36f;
 
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly ChatManager _chatManager = null!;
     [Inject] private readonly ModPresenceManager _modPresence = null!;
+    [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
     private readonly List<ChatBubble> _stackedBubbles = new();
     private Transform? _lobbyHeaderRoot;
@@ -59,7 +61,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
         var name = TrimName(e.UserName ?? "", 15);
         var displayName = e.IsDM ? $"{name} (DM)" : name;
-        ShowStackedBubble(displayName, e.Message);
+        ShowStackedBubble(displayName, e.Message, e.NameColor);
     }
 
     private IEnumerator EnsureLobbyHeaderRoot()
@@ -93,9 +95,20 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                         _lobbyHeaderRoot = root;
                 }
                 if (_lobbyHeaderRoot != null)
+                {
                     EnsureNametagIcons();
+                    ApplyPlacementMode();
+                }
             }
         }
+    }
+
+    private void ApplyPlacementMode()
+    {
+        if (_lobbyHeaderRoot == null) return;
+        var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
+        if (rt == null) return;
+        rt.anchoredPosition = DefaultChatPosition;
     }
 
     /// <summary>Force clear all chat bubbles (e.g. from user button). Keeps root to avoid layout corruption.</summary>
@@ -266,6 +279,13 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return null;
     }
 
+    private static void EnsureCanvasRaycaster(Transform parent)
+    {
+        var canvas = parent.GetComponentInParent<Canvas>();
+        if (canvas != null && canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>() == null)
+            canvas.gameObject.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+    }
+
     private static Transform? FindInChildren(Transform parent, System.Func<Transform, bool> predicate)
     {
         if (predicate(parent)) return parent;
@@ -281,6 +301,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     /// Parents chat stack so the bottom of the chat aligns with the top of the HOST SETUP bar.
     /// Chat grows upward from the bar.
     /// </summary>
+    private static readonly Vector2 DefaultChatPosition = Vector2.zero;
+
     private static Transform? CreateChatRootAboveBanner(Transform banner)
     {
         var canvas = banner.GetComponentInParent<Canvas>();
@@ -294,11 +316,13 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootObj.transform.SetParent(parent, false);
         rootObj.transform.SetAsFirstSibling();
 
+        EnsureCanvasRaycaster(parent);
+
         var rootRect = rootObj.AddComponent<RectTransform>();
         rootRect.anchorMin = new Vector2(0.5f, 1f);
         rootRect.anchorMax = new Vector2(0.5f, 1f);
         rootRect.pivot = new Vector2(0.5f, 0f);
-        rootRect.anchoredPosition = new Vector2(0f, 0f);
+        rootRect.anchoredPosition = DefaultChatPosition;
         rootRect.sizeDelta = new Vector2(420f, 320f);
 
         var vlg = rootObj.AddComponent<VerticalLayoutGroup>();
@@ -314,7 +338,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return rootObj.transform;
     }
 
-    private void ShowStackedBubble(string userName, string message)
+    private void ShowStackedBubble(string userName, string message, string? nameColorHex = null)
     {
         if (!IsInLobby()) return;
 
@@ -330,11 +354,25 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
         var trimmed = TrimName(userName ?? "", 15);
         var safeName = string.IsNullOrEmpty(trimmed) ? "" : trimmed.Replace("<", "&lt;").Replace(">", "&gt;");
-        var text = string.IsNullOrEmpty(userName)
-            ? message
-            : $"<color=#87CEEB>{safeName}</color>: {message}";
+        string text;
+        if (string.IsNullOrEmpty(userName))
+        {
+            text = message;
+        }
+        else if (!string.IsNullOrEmpty(nameColorHex))
+        {
+            var hex = nameColorHex.Trim();
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            if (hex.Length > 6) hex = hex.Substring(0, 6);
+            if (hex.Length != 6) hex = "87CEEB";
+            text = $"<color=#{hex}>{safeName}</color>: {message}";
+        }
+        else
+        {
+            text = $"{safeName}: {message}";
+        }
         bubble.SetText(text);
-        bubble.Show(DisplayDuration, isStacked: true);
+        bubble.Show(ModSettings.BubbleDuration, isStacked: true);
         bubble.transform.SetAsFirstSibling();
         _stackedBubbles.Insert(0, bubble);
 

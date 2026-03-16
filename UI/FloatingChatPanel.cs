@@ -168,12 +168,12 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         if (_contentRoot == null) return;
         if (e.IsSystem)
         {
-            AddMessage("", e.Message ?? "");
+            AddMessage("", e.Message ?? "", null);
             return;
         }
         var name = TrimName(e.UserName ?? "", 15);
         var displayName = e.IsDM ? $"{name} (DM)" : name;
-        AddMessage(displayName, e.Message ?? "");
+        AddMessage(displayName, e.Message ?? "", e.NameColor);
     }
 
     private void ClearExistingChatContent()
@@ -190,12 +190,12 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    private void AddMessage(string userName, string message)
+    private void AddMessage(string userName, string message, string? nameColorHex = null)
     {
         if (_contentRoot == null) return;
 
         MultiplayerChat.Plugin.Log?.Info($"[E2EChat] AddMessage: {userName}: {message}");
-        var row = CreateMessageRow(userName, message);
+        var row = CreateMessageRow(userName, message, nameColorHex);
         row.transform.SetParent(_contentRoot, false);
         _messageRows.Add(row);
 
@@ -210,7 +210,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
             _scrollRect.verticalNormalizedPosition = 0f;
     }
 
-    private GameObject CreateMessageRow(string userName, string message)
+    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null)
     {
         var go = new GameObject("ChatMessage");
         var rect = go.AddComponent<RectTransform>();
@@ -228,10 +228,10 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         textRect.offsetMax = new Vector2(-4, -2);
 
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
-        var yellowHex = ColorUtility.ToHtmlStringRGB(UsernameColor);
+        var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
             ? Escape(message)
-            : $"<color=#{yellowHex}>{Escape(userName)}:</color> {Escape(message)}";
+            : $"<color=#{hex}>{Escape(userName)}:</color> {Escape(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;
         tmp.enableWordWrapping = true;
@@ -247,6 +247,18 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
         return go;
+    }
+
+    private static string ResolveNameColorHex(string? hex)
+    {
+        if (!string.IsNullOrEmpty(hex))
+        {
+            hex = hex.Trim();
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            if (hex.Length > 6) hex = hex.Substring(0, 6);
+            if (hex.Length == 6) return hex;
+        }
+        return ColorUtility.ToHtmlStringRGB(UsernameColor);
     }
 
     private static string Escape(string s) =>

@@ -2,8 +2,6 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using BeatSaberMarkupLanguage.MenuButtons;
-using HMUI;
 using MultiplayerChat.UI;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -12,19 +10,17 @@ using Zenject;
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// Checks GitHub for newer releases. When an update is available, opens URL and adds a menu tab
-/// "Multiplayer Chat Update" that opens the update UI (FlowCoordinator) when clicked.
+/// Checks GitHub for newer releases. Update message is shown in the Multiplayer Chat Update menu tab.
 /// </summary>
 public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 {
     private const string ApiUrl = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
     private const string ReleasesUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases";
 
-    [Inject] private readonly DiContainer _container = null!;
-    [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;
-
     private static readonly Regex VersionRegex = new(@"v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
-    private MenuButton? _updateMenuButton;
+
+    /// <summary>Update message for display in Settings. Set after version check completes.</summary>
+    public static string UpdateMessage { get; private set; } = "Checking for updates...";
 
     public void Initialize()
     {
@@ -76,30 +72,10 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             MultiplayerChat.Plugin.Log?.Info("[E2EChat] No update needed (up to date or ahead)");
         }
 
-        _updateMenuButton = new MenuButton("Multiplayer Chat Update", "View update message", () =>
-        {
-            var fc = _container.InstantiateComponentOnNewGameObject<UpdateFlowCoordinator>();
-            fc.SetMessage(msg);
-            _mainFlowCoordinator.PresentFlowCoordinator(fc);
-        });
-        MenuButtons.Instance.RegisterButton(_updateMenuButton);
-
-        if (updateAvailable)
-        {
-            var fc = _container.InstantiateComponentOnNewGameObject<UpdateFlowCoordinator>();
-            fc.SetMessage(msg);
-            _mainFlowCoordinator.PresentFlowCoordinator(fc);
-        }
+        UpdateMessage = msg;
     }
 
-    public void Dispose()
-    {
-        if (_updateMenuButton != null)
-        {
-            try { MenuButtons.Instance?.UnregisterButton(_updateMenuButton); } catch { }
-            _updateMenuButton = null;
-        }
-    }
+    public void Dispose() { }
 
     private static string? GetCurrentVersion()
     {

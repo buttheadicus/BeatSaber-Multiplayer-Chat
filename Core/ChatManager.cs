@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using MultiplayerChat.Network;
+using MultiplayerChat.Settings;
 using MultiplayerCore.Models;
 using MultiplayerCore.Networking;
 using Zenject;
@@ -93,7 +94,11 @@ public class ChatManager : IInitializable, IDisposable
             return;
         }
 
-        var packet = new EncryptedChatPacket { EncryptedPayload = encrypted };
+        var packet = new EncryptedChatPacket
+        {
+            EncryptedPayload = encrypted,
+            NameColor = NormalizeHexForPacket(ModSettings.NameColor)
+        };
         if (_dmState.IsInDMMode)
             packet.TargetUserId = _dmState.DMTargetUserId;
         _sessionManager.Send(packet);
@@ -104,8 +109,18 @@ public class ChatManager : IInitializable, IDisposable
         if (localPlayer != null)
         {
             var isDm = _dmState.IsInDMMode;
-            MessageReceived?.Invoke(this, new ChatMessageEventArgs(localPlayer.userName, text, localPlayer.userId, isDm));
+            var nameColor = NormalizeHexForPacket(ModSettings.NameColor);
+            MessageReceived?.Invoke(this, new ChatMessageEventArgs(localPlayer.userName, text, localPlayer.userId, isDm, nameColor: nameColor));
         }
+    }
+
+    private static string? NormalizeHexForPacket(string? hex)
+    {
+        if (string.IsNullOrEmpty(hex)) return null;
+        hex = hex.Trim();
+        if (hex.StartsWith("#")) hex = hex.Substring(1);
+        if (hex.Length > 6) hex = hex.Substring(0, 6);
+        return hex.Length == 6 ? hex : null;
     }
 
     private void OnPacketReceived(EncryptedChatPacket packet, IConnectedPlayer sender)
@@ -133,14 +148,14 @@ public class ChatManager : IInitializable, IDisposable
 
         decrypted = decrypted.Replace("<", "&lt;").Replace(">", "&gt;");
         var isDm = packet.TargetUserId != null;
-        MessageReceived?.Invoke(this, new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm));
+        MessageReceived?.Invoke(this, new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
     }
 
     /// <summary>Post a system message to the chat (e.g. "USERNAME has chat! They can see your messages!").</summary>
     public void PostSystemMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
-        MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true));
+        MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true, nameColor: null));
     }
 }
 
@@ -151,13 +166,16 @@ public class ChatMessageEventArgs : EventArgs
     public string UserId { get; }
     public bool IsDM { get; }
     public bool IsSystem { get; }
+    /// <summary>Sender's name color as 6-char hex (e.g. "87CEEB"). Null = use default.</summary>
+    public string? NameColor { get; }
 
-    public ChatMessageEventArgs(string userName, string message, string userId, bool isDm = false, bool isSystem = false)
+    public ChatMessageEventArgs(string userName, string message, string userId, bool isDm = false, bool isSystem = false, string? nameColor = null)
     {
         UserName = userName;
         Message = message;
         UserId = userId;
         IsDM = isDm;
         IsSystem = isSystem;
+        NameColor = nameColor;
     }
 }
