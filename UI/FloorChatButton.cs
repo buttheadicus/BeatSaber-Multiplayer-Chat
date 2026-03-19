@@ -99,7 +99,7 @@ public class FloorChatButton : MonoBehaviour
 
         var parent = startButton.parent;
         var clone = Object.Instantiate(startButton.gameObject, parent);
-        clone.name = "E2EChatButton";
+        clone.name = "MPChatButton";
         clone.transform.SetSiblingIndex(startButton.GetSiblingIndex() + 1);
 
         var rect = (RectTransform)clone.transform;
@@ -117,7 +117,7 @@ public class FloorChatButton : MonoBehaviour
 
         var hover = clone.GetComponent<HoverHint>();
         if (hover != null)
-            hover.text = "Open text chat (E2E encrypted)";
+            hover.text = "Open text chat (MPChat encrypted)";
 
         _buttonRoot = clone;
         _buttonRoot.SetActive(true);
@@ -183,7 +183,7 @@ public class FloorChatButton : MonoBehaviour
     {
         var parent = shoesTransform.parent;
         var clone = Object.Instantiate(shoesTransform.gameObject, parent);
-        clone.name = "E2EChatButton";
+        clone.name = "MPChatButton";
         clone.transform.SetSiblingIndex(shoesTransform.GetSiblingIndex());
 
         var rect = (RectTransform)clone.transform;
@@ -200,7 +200,7 @@ public class FloorChatButton : MonoBehaviour
 
         var hover = clone.GetComponent<HoverHint>();
         if (hover != null)
-            hover.text = "Open text chat (E2E encrypted)";
+            hover.text = "Open text chat (MPChat encrypted)";
 
         _buttonRoot = clone;
         _buttonRoot.SetActive(true);
@@ -222,7 +222,7 @@ public class FloorChatButton : MonoBehaviour
             return false;
 
         var clone = Object.Instantiate(backButton.gameObject, titleView.transform);
-        clone.name = "E2EChatButton";
+        clone.name = "MPChatButton";
         clone.transform.SetAsLastSibling();
 
         var rect = (RectTransform)clone.transform;
@@ -240,7 +240,7 @@ public class FloorChatButton : MonoBehaviour
 
         var hover = clone.GetComponent<HoverHint>();
         if (hover != null)
-            hover.text = "Open text chat (E2E encrypted)";
+            hover.text = "Open text chat (MPChat encrypted)";
 
         var icon = clone.transform.Find("Icon");
         if (icon != null)
@@ -276,7 +276,7 @@ public class FloorChatButton : MonoBehaviour
         var buttons = Object.FindObjectsOfType<Button>();
         foreach (var btn in buttons)
         {
-            if (btn == null || btn.gameObject.name == "E2EChatButton")
+            if (btn == null || btn.gameObject.name == "MPChatButton")
                 continue;
             var rect = btn.transform as RectTransform;
             if (rect == null)
@@ -296,14 +296,14 @@ public class FloorChatButton : MonoBehaviour
     private void CreateStandaloneCanvasButton()
     {
         // Last resort: create a Canvas + Button in center-right (Host Setup area)
-        var canvasObj = new GameObject("E2EChatCanvas");
+        var canvasObj = new GameObject("MPChatCanvas");
         var canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 100;
         canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
         canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
 
-        var buttonObj = new GameObject("E2EChatButton");
+        var buttonObj = new GameObject("MPChatButton");
         buttonObj.transform.SetParent(canvasObj.transform, false);
 
         var rect = buttonObj.AddComponent<RectTransform>();
@@ -338,7 +338,7 @@ public class FloorChatButton : MonoBehaviour
 
     private void SetupClonedButton(GameObject clone, Vector2 position)
     {
-        clone.name = "E2EChatButton";
+        clone.name = "MPChatButton";
 
         var rect = (RectTransform)clone.transform;
         rect.anchoredPosition = position;
@@ -356,7 +356,7 @@ public class FloorChatButton : MonoBehaviour
 
         var hover = clone.GetComponent<HoverHint>();
         if (hover != null)
-            hover.text = "Open text chat (E2E encrypted)";
+            hover.text = "Open text chat (MPChat encrypted)";
     }
 
     private void OnButtonClicked()

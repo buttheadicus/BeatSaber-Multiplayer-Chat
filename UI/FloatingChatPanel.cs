@@ -31,7 +31,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     public void Initialize()
     {
         CreateFloatingScreen();
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] FloatingChatPanel.Initialize done, _contentRoot={_contentRoot != null}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] FloatingChatPanel.Initialize done, _contentRoot={_contentRoot != null}");
         _chatManager.MessageReceived += OnMessageReceived;
     }
 
@@ -56,7 +56,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         _screen.HandleSide = FloatingScreen.Side.Bottom;
         _screen.HighlightHandle = true;
         _screen.ShowHandle = true;
-        _screen.gameObject.name = "E2EChatFloatingScreen";
+        _screen.gameObject.name = "MPChatFloatingScreen";
         _screen.HandleReleased += OnHandleReleased;
 
         if (_screen.Handle != null)
@@ -161,7 +161,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     {
         if (_contentRoot == null && _screen != null)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] _contentRoot was null, rebuilding chat content");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] _contentRoot was null, rebuilding chat content");
             ClearExistingChatContent();
             BuildChatContent();
         }
@@ -194,7 +194,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     {
         if (_contentRoot == null) return;
 
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] AddMessage: {userName}: {message}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] AddMessage: {userName}: {message}");
         var row = CreateMessageRow(userName, message, nameColorHex);
         row.transform.SetParent(_contentRoot, false);
         _messageRows.Add(row);

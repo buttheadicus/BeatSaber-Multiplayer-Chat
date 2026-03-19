@@ -75,7 +75,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
         }
 
         Screen.HandleReleased += OnHandleReleased;
-        Screen.gameObject.name = "E2EChatFloatingScreen";
+        Screen.gameObject.name = "MPChatFloatingScreen";
         Screen.gameObject.SetActive(true);
     }
 

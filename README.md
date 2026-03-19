@@ -20,6 +20,7 @@ End-to-end encrypted text chat for BeatTogether multiplayer. Chat messages are e
 ## Requirements
 
 - Beat Saber 1.40.X (all 1.40 versions)
+- [MultiplayerExtensions](https://github.com/EnderdracheLP/MultiplayerExtensions) 1.1.0+
 - [BSIPA](https://beatmods.com) 4.2.0+
 - [BeatSaberMarkupLanguage](https://beatmods.com) 1.6.0+
 - [SiraUtil](https://beatmods.com) 3.0.0+
@@ -41,7 +42,7 @@ End-to-end encrypted text chat for BeatTogether multiplayer. Chat messages are e
 
 ## How It Works
 
-Encryption: A session key is derived from the sorted list of connected player IDs. Only players in the lobby can compute this key.
+Encryption: A session key is derived from the sorted list of connected player IDs. Only players in your lobby can compute this key.
 Packets: Messages are encrypted before sending. The BeatTogether server relays encrypted bytes and cannot decrypt them.
 Chat bubbles: All messages appear stacked above the lobby header (HOST SETUP / QUICK PLAY LOBBY, etc.). New messages appear at the bottom of the stack; up to 8 messages are shown at once. Bubbles fade in/out over ~15 seconds.
 

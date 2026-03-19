@@ -24,11 +24,11 @@ public class UpdateMessager : MonoBehaviour
     public void ShowUpdateMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
-        MultiplayerChat.Plugin.Log?.Info("[E2EChat] UpdateMessager.ShowUpdateMessage called");
+        MultiplayerChat.Plugin.Log?.Info("[MPChat] UpdateMessager.ShowUpdateMessage called");
         EnsureRoot();
         if (_textMesh == null)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] UpdateMessager: _textMesh is null after EnsureRoot");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] UpdateMessager: _textMesh is null after EnsureRoot");
             return;
         }
         _textMesh.text = message;
@@ -36,11 +36,11 @@ public class UpdateMessager : MonoBehaviour
         {
             _rootObj.SetActive(true);
             StartCoroutine(AnimateAndHide());
-            MultiplayerChat.Plugin.Log?.Info("[E2EChat] UpdateMessager: panel shown");
+            MultiplayerChat.Plugin.Log?.Info("[MPChat] UpdateMessager: panel shown");
         }
         else
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] UpdateMessager: _rootObj is null");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] UpdateMessager: _rootObj is null");
         }
     }
 
@@ -57,10 +57,10 @@ public class UpdateMessager : MonoBehaviour
         if (cam == null)
         {
             cam = Object.FindObjectOfType<Camera>();
-            MultiplayerChat.Plugin.Log?.Info($"[E2EChat] UpdateMessager: Camera.main was null, using FindObjectOfType: {cam?.name ?? "null"}");
+            MultiplayerChat.Plugin.Log?.Info($"[MPChat] UpdateMessager: Camera.main was null, using FindObjectOfType: {cam?.name ?? "null"}");
         }
 
-        _rootObj = new GameObject("E2EUpdateMessager");
+        _rootObj = new GameObject("MPChatUpdateMessager");
         _rootObj.transform.SetParent(transform);
 
         var canvas = _rootObj.AddComponent<Canvas>();
@@ -105,7 +105,7 @@ public class UpdateMessager : MonoBehaviour
         _textMesh.enableWordWrapping = true;
         _textMesh.raycastTarget = false;
 
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] UpdateMessager: root created, renderMode={canvas.renderMode}, camera={cam?.name ?? "null"}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] UpdateMessager: root created, renderMode={canvas.renderMode}, camera={cam?.name ?? "null"}");
     }
 
     private IEnumerator AnimateAndHide()

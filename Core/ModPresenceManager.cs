@@ -11,7 +11,7 @@ using Zenject;
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// Tracks which players have the E2E Chat mod. Broadcasts our presence when connecting;
+/// Tracks which players have the MPChat mod. Broadcasts our presence when connecting;
 /// shows the chat icon on nametags for players in this set.
 /// </summary>
 public class ModPresenceManager : IInitializable, IDisposable
@@ -42,7 +42,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         }
 
         // Presence sends immediately. Reply waits 6 seconds. Ignored from song -> retry in 3 seconds.
-        MultiplayerChat.Plugin.Log?.Info("[E2EChat] ModPresenceManager initialized");
+        MultiplayerChat.Plugin.Log?.Info("[MPChat] ModPresenceManager initialized");
         BroadcastPresence();
         _coroutineHost.StartCoroutine(RepeatBroadcast());
     }
@@ -143,7 +143,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         {
             if (_playersWithMod.Add(sender.userId))
             {
-                MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ModPresence: {sender.userName} has chat mod");
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {sender.userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
                 PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId));
             }
@@ -172,7 +172,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         yield return new WaitForSeconds(3f);
         _presenceRetryCoroutine = null;
         BroadcastPresence();
-        MultiplayerChat.Plugin.Log?.Info("[E2EChat] Presence retry (was ignored from song)");
+        MultiplayerChat.Plugin.Log?.Info("[MPChat] Presence retry (was ignored from song)");
     }
 
     /// <summary>Lyra waits 6 seconds before showing "X has chat" when she receives a reply.</summary>
@@ -187,7 +187,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         {
             if (_playersWithMod.Add(userId))
             {
-                MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ModPresence reply: {userName} has chat mod");
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence reply: {userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
                 PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName));
             }
@@ -218,7 +218,7 @@ public class ModPresenceManager : IInitializable, IDisposable
     {
         if (string.IsNullOrEmpty(targetUserId)) return;
         _sessionManager.Send(new ModPresencePacket { TargetUserId = targetUserId });
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Sent presence reply to {targetUserId}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Sent presence reply to {targetUserId}");
     }
 
     private void BroadcastPresence()

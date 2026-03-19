@@ -31,6 +31,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private readonly List<ChatBubble> _stackedBubbles = new();
     private Transform? _lobbyHeaderRoot;
     private bool _wasInLobby;
+    private bool _isMoveMode;
+    private GameObject? _moveHandle;
+    private Coroutine? _moveModeHelperCoroutine;
+
+    public bool IsMoveMode => _isMoveMode;
 
     public void Initialize()
     {
@@ -40,6 +45,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     public void Dispose()
     {
+        _isMoveMode = false;
+        RemoveMoveHandle();
         _chatManager.MessageReceived -= OnMessageReceived;
         foreach (var bubble in _stackedBubbles)
         {
@@ -53,7 +60,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private void OnMessageReceived(object? sender, ChatMessageEventArgs e)
     {
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] OnMessageReceived: {e.UserName}: {e.Message}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] OnMessageReceived: {e.UserName}: {e.Message}");
         if (e.IsSystem)
         {
             ShowStackedBubble("", e.Message);
@@ -103,12 +110,161 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
+    /// <summary>When custom placement is on: enter move mode to show handle for dragging.</summary>
+    public void EnterMoveMode()
+    {
+        if (!ModSettings.CustomPlacement) return;
+        if (_isMoveMode) return;
+        _isMoveMode = true;
+        if (_lobbyHeaderRoot == null)
+        {
+            var root = FindOrCreateLobbyHeaderChatRoot();
+            if (root != null)
+                _lobbyHeaderRoot = root;
+        }
+        EnsureMoveHandle();
+        if (_moveHandle == null && _lobbyHeaderRoot == null)
+            _moveModeHelperCoroutine = StartCoroutine(RetryEnterMoveMode());
+        else
+            _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
+    }
+
+    private IEnumerator RetryEnterMoveMode()
+    {
+        for (int i = 0; i < 6 && _isMoveMode; i++)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (!_isMoveMode) yield break;
+            if (_lobbyHeaderRoot == null)
+            {
+                var root = FindOrCreateLobbyHeaderChatRoot();
+                if (root != null)
+                    _lobbyHeaderRoot = root;
+            }
+            if (_lobbyHeaderRoot != null)
+            {
+                EnsureMoveHandle();
+                if (_moveHandle != null)
+                {
+                    _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
+                    yield break;
+                }
+            }
+        }
+        _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
+    }
+
+    /// <summary>Exit move mode and save position.</summary>
+    public void ExitMoveMode()
+    {
+        if (!_isMoveMode) return;
+        _isMoveMode = false;
+        if (_moveModeHelperCoroutine != null)
+        {
+            StopCoroutine(_moveModeHelperCoroutine);
+            _moveModeHelperCoroutine = null;
+        }
+        RemoveMoveHandle();
+        if (_lobbyHeaderRoot != null)
+        {
+            var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
+            if (rt != null)
+                ModSettings.LobbyChatPosition = rt.anchoredPosition;
+        }
+    }
+
+    /// <summary>Reset chat to default position (above HOST SETUP).</summary>
+    public void ResetToDefaultPosition()
+    {
+        if (_lobbyHeaderRoot == null) return;
+        var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.anchoredPosition = DefaultChatPosition;
+            ModSettings.LobbyChatPosition = DefaultChatPosition;
+        }
+    }
+
     private void ApplyPlacementMode()
     {
         if (_lobbyHeaderRoot == null) return;
         var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
         if (rt == null) return;
-        rt.anchoredPosition = DefaultChatPosition;
+
+        if (ModSettings.CustomPlacement)
+        {
+            rt.anchoredPosition = ModSettings.LobbyChatPosition;
+            if (_isMoveMode)
+                EnsureMoveHandle();
+            else
+                RemoveMoveHandle();
+        }
+        else
+        {
+            _isMoveMode = false;
+            RemoveMoveHandle();
+            if (_moveModeHelperCoroutine != null)
+            {
+                StopCoroutine(_moveModeHelperCoroutine);
+                _moveModeHelperCoroutine = null;
+            }
+            rt.anchoredPosition = DefaultChatPosition;
+        }
+    }
+
+    private IEnumerator MoveModeHelperMessages()
+    {
+        while (_isMoveMode)
+        {
+            yield return new WaitForSeconds(1f);
+            if (!_isMoveMode) yield break;
+            ShowStackedBubble("", "chat message (to help you see where you are moving the chat)", nameColorHex: null);
+        }
+    }
+
+    private void EnsureMoveHandle()
+    {
+        if (_moveHandle != null || _lobbyHeaderRoot == null) return;
+        var handleObj = new GameObject("MPChatMoveHandle");
+        handleObj.layer = 5; // UI layer for raycast targeting
+        handleObj.transform.SetParent(_lobbyHeaderRoot, false);
+        handleObj.transform.SetAsFirstSibling();
+
+        var rect = handleObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, 4f);
+        rect.sizeDelta = new Vector2(0f, 24f);
+
+        var layout = handleObj.AddComponent<LayoutElement>();
+        layout.minHeight = 24f;
+        layout.preferredHeight = 24f;
+        layout.flexibleHeight = 0f;
+
+        var img = handleObj.AddComponent<Image>();
+        img.color = new Color(0.4f, 0.7f, 1f, 1f);
+        img.raycastTarget = true;
+        img.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
+
+        handleObj.AddComponent<ChatMoveHandle>();
+        _moveHandle = handleObj;
+        handleObj.SetActive(true);
+
+        EnsureCanvasRaycaster(handleObj.transform);
+
+        var rootRect = _lobbyHeaderRoot.GetComponent<RectTransform>();
+        if (rootRect != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rootRect);
+    }
+
+    private void RemoveMoveHandle()
+    {
+        if (_moveHandle != null)
+        {
+            UnityEngine.Object.Destroy(_moveHandle);
+            _moveHandle = null;
+        }
     }
 
     /// <summary>Force clear all chat bubbles (e.g. from user button). Keeps root to avoid layout corruption.</summary>
@@ -196,11 +352,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             var root = CreateChatRootAboveBanner(banner);
             if (root != null)
             {
-                MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Chat attached to VR game UI above HOST SETUP: {banner.name}");
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached to VR game UI above HOST SETUP: {banner.name}");
                 return root;
             }
         }
-        MultiplayerChat.Plugin.Log?.Warn("[E2EChat] Could not find HOST SETUP bar in lobby VR UI - chat bubbles disabled");
+        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not find HOST SETUP bar in lobby VR UI - chat bubbles disabled");
         return null;
     }
 
@@ -311,7 +467,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var parent = banner.GetComponent<RectTransform>() != null ? banner : banner.parent;
         if (parent == null) return null;
 
-        var rootObj = new GameObject("E2EChatLobbyHeaderStack");
+        var rootObj = new GameObject("MPChatLobbyHeaderStack");
         rootObj.layer = banner.gameObject.layer;
         rootObj.transform.SetParent(parent, false);
         rootObj.transform.SetAsFirstSibling();
@@ -322,7 +478,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootRect.anchorMin = new Vector2(0.5f, 1f);
         rootRect.anchorMax = new Vector2(0.5f, 1f);
         rootRect.pivot = new Vector2(0.5f, 0f);
-        rootRect.anchoredPosition = DefaultChatPosition;
+        rootRect.anchoredPosition = ModSettings.CustomPlacement ? ModSettings.LobbyChatPosition : DefaultChatPosition;
         rootRect.sizeDelta = new Vector2(420f, 320f);
 
         var vlg = rootObj.AddComponent<VerticalLayoutGroup>();
@@ -347,6 +503,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             var newRoot = FindOrCreateLobbyHeaderChatRoot();
             if (newRoot == null) return;
             _lobbyHeaderRoot = newRoot;
+            if (_isMoveMode)
+                EnsureMoveHandle();
         }
 
         var bubble = CreateStackedBubble(_lobbyHeaderRoot);
@@ -390,7 +548,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private ChatBubble? CreateStackedBubble(Transform parent)
     {
-        var panelObj = new GameObject("E2EChatBubble");
+        var panelObj = new GameObject("MPChatBubble");
         panelObj.layer = 5;
         panelObj.transform.SetParent(parent, false);
 

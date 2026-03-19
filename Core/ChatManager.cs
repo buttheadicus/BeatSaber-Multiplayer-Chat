@@ -90,7 +90,7 @@ public class ChatManager : IInitializable, IDisposable
         var encrypted = _encryption.Encrypt(text);
         if (encrypted == null)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] Encrypt returned null (no session key?)");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Encrypt returned null (no session key?)");
             return;
         }
 
@@ -102,7 +102,7 @@ public class ChatManager : IInitializable, IDisposable
         if (_dmState.IsInDMMode)
             packet.TargetUserId = _dmState.DMTargetUserId;
         _sessionManager.Send(packet);
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Sent message, invoking MessageReceived");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Sent message, invoking MessageReceived");
 
         // Show our own message locally for immediate feedback
         var localPlayer = _sessionManager.localPlayer;

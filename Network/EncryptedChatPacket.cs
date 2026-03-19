@@ -46,7 +46,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             }
             if (payload.Length > MaxPayloadSize)
             {
-                MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Rejected oversized packet: {payload.Length} bytes");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Rejected oversized packet: {payload.Length} bytes");
                 EncryptedPayload = null;
                 TargetUserId = null;
                 return;
@@ -69,7 +69,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Failed to deserialize packet: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to deserialize packet: {ex.Message}");
             EncryptedPayload = null;
             TargetUserId = null;
             NameColor = null;

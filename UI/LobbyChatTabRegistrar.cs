@@ -58,7 +58,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
             }
             catch (Exception ex)
             {
-                MultiplayerChat.Plugin.Log?.Error($"[E2EChat] Failed to add tab: {ex}");
+                MultiplayerChat.Plugin.Log?.Error($"[MPChat] Failed to add tab: {ex}");
             }
         }
     }
@@ -86,7 +86,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         }
         else
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] ChatManager.Instance is null - not in multiplayer lobby?");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] ChatManager.Instance is null - not in multiplayer lobby?");
         }
     }
 

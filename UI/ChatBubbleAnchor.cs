@@ -11,7 +11,7 @@ namespace MultiplayerChat.UI;
 
 /// <summary>
 /// Attached to AvatarCaption (nametag) via SiraUtil LobbyAvatarPlaceRegistration.
-/// Adds a chat icon sprite after the player name to indicate they have the E2E Chat mod.
+/// Adds a chat icon sprite after the player name to indicate they have the MPChat mod.
 /// Same pattern as MultiplayerExtensions uses for the Steam logo.
 /// </summary>
 public class ChatBubbleAnchor : MonoBehaviour
@@ -50,7 +50,7 @@ public class ChatBubbleAnchor : MonoBehaviour
 
         if (string.IsNullOrEmpty(_userId))
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] ChatBubbleAnchor: could not get userId from controller/place");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] ChatBubbleAnchor: could not get userId from controller/place");
             yield break;
         }
 
@@ -77,7 +77,7 @@ public class ChatBubbleAnchor : MonoBehaviour
             _chatIconSprite = LoadChatIconSprite();
         if (_chatIconSprite == null) return;
 
-        _iconObj = new GameObject("E2EChatNametagIcon");
+        _iconObj = new GameObject("MPChatNametagIcon");
         _iconObj.transform.SetParent(transform, false);
         _iconObj.transform.SetAsLastSibling();
         _iconObj.layer = 5;
@@ -106,7 +106,7 @@ public class ChatBubbleAnchor : MonoBehaviour
             using var stream = asm.GetManifestResourceStream(name);
             if (stream == null)
             {
-                MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Could not find embedded sprite: {name}");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Could not find embedded sprite: {name}");
                 return null;
             }
             var bytes = new byte[stream.Length];
@@ -114,7 +114,7 @@ public class ChatBubbleAnchor : MonoBehaviour
             var tex = LoadTextureFromPng(bytes);
             if (tex == null)
             {
-                MultiplayerChat.Plugin.Log?.Warn("[E2EChat] Failed to load PNG for chat icon");
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Failed to load PNG for chat icon");
                 return null;
             }
             tex.filterMode = FilterMode.Bilinear;
@@ -122,7 +122,7 @@ public class ChatBubbleAnchor : MonoBehaviour
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Failed to load chat icon sprite: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to load chat icon sprite: {ex.Message}");
             return null;
         }
     }
@@ -135,7 +135,7 @@ public class ChatBubbleAnchor : MonoBehaviour
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] System.Drawing PNG load failed (e.g. Steam Deck/Linux), using fallback: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] System.Drawing PNG load failed (e.g. Steam Deck/Linux), using fallback: {ex.Message}");
             return CreatePlaceholderSpriteTexture();
         }
     }

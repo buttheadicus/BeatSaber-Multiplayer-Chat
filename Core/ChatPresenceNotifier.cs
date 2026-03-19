@@ -45,7 +45,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
             _alreadyAnnouncedUserIds.Add(e.UserId);
         }
         var trimmed = TrimName(e.UserName, 15);
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ChatPresenceNotifier: adding {trimmed} to batch");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: adding {trimmed} to batch");
         _pendingNames.Add(trimmed);
         ScheduleBatch();
     }
@@ -82,7 +82,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
             ? $"{names[0]} has chat! They can see your messages!"
             : $"{string.Join(", ", names)} has chat! They can see your messages!";
 
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] ChatPresenceNotifier: posting '{msg}'");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: posting '{msg}'");
         _chatManager.PostSystemMessage(msg);
     }
 }

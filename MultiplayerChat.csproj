@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>MultiplayerChat</AssemblyName>
     <RootNamespace>MultiplayerChat</RootNamespace>
-    <Version>0.1.4</Version>
+    <Version>0.1.6</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
     <BeatSaberDir>f:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
@@ -15,6 +15,9 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="ChatAutoUpdater\**" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
   </ItemGroup>

@@ -11,8 +11,13 @@ public static class ModSettings
     private const string KeyBubbleDuration = "MultiplayerChat.BubbleDuration";
     private const string KeyShowSystemMessages = "MultiplayerChat.ShowSystemMessages";
     private const string KeyNameColor = "MultiplayerChat.NameColor";
+    private const string KeyCustomPlacement = "MultiplayerChat.CustomPlacement";
+    private const string KeyLobbyChatPosX = "MultiplayerChat.LobbyChatPosX";
+    private const string KeyLobbyChatPosY = "MultiplayerChat.LobbyChatPosY";
+
     private const float DefaultBubbleDuration = 15f;
     private const bool DefaultShowSystemMessages = true;
+    private const bool DefaultCustomPlacement = false;
     private const string DefaultNameColor = "87CEEB";
 
     public static float BubbleDuration
@@ -38,15 +43,19 @@ public static class ModSettings
 
     public static string NameColor
     {
-        get => PlayerPrefs.GetString(KeyNameColor, DefaultNameColor);
+        get
+        {
+            var fromJson = MultiplayerExtensionsJson.GetPlayerColorHex();
+            return !string.IsNullOrEmpty(fromJson) ? fromJson : PlayerPrefs.GetString(KeyNameColor, DefaultNameColor);
+        }
         set
         {
             var hex = (value ?? "").Trim();
             if (hex.StartsWith("#")) hex = hex.Substring(1);
-            // Cap to 6 characters (RGB only, no alpha)
             if (hex.Length > 6) hex = hex.Substring(0, 6);
             if (hex.Length == 6 && IsValidHex(hex))
             {
+                MultiplayerExtensionsJson.SetPlayerColorHex(hex);
                 PlayerPrefs.SetString(KeyNameColor, hex);
                 PlayerPrefs.Save();
             }
@@ -62,4 +71,27 @@ public static class ModSettings
         return true;
     }
 
+    /// <summary>Off = default position above HOST SETUP. On = custom placement with draggable handle.</summary>
+    public static bool CustomPlacement
+    {
+        get => PlayerPrefs.HasKey(KeyCustomPlacement) && PlayerPrefs.GetInt(KeyCustomPlacement) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyCustomPlacement, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    public static Vector2 LobbyChatPosition
+    {
+        get => new Vector2(
+            PlayerPrefs.GetFloat(KeyLobbyChatPosX, 0f),
+            PlayerPrefs.GetFloat(KeyLobbyChatPosY, 0f));
+        set
+        {
+            PlayerPrefs.SetFloat(KeyLobbyChatPosX, value.x);
+            PlayerPrefs.SetFloat(KeyLobbyChatPosY, value.y);
+            PlayerPrefs.Save();
+        }
+    }
 }

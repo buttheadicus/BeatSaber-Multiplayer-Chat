@@ -3,7 +3,7 @@ using LiteNetLib.Utils;
 namespace MultiplayerChat.Network;
 
 /// <summary>
-/// Packet sent when joining a lobby to indicate this player has the E2E Chat mod.
+/// Packet sent when joining a lobby to indicate this player has the MPChat mod.
 /// TargetUserId: when set, only that user should process it (targeted reply or ignored).
 /// IsIgnoredFromSong: when true, recipient is in a song and should retry later.
 /// </summary>

@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
+using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using HMUI;
 using MultiplayerChat.UI;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -11,6 +14,7 @@ namespace MultiplayerChat.Core;
 
 /// <summary>
 /// Checks GitHub for newer releases. Update message is shown in the Multiplayer Chat Update menu tab.
+/// Auto-opens the update tab when an update is detected.
 /// </summary>
 public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 {
@@ -18,6 +22,9 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     private const string ReleasesUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases";
 
     private static readonly Regex VersionRegex = new(@"v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+
+    [Inject] private readonly DiContainer _container = null!;
+    [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;
 
     /// <summary>Update message for display in Settings. Set after version check completes.</summary>
     public static string UpdateMessage { get; private set; } = "Checking for updates...";
@@ -29,15 +36,15 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
     private IEnumerator CheckForUpdates()
     {
-        MultiplayerChat.Plugin.Log?.Info("[E2EChat] Version check starting...");
+        MultiplayerChat.Plugin.Log?.Info("[MPChat] Version check starting...");
         yield return new WaitForSeconds(0.5f);
         var currentVersion = GetCurrentVersion();
         if (string.IsNullOrEmpty(currentVersion))
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] Could not read current version from manifest");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not read current version from manifest");
             yield break;
         }
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Current version: {currentVersion}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Current version: {currentVersion}");
 
         using var request = UnityWebRequest.Get(ApiUrl);
         request.SetRequestHeader("User-Agent", "MultiplayerChat-Mod");
@@ -45,34 +52,87 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Version check failed: {request.error}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Version check failed: {request.error}");
             yield break;
         }
 
         var latestVersion = ParseVersionFromJson(request.downloadHandler.text);
         if (string.IsNullOrEmpty(latestVersion))
         {
-            MultiplayerChat.Plugin.Log?.Warn("[E2EChat] Could not parse version from GitHub response");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not parse version from GitHub response");
             yield break;
         }
-        MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Latest GitHub version: {latestVersion}");
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Latest GitHub version: {latestVersion}");
 
         var updateAvailable = IsNewerVersion(latestVersion!, currentVersion!);
         var msg = updateAvailable
             ? "An update to Multiplayer Chat is available! Updating is STRONGLY recommended! We have already opened a tab in your browser to download the latest version."
             : "There is currently no update avalible. Please close this. This will automatically open when there is a update avalible informing you to update this mod.";
 
+        UpdateMessage = msg;
+
         if (updateAvailable)
         {
-            Application.OpenURL(ReleasesUrl);
-            MultiplayerChat.Plugin.Log?.Info($"[E2EChat] Update available: {currentVersion} -> {latestVersion}");
+            MultiplayerChat.Plugin.Log?.Info($"[MPChat] Update available: {currentVersion} -> {latestVersion}");
+            LaunchChatAutoUpdater();
         }
         else
         {
-            MultiplayerChat.Plugin.Log?.Info("[E2EChat] No update needed (up to date or ahead)");
+            MultiplayerChat.Plugin.Log?.Info("[MPChat] No update needed (up to date or ahead)");
         }
+    }
 
-        UpdateMessage = msg;
+    private void LaunchChatAutoUpdater()
+    {
+        try
+        {
+            var gameRoot = Path.GetDirectoryName(Application.dataPath);
+            if (string.IsNullOrEmpty(gameRoot))
+            {
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not get Beat Saber path");
+                Application.OpenURL(ReleasesUrl);
+                PresentUpdateFlowCoordinator();
+                return;
+            }
+            var cauPath = Path.Combine(gameRoot, "Plugins", "Chat Auto Updater (CAU).exe");
+            if (!File.Exists(cauPath))
+            {
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] CAU not found at {cauPath}");
+                Application.OpenURL(ReleasesUrl);
+                PresentUpdateFlowCoordinator();
+                return;
+            }
+            var processId = Process.GetCurrentProcess().Id;
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = cauPath,
+                Arguments = $"\"{gameRoot}\" {processId}",
+                UseShellExecute = true
+            };
+            Process.Start(startInfo);
+            Application.Quit();
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to launch CAU: {ex.Message}");
+            Application.OpenURL(ReleasesUrl);
+            PresentUpdateFlowCoordinator();
+        }
+    }
+
+    private void PresentUpdateFlowCoordinator()
+    {
+        try
+        {
+            var fc = _container.InstantiateComponentOnNewGameObject<UpdateFlowCoordinator>();
+            fc.ParentFlow = _mainFlowCoordinator;
+            fc.SetMessage(UpdateMessage);
+            _mainFlowCoordinator.PresentFlowCoordinator(fc);
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to present update tab: {ex.Message}");
+        }
     }
 
     public void Dispose() { }
@@ -93,7 +153,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[E2EChat] Failed to read version: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to read version: {ex.Message}");
             return null;
         }
     }

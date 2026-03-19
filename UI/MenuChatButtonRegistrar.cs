@@ -20,7 +20,7 @@ public class MenuChatButtonRegistrar : IInitializable, IDisposable
     {
         _menuButton = new MenuButton(
             "TEXT CHAT",
-            "Open text chat (E2E encrypted). Join a multiplayer lobby to send messages.",
+            "Open text chat (MPChat encrypted). Join a multiplayer lobby to send messages.",
             OnMenuButtonClicked);
         MenuButtons.Instance.RegisterButton(_menuButton);
     }
