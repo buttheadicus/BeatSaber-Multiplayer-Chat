@@ -90,19 +90,21 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         if (_chatLogContent == null) return;
         if (e.IsSystem)
         {
-            AddMessageToLog("", e.Message, null);
+            AddMessageToLog("", e.Message, null, e.SystemMessageRichText);
             return;
         }
-        var name = TrimName(e.UserName ?? "", 15);
-        var displayName = e.IsDM ? $"{name} (DM)" : name;
-        AddMessageToLog(displayName, e.Message, e.NameColor);
+        var name = TrimName(e.UserName ?? "", 30);
+        var msg = e.Message ?? "";
+        if (e.IsDM)
+            msg = $"(DM) {msg}";
+        AddMessageToLog(name, msg, e.NameColor);
     }
 
-    private void AddMessageToLog(string userName, string message, string? nameColorHex = null)
+    private void AddMessageToLog(string userName, string message, string? nameColorHex = null, bool systemMessageRichText = false)
     {
         if (_chatLogContent == null) return;
 
-        var row = CreateMessageRow(userName, message, nameColorHex);
+        var row = CreateMessageRow(userName, message, nameColorHex, systemMessageRichText);
         row.transform.SetParent(_chatLogContent.transform, false);
         _messageRows.Add(row);
 
@@ -121,7 +123,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
     /// Creates a chatroom-style row (emulating BeatSaberPlus ChatMessageWidget).
     /// Explicit width, top-left anchored text, word wrap.
     /// </summary>
-    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null)
+    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null, bool systemMessageRichText = false)
     {
         const float leftRightMargins = 4f;
         const float topDownMargins = 1f;
@@ -148,7 +150,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
-            ? EscapeRichText(message)
+            ? (systemMessageRichText ? message : EscapeRichText(message))
             : $"<color=#{hex}>{EscapeRichText(userName)}:</color> {EscapeRichText(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;

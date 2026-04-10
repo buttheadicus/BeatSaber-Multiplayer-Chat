@@ -51,11 +51,16 @@ public class KeyboardViewController : BSMLAutomaticViewController
     private void SubmitClicked()
     {
         var text = _chatInput?.Text?.Trim() ?? "";
-        if (!string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text))
         {
-            TextSubmitted?.Invoke(this, text);
-            _chatManager?.SendMessage(text);
+            Cancelled?.Invoke(this, EventArgs.Empty);
+            return;
         }
+
+        if (_chatManager == null || !_chatManager.SendMessage(text))
+            return;
+
+        TextSubmitted?.Invoke(this, text);
         Cancelled?.Invoke(this, EventArgs.Empty);
     }
 

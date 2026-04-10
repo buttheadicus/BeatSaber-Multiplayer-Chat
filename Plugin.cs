@@ -23,6 +23,7 @@ public class Plugin
     public void Init(IPALogger logger, Zenjector zenjector)
     {
         Log = logger;
+        ChatPersistentId.EnsureLoaded();
         zenjector.UseLogger(logger);
         _harmony = new Harmony("MultiplayerChat");
         _harmony.PatchAll(Assembly.GetExecutingAssembly());
@@ -44,6 +45,9 @@ public class Plugin
     private static void InstallChatBindings(DiContainer container)
     {
         container.BindInterfacesAndSelfTo<EncryptionManager>().AsSingle();
+        container.BindInterfacesAndSelfTo<ChatIdConfigStore>().AsSingle().NonLazy();
+        container.BindInterfacesAndSelfTo<LearnedChatIdsStore>().AsSingle().NonLazy();
+        container.Bind<ChatPlayerIdRegistry>().AsSingle();
         container.Bind<ChatMuteManager>().AsSingle();
         container.Bind<ChatDMState>().AsSingle();
         container.BindInterfacesAndSelfTo<ChatManager>().AsSingle();
@@ -55,7 +59,7 @@ public class Plugin
         container.Bind<SettingsViewController>().FromNewComponentAsViewController().AsTransient();
         container.Bind<MultiplayerChatSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
         container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
-        container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsTransient();
+        container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
         container.BindInterfacesAndSelfTo<LobbyChatTabRegistrar>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         container.RegisterRedecorator(new LobbyAvatarRegistration(DecorateAvatar));
         container.RegisterRedecorator(new LobbyAvatarPlaceRegistration(DecorateAvatarPlace));

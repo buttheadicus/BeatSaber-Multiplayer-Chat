@@ -1,14 +1,15 @@
 using System;
 using BeatSaberMarkupLanguage.Attributes;
+using BeatSaberMarkupLanguage.Components.Settings;
 using BeatSaberMarkupLanguage.ViewControllers;
-using MultiplayerChat.Core;
 using MultiplayerChat.Settings;
-using Zenject;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
 /// <summary>
-/// Settings view for Multiplayer Chat. Name color and other options.
+/// Settings view for Multiplayer Chat. Name color and bubble duration (move chat UI hidden for now).
 /// </summary>
 [ViewDefinition("MultiplayerChat.UI.SettingsView.bsml")]
 public class SettingsViewController : BSMLAutomaticViewController
@@ -19,7 +20,10 @@ public class SettingsViewController : BSMLAutomaticViewController
     private BeatSaberMarkupLanguage.Components.Settings.SliderSetting? _bubbleDurationSlider;
 
     [UIComponent("NameColorInput")]
-    private BeatSaberMarkupLanguage.Components.Settings.StringSetting? _nameColorInput;
+    private StringSetting? _nameColorInput;
+
+    [UIComponent("ChatBubbleSoundsToggle")]
+    private ToggleSetting? _chatBubbleSoundsToggle;
 
     [UIValue("BubbleDuration")]
     private float BubbleDuration
@@ -41,6 +45,13 @@ public class SettingsViewController : BSMLAutomaticViewController
         }
     }
 
+    [UIValue("ChatBubbleSoundsEnabled")]
+    public bool ChatBubbleSoundsEnabled
+    {
+        get => ModSettings.ChatBubbleSoundsEnabled;
+        set => ModSettings.ChatBubbleSoundsEnabled = value;
+    }
+
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
@@ -53,6 +64,9 @@ public class SettingsViewController : BSMLAutomaticViewController
             if (hex.Length > 6) hex = hex.Substring(0, 6);
             ModSettings.NameColor = hex;
         }
+        var tgl = _chatBubbleSoundsToggle?.GetComponentInChildren<Toggle>(true);
+        if (tgl != null)
+            ModSettings.ChatBubbleSoundsEnabled = tgl.isOn;
         ApplyClicked?.Invoke(this, EventArgs.Empty);
     }
 }

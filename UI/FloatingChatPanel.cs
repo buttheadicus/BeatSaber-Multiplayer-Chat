@@ -168,12 +168,14 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         if (_contentRoot == null) return;
         if (e.IsSystem)
         {
-            AddMessage("", e.Message ?? "", null);
+            AddMessage("", e.Message ?? "", null, e.SystemMessageRichText);
             return;
         }
-        var name = TrimName(e.UserName ?? "", 15);
-        var displayName = e.IsDM ? $"{name} (DM)" : name;
-        AddMessage(displayName, e.Message ?? "", e.NameColor);
+        var name = TrimName(e.UserName ?? "", 30);
+        var msg = e.Message ?? "";
+        if (e.IsDM)
+            msg = $"(DM) {msg}";
+        AddMessage(name, msg, e.NameColor);
     }
 
     private void ClearExistingChatContent()
@@ -190,12 +192,12 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    private void AddMessage(string userName, string message, string? nameColorHex = null)
+    private void AddMessage(string userName, string message, string? nameColorHex = null, bool systemMessageRichText = false)
     {
         if (_contentRoot == null) return;
 
         MultiplayerChat.Plugin.Log?.Info($"[MPChat] AddMessage: {userName}: {message}");
-        var row = CreateMessageRow(userName, message, nameColorHex);
+        var row = CreateMessageRow(userName, message, nameColorHex, systemMessageRichText);
         row.transform.SetParent(_contentRoot, false);
         _messageRows.Add(row);
 
@@ -210,7 +212,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
             _scrollRect.verticalNormalizedPosition = 0f;
     }
 
-    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null)
+    private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null, bool systemMessageRichText = false)
     {
         var go = new GameObject("ChatMessage");
         var rect = go.AddComponent<RectTransform>();
@@ -230,7 +232,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
-            ? Escape(message)
+            ? (systemMessageRichText ? message : Escape(message))
             : $"<color=#{hex}>{Escape(userName)}:</color> {Escape(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;

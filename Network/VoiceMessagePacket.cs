@@ -4,39 +4,35 @@ using LiteNetLib.Utils;
 namespace MultiplayerChat.Network;
 
 /// <summary>
-/// Packet containing end-to-end encrypted chat message.
-/// Only players in the lobby can decrypt - the server relays encrypted bytes.
+/// End-to-end encrypted voice payload (encoded by <see cref="MultiplayerChat.Core.VoiceMessageCodec"/>).
 /// </summary>
-public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPacket
+public class VoiceMessagePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
-    private const int MaxPayloadSize = 4096;
+    /// <summary>Max voice blob size (bytes) before encryption (~24s mono @ 44.1kHz float PCM).</summary>
+    internal const int MaxPlaintextVoiceBytes = 4_194_304;
 
-    /// <summary>
-    /// Encrypted message bytes (AES-256-CBC + HMAC). Format: IV + Ciphertext + HMAC.
-    /// </summary>
+    /// <summary>Max encrypted payload on the wire (generous upper bound).</summary>
+    private const int MaxEncryptedPayloadSize = MaxPlaintextVoiceBytes + 4096;
+
     public byte[]? EncryptedPayload;
 
-    /// <summary>
-    /// When set, this is a DM - only sender and this user should display the message.
-    /// </summary>
+    /// <summary>When set, only sender and this user receive/play the voice (DM).</summary>
     public string? TargetUserId;
 
-    /// <summary>
-    /// Sender's name color as 6-char hex (e.g. "87CEEB"). Used by other clients to display username in correct color.
-    /// </summary>
+    /// <summary>Sender's username color as 6-char hex without # (optional; old clients omit).</summary>
     public string? NameColor;
 
     /// <summary>Sender's persistent 8-digit Chat ID (0.2.0 required).</summary>
     public string? SenderChatId;
 
-    /// <summary>When set with <see cref="TargetUserId"/>, DM recipient's Chat ID (0.2.0).</summary>
+    /// <summary>DM recipient's Chat ID when <see cref="TargetUserId"/> is set (0.2.0).</summary>
     public string? TargetChatId;
 
     public override void Serialize(NetDataWriter writer)
     {
         writer.PutBytesWithLength(EncryptedPayload ?? Array.Empty<byte>());
         writer.Put(TargetUserId ?? "");
-        writer.Put(NormalizeHex(NameColor) ?? "");
+        writer.Put(NameColor ?? "");
         writer.Put(SenderChatId ?? "");
         writer.Put(TargetChatId ?? "");
     }
@@ -55,9 +51,10 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
                 TargetChatId = null;
                 return;
             }
-            if (payload.Length > MaxPayloadSize)
+
+            if (payload.Length > MaxEncryptedPayloadSize)
             {
-                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Rejected oversized packet: {payload.Length} bytes");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Rejected oversized voice packet: {payload.Length} bytes");
                 EncryptedPayload = null;
                 TargetUserId = null;
                 NameColor = null;
@@ -65,6 +62,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
                 TargetChatId = null;
                 return;
             }
+
             EncryptedPayload = payload;
             TargetUserId = null;
             NameColor = null;
@@ -72,15 +70,15 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             TargetChatId = null;
             if (reader.AvailableBytes > 0)
             {
-                var target = reader.GetString();
-                if (!string.IsNullOrEmpty(target))
-                    TargetUserId = target;
+                var t = reader.GetString();
+                if (!string.IsNullOrEmpty(t))
+                    TargetUserId = t;
             }
             if (reader.AvailableBytes > 0)
             {
-                var color = reader.GetString();
-                if (!string.IsNullOrEmpty(color))
-                    NameColor = NormalizeHex(color);
+                var c = reader.GetString();
+                if (!string.IsNullOrEmpty(c))
+                    NameColor = c;
             }
             if (reader.AvailableBytes > 0)
             {
@@ -97,21 +95,12 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to deserialize packet: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to deserialize voice packet: {ex.Message}");
             EncryptedPayload = null;
             TargetUserId = null;
             NameColor = null;
             SenderChatId = null;
             TargetChatId = null;
         }
-    }
-
-    private static string? NormalizeHex(string? hex)
-    {
-        if (string.IsNullOrEmpty(hex)) return null;
-        hex = hex.Trim();
-        if (hex.StartsWith("#")) hex = hex.Substring(1);
-        if (hex.Length > 6) hex = hex.Substring(0, 6);
-        return hex.Length == 6 ? hex : null;
     }
 }

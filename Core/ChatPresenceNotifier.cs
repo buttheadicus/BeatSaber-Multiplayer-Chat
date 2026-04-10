@@ -21,7 +21,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
     [Inject] private readonly ModPresenceManager _modPresence = null!;
     [Inject] private readonly CoroutineHost _coroutineHost = null!;
 
-    private readonly List<string> _pendingNames = new();
+    private readonly List<(string Name, string? NameColorHex)> _pendingEntries = new();
     private Coroutine? _batchCoroutine;
 
     public void Initialize()
@@ -44,9 +44,9 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
             if (_alreadyAnnouncedUserIds.Contains(e.UserId)) return;
             _alreadyAnnouncedUserIds.Add(e.UserId);
         }
-        var trimmed = TrimName(e.UserName, 15);
+        var trimmed = TrimName(e.UserName, 30);
         MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: adding {trimmed} to batch");
-        _pendingNames.Add(trimmed);
+        _pendingEntries.Add((trimmed, e.NameColorHex));
         ScheduleBatch();
     }
 
@@ -73,16 +73,29 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
 
     private void FlushBatch()
     {
-        if (_pendingNames.Count == 0) return;
+        if (_pendingEntries.Count == 0) return;
 
-        var names = _pendingNames.ToList();
-        _pendingNames.Clear();
+        var entries = _pendingEntries.ToList();
+        _pendingEntries.Clear();
 
-        var msg = names.Count == 1
-            ? $"{names[0]} has chat! They can see your messages!"
-            : $"{string.Join(", ", names)} has chat! They can see your messages!";
+        var coloredNames = entries.Count == 1
+            ? RichPresenceName(entries[0].Name, entries[0].NameColorHex)
+            : string.Join(", ", entries.Select(e => RichPresenceName(e.Name, e.NameColorHex)));
 
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: posting '{msg}'");
-        _chatManager.PostSystemMessage(msg);
+        var msg = $"{coloredNames} has chat! They can see your messages!";
+
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: posting presence line ({entries.Count} name(s))");
+        _chatManager.PostSystemMessageRich(msg);
+    }
+
+    private static string RichPresenceName(string displayName, string? hex6)
+    {
+        var raw = hex6?.Trim();
+        var h = string.IsNullOrEmpty(raw) ? "87CEEB" : raw;
+        if (h.StartsWith("#")) h = h.Substring(1);
+        if (h.Length > 6) h = h.Substring(0, 6);
+        if (h.Length != 6) h = "87CEEB";
+        var safe = (displayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        return $"<color=#{h}>{safe}</color>";
     }
 }

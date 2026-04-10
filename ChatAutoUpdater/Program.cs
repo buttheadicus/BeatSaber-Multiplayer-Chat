@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -10,6 +13,8 @@ namespace ChatAutoUpdater;
 
 static class Program
 {
+    public const string DllName = "MultiplayerChat.dll";
+    public const string PdbName = "MultiplayerChat.pdb";
 
     [STAThread]
     static void Main(string[] args)
@@ -21,7 +26,6 @@ static class Program
         var beatSaberPath = args.Length > 0 ? args[0] : GetBeatSaberPathFromExe();
         var processId = args.Length > 1 && int.TryParse(args[1], out var pid) ? pid : (int?)null;
 
-        // Force close Beat Saber
         if (processId.HasValue)
         {
             try
@@ -45,7 +49,6 @@ static class Program
 
     private static string GetBeatSaberPathFromExe()
     {
-        // CAU lives in Plugins folder; parent of Plugins is Beat Saber root
         var exePath = System.Reflection.Assembly.GetExecutingAssembly().Location;
         var pluginsDir = Path.GetDirectoryName(exePath);
         var beatSaberRoot = pluginsDir != null ? Path.GetDirectoryName(pluginsDir) : null;
@@ -57,6 +60,7 @@ public class UpdaterForm : Form
 {
     private readonly string _beatSaberPath;
     private const string ReleasesUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
+    private const string LatestReleaseApi = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
 
     public UpdaterForm(string beatSaberPath)
     {
@@ -117,50 +121,144 @@ public class UpdaterForm : Form
 
     private async Task DownloadAndInstallAsync()
     {
-        using var client = new WebClient();
-        client.Headers.Add("User-Agent", "MultiplayerChat-CAU");
-        var json = await client.DownloadStringTaskAsync("https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest");
-        var match = Regex.Match(json, @"""browser_download_url""\s*:\s*""(https://[^""]+\.zip)""");
-        var zipUrl = match.Success ? match.Groups[1].Value : null;
-        if (string.IsNullOrEmpty(zipUrl))
-            throw new Exception("No zip asset found in latest release");
+        // GitHub API + releases require TLS 1.2+
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
-        var zipBytes = await client.DownloadDataTaskAsync(zipUrl);
-        var tempZip = Path.Combine(Path.GetTempPath(), "MultiplayerChat-Update.zip");
-        File.WriteAllBytes(tempZip, zipBytes);
+        var tempZip = Path.Combine(Path.GetTempPath(), "MultiplayerChat-Update-" + Guid.NewGuid().ToString("N") + ".zip");
+        var extractDir = Path.Combine(Path.GetTempPath(), "MultiplayerChat-Update-Extract-" + Guid.NewGuid().ToString("N"));
 
-        var extractDir = Path.Combine(Path.GetTempPath(), "MultiplayerChat-Update-Extract");
-        if (Directory.Exists(extractDir))
-            Directory.Delete(extractDir, true);
-        System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, extractDir);
-
-        // Zip structure: extracted folder contains manifest.json and Plugins/ subfolder
-        var extractedRoot = extractDir;
-        if (Directory.GetFiles(extractDir).Length == 0 && Directory.GetDirectories(extractDir).Length == 1)
-            extractedRoot = Directory.GetDirectories(extractDir)[0];
-
-        var pluginsSource = Path.Combine(extractedRoot, "Plugins");
-        var pluginsDest = Path.Combine(_beatSaberPath, "Plugins");
-        if (!Directory.Exists(pluginsDest))
-            Directory.CreateDirectory(pluginsDest);
-
-        if (Directory.Exists(pluginsSource))
+        try
         {
-            foreach (var file in Directory.GetFiles(pluginsSource))
+            using var client = new WebClient();
+            client.Headers.Set("User-Agent", "MultiplayerChat-CAU");
+            client.Headers.Set("Accept", "application/vnd.github.v3+json");
+
+            var json = await client.DownloadStringTaskAsync(LatestReleaseApi);
+            var zipUrl = PickReleaseZipUrl(json);
+            if (string.IsNullOrEmpty(zipUrl))
+                throw new Exception("No suitable .zip release asset found on GitHub (check repo releases).");
+
+            var zipBytes = await client.DownloadDataTaskAsync(zipUrl);
+            File.WriteAllBytes(tempZip, zipBytes);
+
+            if (Directory.Exists(extractDir))
+                Directory.Delete(extractDir, true);
+            ZipFile.ExtractToDirectory(tempZip, extractDir);
+
+            var dllSourcePath = FindFileRecursive(extractDir, Program.DllName);
+            if (string.IsNullOrEmpty(dllSourcePath))
+                throw new Exception($"{Program.DllName} not found inside the release zip. Release layout may have changed.");
+
+            var sourceDir = Path.GetDirectoryName(dllSourcePath);
+            if (string.IsNullOrEmpty(sourceDir))
+                throw new Exception("Invalid path to extracted DLL.");
+
+            var pluginsDest = Path.Combine(_beatSaberPath, "Plugins");
+            if (!Directory.Exists(pluginsDest))
+                Directory.CreateDirectory(pluginsDest);
+
+            // 1) Remove current plugin binaries (unlocked: game was killed)
+            foreach (var name in new[] { Program.DllName, Program.PdbName })
             {
-                var dest = Path.Combine(pluginsDest, Path.GetFileName(file));
-                File.Copy(file, dest, true);
+                var existing = Path.Combine(pluginsDest, name);
+                if (File.Exists(existing))
+                {
+                    try { File.Delete(existing); }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Could not delete {name}: {ex.Message}. Close Beat Saber / file handles and retry.");
+                    }
+                }
+            }
+
+            // 2) Copy new DLL + PDB from the folder that contained the DLL in the archive
+            var destDll = Path.Combine(pluginsDest, Program.DllName);
+            File.Copy(dllSourcePath, destDll, false);
+
+            var pdbSource = Path.Combine(sourceDir, Program.PdbName);
+            if (File.Exists(pdbSource))
+            {
+                var destPdb = Path.Combine(pluginsDest, Program.PdbName);
+                File.Copy(pdbSource, destPdb, false);
             }
         }
-
-        var manifestSource = Path.Combine(extractedRoot, "manifest.json");
-        if (File.Exists(manifestSource))
+        finally
         {
-            var manifestDest = Path.Combine(_beatSaberPath, "manifest.json");
-            File.Copy(manifestSource, manifestDest, true);
+            TryDelete(tempZip);
+            TryDeleteDir(extractDir);
+        }
+    }
+
+    /// <summary>GitHub JSON has many browser_download_url fields; pick the mod release .zip, not API zipballs.</summary>
+    private static string PickReleaseZipUrl(string json)
+    {
+        var matches = Regex.Matches(json, @"""browser_download_url""\s*:\s*""(https://[^""]+\.zip)""", RegexOptions.IgnoreCase);
+        var candidates = new List<string>();
+        foreach (Match m in matches)
+        {
+            if (m.Success)
+                candidates.Add(m.Groups[1].Value);
         }
 
-        try { File.Delete(tempZip); } catch { }
-        try { Directory.Delete(extractDir, true); } catch { }
+        if (candidates.Count == 0)
+            return string.Empty;
+
+        // Prefer GitHub "releases/download" assets (uploaded release zips)
+        var releaseDownloads = candidates
+            .Where(u => u.IndexOf("/releases/download/", StringComparison.OrdinalIgnoreCase) >= 0)
+            .ToList();
+
+        IEnumerable<string> pool = releaseDownloads.Count > 0 ? releaseDownloads : candidates;
+
+        // Prefer filename containing MultiplayerChat (mod zip)
+        var named = pool.FirstOrDefault(u => u.IndexOf("MultiplayerChat", StringComparison.OrdinalIgnoreCase) >= 0);
+        if (named != null)
+            return named;
+
+        // Prefer BeatSaber / repo name in URL
+        named = pool.FirstOrDefault(u => u.IndexOf("BeatSaber", StringComparison.OrdinalIgnoreCase) >= 0
+            || u.IndexOf("Multiplayer-Chat", StringComparison.OrdinalIgnoreCase) >= 0);
+        if (named != null)
+            return named;
+
+        return pool.FirstOrDefault() ?? string.Empty;
+    }
+
+    private static string FindFileRecursive(string root, string fileName)
+    {
+        try
+        {
+            foreach (var path in Directory.GetFiles(root, fileName, SearchOption.AllDirectories))
+            {
+                var name = Path.GetFileName(path);
+                if (string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase))
+                    return path;
+            }
+        }
+        catch { /* ignore inaccessible dirs */ }
+
+        return string.Empty;
+    }
+
+    private static void TryDelete(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch { /* ignore */ }
+    }
+
+    private static void TryDeleteDir(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, true);
+        }
+        catch { /* ignore */ }
     }
 }

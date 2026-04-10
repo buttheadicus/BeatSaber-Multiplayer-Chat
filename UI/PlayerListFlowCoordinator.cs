@@ -12,26 +12,26 @@ public class PlayerListFlowCoordinator : FlowCoordinator
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
     public PlayerListViewController.Mode Mode { get; set; }
-    public System.Action? OnDMDismissed { get; set; }
 
-    public void Present(HMUI.FlowCoordinator parent, PlayerListViewController.Mode mode, System.Action? onDmDismissed = null)
+    public void Present(HMUI.FlowCoordinator parent, PlayerListViewController.Mode mode)
     {
         ParentFlow = parent;
         Mode = mode;
-        OnDMDismissed = onDmDismissed;
         parent.PresentFlowCoordinator(this);
     }
 
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         showBackButton = true;
-        SetTitle(Mode == PlayerListViewController.Mode.Mute ? "Mute / Unmute Player" : "DM Player");
-        _playerListViewController.SetMode(Mode, () =>
-        {
-            OnDMDismissed?.Invoke();
-            ParentFlow?.DismissFlowCoordinator(this);
-        });
+        SetTitle(Mode == PlayerListViewController.Mode.Mute ? "Mute / Unmute" : "DM PLAYER");
+        _playerListViewController.SetMode(Mode, () => ParentFlow?.DismissFlowCoordinator(this));
         ProvideInitialViewControllers(_playerListViewController);
+    }
+
+    protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
+    {
+        if (removedFromHierarchy)
+            ParentFlow = null;
     }
 
     protected override void BackButtonWasPressed(ViewController topViewController)

@@ -1,42 +1,55 @@
 using System;
-using System.Collections.Generic;
 
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// Tracks which players are muted. Muted players' messages are not shown locally.
+/// Mutes by persistent chat ID (saved in ChatIDConfig.dat). If a player's ID is not known yet,
+/// mute is stored by platform userId until presence provides their chat ID.
 /// </summary>
 public class ChatMuteManager
 {
-    private readonly HashSet<string> _mutedUserIds = new();
-    private readonly object _lock = new();
+    private readonly ChatIdConfigStore _config = null!;
+    private readonly ChatPlayerIdRegistry _registry = null!;
 
-    public bool IsMuted(string userId)
+    public ChatMuteManager(ChatIdConfigStore config, ChatPlayerIdRegistry registry)
     {
-        if (string.IsNullOrEmpty(userId)) return false;
-        lock (_lock) return _mutedUserIds.Contains(userId);
+        _config = config;
+        _registry = registry;
     }
 
-    public void ToggleMute(string userId)
+    public bool IsMuted(string platformUserId)
     {
-        if (string.IsNullOrEmpty(userId)) return;
-        lock (_lock)
-        {
-            if (_mutedUserIds.Contains(userId))
-                _mutedUserIds.Remove(userId);
-            else
-                _mutedUserIds.Add(userId);
-        }
+        if (string.IsNullOrEmpty(platformUserId)) return false;
+        if (_registry.TryGetChatId(platformUserId, out var chatId) && _config.IsMutedChatId(chatId))
+            return true;
+        return _config.IsMutedPlatformUserId(platformUserId);
     }
 
-    public bool SetMuted(string userId, bool muted)
+    public void ToggleMute(string platformUserId)
     {
-        if (string.IsNullOrEmpty(userId)) return false;
-        lock (_lock)
-        {
-            if (muted)
-                return _mutedUserIds.Add(userId);
-            return _mutedUserIds.Remove(userId);
-        }
+        if (string.IsNullOrEmpty(platformUserId)) return;
+        if (_registry.TryGetChatId(platformUserId, out var chatId))
+            _config.ToggleMutedChatId(chatId);
+        else
+            _config.ToggleMutedPlatformUserId(platformUserId);
+    }
+
+    public bool SetMuted(string platformUserId, bool muted)
+    {
+        if (string.IsNullOrEmpty(platformUserId)) return false;
+        var currently = IsMuted(platformUserId);
+        if (currently == muted) return false;
+        ToggleMute(platformUserId);
+        return true;
+    }
+
+    public bool HasAnyMuted() => _config.HasAnyMutedEntry();
+
+    public void ClearAllMutes() => _config.ClearAllMutes();
+
+    /// <summary>Called when we learn a remote player's chat ID (e.g. from presence).</summary>
+    public void OnPeerChatIdLearned(string platformUserId, string chatId)
+    {
+        _config.OnChatIdLearnedForUser(platformUserId, chatId);
     }
 }

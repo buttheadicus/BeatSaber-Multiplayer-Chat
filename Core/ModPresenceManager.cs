@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using MultiplayerChat.Network;
+using MultiplayerChat.Settings;
 using MultiplayerCore.Models;
 using MultiplayerCore.Networking;
 using UnityEngine;
@@ -26,6 +27,8 @@ public class ModPresenceManager : IInitializable, IDisposable
     [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
     [Inject] private readonly MpPacketSerializer _packetSerializer = null!;
     [Inject] private readonly CoroutineHost _coroutineHost = null!;
+    [Inject] private readonly ChatPlayerIdRegistry _chatPlayerIdRegistry = null!;
+    [Inject] private readonly ChatMuteManager _chatMuteManager = null!;
 
     public void Initialize()
     {
@@ -103,6 +106,13 @@ public class ModPresenceManager : IInitializable, IDisposable
     {
         if (string.IsNullOrEmpty(sender.userId)) return;
 
+        if (!ChatPersistentId.IsValidFormat(packet.SenderChatId))
+            return;
+        if (_chatPlayerIdRegistry.TryGetChatId(sender.userId, out var known) && known != packet.SenderChatId)
+            return;
+        _chatPlayerIdRegistry.SetMapping(sender.userId, packet.SenderChatId!);
+        _chatMuteManager.OnPeerChatIdLearned(sender.userId, packet.SenderChatId!);
+
         var local = _sessionManager.localPlayer;
         if (local == null || string.IsNullOrEmpty(local.userId)) return;
 
@@ -121,7 +131,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             }
             // Proper reply - they have the mod. Lyra waits 6 seconds before showing "X has chat".
             _hasReceivedPresenceReply = true;
-            _coroutineHost.StartCoroutine(ShowPlayerWithModAfter6Seconds(sender.userId, sender.userName ?? sender.userId));
+            _coroutineHost.StartCoroutine(ShowPlayerWithModAfter6Seconds(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor));
             CancelPresenceRetry();
             return;
         }
@@ -145,7 +155,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             {
                 MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {sender.userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId));
+                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor));
             }
         }
 
@@ -176,7 +186,7 @@ public class ModPresenceManager : IInitializable, IDisposable
     }
 
     /// <summary>Lyra waits 6 seconds before showing "X has chat" when she receives a reply.</summary>
-    private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName)
+    private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName, string? senderNameColor)
     {
         yield return new WaitForSeconds(6f);
         // Don't add if they left during the delay
@@ -189,16 +199,37 @@ public class ModPresenceManager : IInitializable, IDisposable
             {
                 MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence reply: {userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName));
+                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor));
             }
         }
+    }
+
+    private ModPresencePacket BuildPresencePacket(string? targetUserId = null, bool ignoredFromSong = false)
+    {
+        return new ModPresencePacket
+        {
+            TargetUserId = targetUserId,
+            IsIgnoredFromSong = ignoredFromSong,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeNameColorForPacket(ModSettings.NameColor)
+        };
+    }
+
+    private static string? NormalizeNameColorForPacket(string? hex)
+    {
+        if (string.IsNullOrEmpty(hex)) return null;
+        hex = hex.Trim();
+        if (hex.StartsWith("#")) hex = hex.Substring(1);
+        if (hex.Length > 6) hex = hex.Substring(0, 6);
+        return hex.Length == 6 ? hex : null;
     }
 
     /// <summary>Sends "ignored from song" - recipient should retry in 3 seconds.</summary>
     private void SendPresenceIgnoredTo(string targetUserId)
     {
         if (string.IsNullOrEmpty(targetUserId)) return;
-        _sessionManager.Send(new ModPresencePacket { TargetUserId = targetUserId, IsIgnoredFromSong = true });
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current)) return;
+        _sessionManager.Send(BuildPresencePacket(targetUserId, ignoredFromSong: true));
     }
 
     /// <summary>True when we're in the lobby (not during gameplay or results).</summary>
@@ -217,13 +248,15 @@ public class ModPresenceManager : IInitializable, IDisposable
     private void SendPresenceTo(string targetUserId)
     {
         if (string.IsNullOrEmpty(targetUserId)) return;
-        _sessionManager.Send(new ModPresencePacket { TargetUserId = targetUserId });
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current)) return;
+        _sessionManager.Send(BuildPresencePacket(targetUserId));
         MultiplayerChat.Plugin.Log?.Info($"[MPChat] Sent presence reply to {targetUserId}");
     }
 
     private void BroadcastPresence()
     {
-        _sessionManager.Send(new ModPresencePacket());
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current)) return;
+        _sessionManager.Send(BuildPresencePacket());
     }
 }
 
@@ -231,9 +264,13 @@ public class PlayerWithModEventArgs : EventArgs
 {
     public string UserId { get; }
     public string UserName { get; }
-    public PlayerWithModEventArgs(string userId, string userName)
+    /// <summary>6-char hex without # from presence packet; null if unknown or old client.</summary>
+    public string? NameColorHex { get; }
+
+    public PlayerWithModEventArgs(string userId, string userName, string? nameColorHex = null)
     {
         UserId = userId;
         UserName = userName;
+        NameColorHex = nameColorHex;
     }
 }

@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using MultiplayerChat.Core;
 using MultiplayerChat.Settings;
 using HMUI;
-using MultiplayerCore.Models;
-using MultiplayerCore.Networking;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -23,10 +21,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private const int MaxVisibleBubbles = 8;
     private const float BubbleHeight = 36f;
 
+    /// <summary>Active lobby instance (BSML settings VC often does not get this via Zenject injection).</summary>
+    public static ChatBubbleManager? Instance { get; private set; }
+
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly ChatManager _chatManager = null!;
     [Inject] private readonly ModPresenceManager _modPresence = null!;
-    [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
     private readonly List<ChatBubble> _stackedBubbles = new();
     private Transform? _lobbyHeaderRoot;
@@ -39,12 +39,18 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     public void Initialize()
     {
+        Instance = this;
         _chatManager.MessageReceived += OnMessageReceived;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        StartCoroutine(ChatSoundEffects.LoadClipsRoutine());
         StartCoroutine(EnsureLobbyHeaderRoot());
     }
 
     public void Dispose()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        if (Instance == this)
+            Instance = null;
         _isMoveMode = false;
         RemoveMoveHandle();
         _chatManager.MessageReceived -= OnMessageReceived;
@@ -66,9 +72,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             ShowStackedBubble("", e.Message);
             return;
         }
-        var name = TrimName(e.UserName ?? "", 15);
-        var displayName = e.IsDM ? $"{name} (DM)" : name;
-        ShowStackedBubble(displayName, e.Message, e.NameColor);
+        var name = TrimName(e.UserName ?? "", 30);
+        var msg = e.Message ?? "";
+        if (e.IsDM)
+            msg = $"(DM) {msg}";
+        ShowStackedBubble(name, msg, e.NameColor);
     }
 
     private IEnumerator EnsureLobbyHeaderRoot()
@@ -81,6 +89,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
             if (_wasInLobby && !inLobby)
                 ClearChat();
+            // GameCore is often additively loaded; IsInSong checks all loaded scenes.
             if (inSong && _stackedBubbles.Count > 0)
                 ClearChat();
 
@@ -123,7 +132,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 _lobbyHeaderRoot = root;
         }
         EnsureMoveHandle();
-        if (_moveHandle == null && _lobbyHeaderRoot == null)
+        if (_moveHandle == null)
             _moveModeHelperCoroutine = StartCoroutine(RetryEnterMoveMode());
         else
             _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
@@ -131,9 +140,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private IEnumerator RetryEnterMoveMode()
     {
-        for (int i = 0; i < 6 && _isMoveMode; i++)
+        yield return null;
+        for (int i = 0; i < 12 && _isMoveMode; i++)
         {
-            yield return new WaitForSeconds(0.5f);
             if (!_isMoveMode) yield break;
             if (_lobbyHeaderRoot == null)
             {
@@ -150,6 +159,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     yield break;
                 }
             }
+            yield return new WaitForSeconds(0.25f);
         }
         _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
     }
@@ -228,30 +238,43 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var handleObj = new GameObject("MPChatMoveHandle");
         handleObj.layer = 5; // UI layer for raycast targeting
         handleObj.transform.SetParent(_lobbyHeaderRoot, false);
-        handleObj.transform.SetAsFirstSibling();
+        handleObj.transform.SetAsLastSibling();
 
         var rect = handleObj.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, 4f);
-        rect.sizeDelta = new Vector2(0f, 24f);
+        // Centered grab handle over the chat stack (ignores vertical layout, like draggable affordances in list UIs).
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.localScale = Vector3.one;
+        const float h = 120f;
+        rect.sizeDelta = new Vector2(h, h);
 
         var layout = handleObj.AddComponent<LayoutElement>();
-        layout.minHeight = 24f;
-        layout.preferredHeight = 24f;
+        layout.minWidth = h;
+        layout.minHeight = h;
+        layout.preferredWidth = h;
+        layout.preferredHeight = h;
+        layout.flexibleWidth = 0f;
         layout.flexibleHeight = 0f;
+        layout.ignoreLayout = true;
 
         var img = handleObj.AddComponent<Image>();
-        img.color = new Color(0.4f, 0.7f, 1f, 1f);
+        img.color = new Color(0.4f, 0.7f, 1f, 0.92f);
         img.raycastTarget = true;
         img.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
+
+        var overlay = handleObj.AddComponent<Canvas>();
+        overlay.overrideSorting = true;
+        overlay.sortingOrder = 32000;
+        handleObj.AddComponent<GraphicRaycaster>();
 
         handleObj.AddComponent<ChatMoveHandle>();
         _moveHandle = handleObj;
         handleObj.SetActive(true);
 
         EnsureCanvasRaycaster(handleObj.transform);
+        MultiplayerChat.Plugin.Log?.Info("[MPChat] Move handle created on chat root (nested canvas, on top)");
 
         var rootRect = _lobbyHeaderRoot.GetComponent<RectTransform>();
         if (rootRect != null)
@@ -346,26 +369,29 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     /// </summary>
     private Transform? FindOrCreateLobbyHeaderChatRoot()
     {
-        var banner = FindHostSetupBannerInLobby();
+        var banner = FindHostSetupBannerInLobby(allowOverlay: false) ?? FindHostSetupBannerInLobby(allowOverlay: true);
         if (banner != null)
         {
             var root = CreateChatRootAboveBanner(banner);
             if (root != null)
             {
-                MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached to VR game UI above HOST SETUP: {banner.name}");
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached to lobby UI above HOST SETUP: {banner.name}");
                 return root;
             }
         }
-        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not find HOST SETUP bar in lobby VR UI - chat bubbles disabled");
+        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not find HOST SETUP bar in lobby UI - chat bubbles disabled");
         return null;
     }
 
     /// <summary>
-    /// Finds the HOST SETUP bar by scanning ALL text components in the scene.
-    /// The lobby uses VR World Space / Screen Space Camera canvas - not screen overlay.
+    /// Finds the HOST SETUP bar by scanning text in the scene. Prefers world-space / camera canvases;
+    /// when <paramref name="allowOverlay"/> is true, Screen Space Overlay matches are allowed (move handle / chat root).
     /// </summary>
-    private static Transform? FindHostSetupBannerInLobby()
+    private static Transform? FindHostSetupBannerInLobby(bool allowOverlay)
     {
+        bool AcceptCanvas(Canvas? canvas) =>
+            canvas != null && (allowOverlay || canvas.renderMode != RenderMode.ScreenSpaceOverlay);
+
         foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
         {
             if (tmp == null) continue;
@@ -374,7 +400,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 text.Contains("QUICK PLAY LOBBY") || text == "HOST SETUP" || text == "CLIENT SETUP")
             {
                 var canvas = tmp.GetComponentInParent<Canvas>();
-                if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                if (AcceptCanvas(canvas))
                     return tmp.transform;
             }
         }
@@ -386,7 +412,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 text.Contains("QUICK PLAY LOBBY") || text == "HOST SETUP" || text == "CLIENT SETUP")
             {
                 var canvas = curved.GetComponentInParent<Canvas>();
-                if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                if (AcceptCanvas(canvas))
                     return curved.transform;
             }
         }
@@ -404,7 +430,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             if (found != null)
             {
                 var canvas = found.GetComponentInParent<Canvas>();
-                if (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                if (AcceptCanvas(canvas))
                     return found;
             }
         }
@@ -424,12 +450,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     text.Contains("QUICK PLAY LOBBY"))
                 {
                     var c = tmp.GetComponentInParent<Canvas>();
-                    if (c != null && c.renderMode != RenderMode.ScreenSpaceOverlay)
+                    if (AcceptCanvas(c))
                         return tmp.transform;
                 }
             }
             var titleCanvas = titleView.GetComponentInParent<Canvas>();
-            if (titleCanvas != null && titleCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            if (AcceptCanvas(titleCanvas))
                 return titleView.transform;
         }
         return null;
@@ -510,7 +536,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var bubble = CreateStackedBubble(_lobbyHeaderRoot);
         if (bubble == null) return;
 
-        var trimmed = TrimName(userName ?? "", 15);
+        var trimmed = TrimName(userName ?? "", 30);
         var safeName = string.IsNullOrEmpty(trimmed) ? "" : trimmed.Replace("<", "&lt;").Replace(">", "&gt;");
         string text;
         if (string.IsNullOrEmpty(userName))
@@ -604,14 +630,27 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return false;
     }
 
+    /// <summary>True when the gameplay scene is loaded (often additive; active scene may still be Menu).</summary>
     private static bool IsInSong()
     {
         try
         {
-            var scene = SceneManager.GetActiveScene();
-            return scene.IsValid() && scene.name == "GameCore";
+            for (var i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var s = SceneManager.GetSceneAt(i);
+                if (s.isLoaded && s.name == "GameCore")
+                    return true;
+            }
+            return false;
         }
         catch { return false; }
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name != "GameCore" || _stackedBubbles.Count == 0)
+            return;
+        ClearChat();
     }
 
     private static string TrimName(string name, int maxLen)

@@ -15,10 +15,18 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
     /// <summary>When true, sender received presence but was in a song - retry in 3 seconds.</summary>
     public bool IsIgnoredFromSong;
 
+    /// <summary>Sender's persistent 8-digit Multiplayer Chat ID (optional for backward compatibility).</summary>
+    public string? SenderChatId;
+
+    /// <summary>Sender's username color as 6-char hex without # (optional; old clients omit).</summary>
+    public string? SenderNameColor;
+
     public override void Serialize(NetDataWriter writer)
     {
         writer.Put(TargetUserId ?? "");
         writer.Put((byte)(IsIgnoredFromSong ? 1 : 0));
+        writer.Put(SenderChatId ?? "");
+        writer.Put(SenderNameColor ?? "");
     }
 
     public override void Deserialize(NetDataReader reader)
@@ -32,6 +40,23 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
         {
             TargetUserId = null;
         }
+
         IsIgnoredFromSong = reader.AvailableBytes > 0 && reader.GetByte() != 0; // backward compat: old packets have no byte
+
+        SenderChatId = null;
+        if (reader.AvailableBytes > 0)
+        {
+            var id = reader.GetString();
+            if (!string.IsNullOrEmpty(id))
+                SenderChatId = id;
+        }
+
+        SenderNameColor = null;
+        if (reader.AvailableBytes > 0)
+        {
+            var c = reader.GetString();
+            if (!string.IsNullOrEmpty(c))
+                SenderNameColor = c;
+        }
     }
 }

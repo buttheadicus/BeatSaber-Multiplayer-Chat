@@ -14,6 +14,7 @@ public static class ModSettings
     private const string KeyCustomPlacement = "MultiplayerChat.CustomPlacement";
     private const string KeyLobbyChatPosX = "MultiplayerChat.LobbyChatPosX";
     private const string KeyLobbyChatPosY = "MultiplayerChat.LobbyChatPosY";
+    private const string KeyChatBubbleSounds = "MultiplayerChat.ChatBubbleSounds";
 
     private const float DefaultBubbleDuration = 15f;
     private const bool DefaultShowSystemMessages = true;
@@ -94,4 +95,16 @@ public static class ModSettings
             PlayerPrefs.Save();
         }
     }
+
+    /// <summary>UI one-shot sounds for chat bubbles (not system lines).</summary>
+    public static bool ChatBubbleSoundsEnabled
+    {
+        get => !PlayerPrefs.HasKey(KeyChatBubbleSounds) || PlayerPrefs.GetInt(KeyChatBubbleSounds) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyChatBubbleSounds, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
 }

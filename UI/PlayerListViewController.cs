@@ -1,37 +1,55 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
-using HMUI;
 using MultiplayerChat.Core;
 using MultiplayerCore.Models;
-using MultiplayerCore.Networking;
 using TMPro;
-using UnityEngine;
 using UnityEngine.UI;
 using Zenject;
 
 namespace MultiplayerChat.UI;
 
 /// <summary>
-/// Displays a scrollable list of players in the lobby. Used for Mute (toggle mute on select) and DM (select target, then dismiss).
-/// Uses BSML for layout and populates buttons in code (custom-list TableView was not rendering).
+/// 4×3 player button grid for Mute (toggle per tap) and DM (pick one, then dismiss).
+/// Layout pattern similar to settings-style FlowCoordinator views; list UX inspired by
+/// <see href="https://github.com/BlqzingIce/MultiplayerInfo">MultiplayerInfo</see> player picking flows.
 /// </summary>
 [ViewDefinition("MultiplayerChat.UI.PlayerList.bsml")]
 public class PlayerListViewController : BSMLAutomaticViewController
 {
     public enum Mode { Mute, DM }
 
+    private const int SlotCount = 12;
+    private const int MaxNameLen = 30;
+
     [Inject] private readonly ChatMuteManager _muteManager = null!;
+    [Inject] private readonly ChatIdConfigStore _chatIdConfigStore = null!;
     [Inject] private readonly ChatDMState _dmState = null!;
+    [Inject] private readonly ChatPlayerIdRegistry _chatPlayerIdRegistry = null!;
+    [Inject] private readonly ChatManager _chatManager = null!;
     [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
-    [UIComponent("player_list_content")]
-    private RectTransform? _contentRoot;
+    [UIComponent("GridTitle")] private TMP_Text? _gridTitle;
+    [UIComponent("GridHint")] private TMP_Text? _gridHint;
+    [UIComponent("ClearAllMutesButton")] private Button? _clearAllMutesButton;
 
+    [UIComponent("Slot0")] private Button? _slot0;
+    [UIComponent("Slot1")] private Button? _slot1;
+    [UIComponent("Slot2")] private Button? _slot2;
+    [UIComponent("Slot3")] private Button? _slot3;
+    [UIComponent("Slot4")] private Button? _slot4;
+    [UIComponent("Slot5")] private Button? _slot5;
+    [UIComponent("Slot6")] private Button? _slot6;
+    [UIComponent("Slot7")] private Button? _slot7;
+    [UIComponent("Slot8")] private Button? _slot8;
+    [UIComponent("Slot9")] private Button? _slot9;
+    [UIComponent("Slot10")] private Button? _slot10;
+    [UIComponent("Slot11")] private Button? _slot11;
+
+    private Button?[] _slots = Array.Empty<Button?>();
     private Mode _mode;
     private Action? _onDismiss;
     private List<IConnectedPlayer> _players = new();
@@ -42,274 +60,140 @@ public class PlayerListViewController : BSMLAutomaticViewController
         _onDismiss = onDismiss;
     }
 
+    [UIAction("#post-parse")]
+    private void PostParse()
+    {
+        _slots = new[]
+        {
+            _slot0, _slot1, _slot2, _slot3, _slot4, _slot5,
+            _slot6, _slot7, _slot8, _slot9, _slot10, _slot11
+        };
+        if (_clearAllMutesButton != null)
+            _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
+        ApplyTitle();
+        ReloadGrid();
+    }
+
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
-        StartCoroutine(DeferredReloadList());
+        if (_clearAllMutesButton != null)
+            _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
+        ApplyTitle();
+        ReloadGrid();
     }
 
-    private IEnumerator DeferredReloadList()
+    [UIAction("ClearAllMutesClicked")]
+    private void ClearAllMutesClicked()
     {
-        yield return null;
-        if (_contentRoot == null)
-        {
-            var scroll = GetComponentInChildren<ScrollRect>();
-            if (scroll?.content != null)
-                _contentRoot = scroll.content;
-        }
-        if (_contentRoot == null)
-        {
-            var root = FindRootVertical(transform);
-            if (root != null && root.childCount >= 2)
-            {
-                var second = root.GetChild(1);
-                var scroll = second.GetComponent<ScrollRect>();
-                _contentRoot = scroll?.content ?? (RectTransform)second;
-                if (_contentRoot == null && second.childCount > 0)
-                    _contentRoot = (RectTransform)second.GetChild(0);
-            }
-        }
-        if (_contentRoot == null)
-        {
-            var vlg = GetComponentsInChildren<VerticalLayoutGroup>();
-            foreach (var v in vlg)
-            {
-                var rt = (RectTransform)v.transform;
-                if (rt.childCount == 0 && rt != transform && rt.GetComponent<TextMeshProUGUI>() == null)
-                {
-                    _contentRoot = rt;
-                    break;
-                }
-            }
-        }
-        ReloadList();
+        if (_mode != Mode.Mute) return;
+        _chatIdConfigStore.ClearAllMutes();
+        ReloadGrid();
     }
 
-    private static Transform? FindRootVertical(Transform t)
+    private void ApplyTitle()
     {
-        if (t.childCount == 0) return null;
-        foreach (Transform c in t)
+        if (_gridTitle != null)
         {
-            var vlg = c.GetComponent<VerticalLayoutGroup>();
-            if (vlg != null && c.childCount >= 2)
-            {
-                var first = c.GetChild(0).GetComponentInChildren<TextMeshProUGUI>();
-                if (first != null && first.text.Contains("Select"))
-                    return c;
-            }
-            var found = FindRootVertical(c);
-            if (found != null) return found;
+            _gridTitle.text = _mode == Mode.Mute
+                ? "Mute / Unmute"
+                : "Press DM again to end the DM!";
         }
-        return null;
+        if (_gridHint != null)
+            _gridHint.text = "Tap a name";
     }
 
-    private void ReloadList()
+    [UIAction("OnSlot0")] private void OnSlot0() => OnSlotClicked(0);
+    [UIAction("OnSlot1")] private void OnSlot1() => OnSlotClicked(1);
+    [UIAction("OnSlot2")] private void OnSlot2() => OnSlotClicked(2);
+    [UIAction("OnSlot3")] private void OnSlot3() => OnSlotClicked(3);
+    [UIAction("OnSlot4")] private void OnSlot4() => OnSlotClicked(4);
+    [UIAction("OnSlot5")] private void OnSlot5() => OnSlotClicked(5);
+    [UIAction("OnSlot6")] private void OnSlot6() => OnSlotClicked(6);
+    [UIAction("OnSlot7")] private void OnSlot7() => OnSlotClicked(7);
+    [UIAction("OnSlot8")] private void OnSlot8() => OnSlotClicked(8);
+    [UIAction("OnSlot9")] private void OnSlot9() => OnSlotClicked(9);
+    [UIAction("OnSlot10")] private void OnSlot10() => OnSlotClicked(10);
+    [UIAction("OnSlot11")] private void OnSlot11() => OnSlotClicked(11);
+
+    private void OnSlotClicked(int index)
     {
-        if (_contentRoot == null && transform.childCount > 0)
-        {
-            var first = transform.GetChild(0);
-            if (first.childCount >= 2)
-                _contentRoot = (RectTransform)first.GetChild(1);
-        }
-        if (_contentRoot == null && transform.childCount > 0)
-        {
-            var container = new GameObject("PlayerListContent");
-            container.transform.SetParent(transform.GetChild(0), false);
-            var rect = container.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0, 0);
-            rect.anchorMax = new Vector2(1, 1);
-            rect.offsetMin = new Vector2(10, 10);
-            rect.offsetMax = new Vector2(-10, -10);
-            var vlg = container.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 4;
-            vlg.childForceExpandWidth = true;
-            vlg.childControlHeight = true;
-            vlg.childForceExpandHeight = false;
-            container.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            _contentRoot = rect;
-        }
-        if (_contentRoot == null) return;
+        if (index < 0 || index >= _players.Count)
+            return;
+        OnPlayerSelected(_players[index]);
+    }
 
-        MakeScrollViewportTransparent();
-
-        for (var i = _contentRoot.childCount - 1; i >= 0; i--)
-            Destroy(_contentRoot.GetChild(i).gameObject);
+    private void ReloadGrid()
+    {
+        if (_slots.Length == 0)
+            return;
 
         _players = GetConnectedPlayers();
-
-        EnsureContentLayout();
-
-        if (_mode == Mode.DM && _dmState.IsInDMMode)
-        {
-            var exitBtn = CreateLabelButton("← Exit DM", () =>
-            {
-                _dmState.ClearDMTarget();
-                _onDismiss?.Invoke();
-            });
-            exitBtn.transform.SetParent(_contentRoot, false);
-        }
-
-        if (_players.Count == 0)
-        {
-            var msg = ChatManager.Instance == null ? "Not in lobby" : "No players in lobby";
-            var empty = CreateLabel(msg);
-            empty.transform.SetParent(_contentRoot, false);
-            LayoutRebuilder.ForceRebuildLayoutImmediate(_contentRoot);
-            return;
-        }
-
         var localId = _sessionManager?.localPlayer?.userId;
-        foreach (var p in _players)
-        {
-            if (_mode == Mode.DM && p.userId == localId) continue; // Don't DM yourself
-            var muted = _mode == Mode.Mute && _muteManager.IsMuted(p.userId);
-            var label = muted ? $"{p.userName} (muted)" : p.userName;
-            var btn = CreatePlayerButton(label, p);
-            btn.transform.SetParent(_contentRoot, false);
-        }
+        if (!string.IsNullOrEmpty(localId))
+            _players = _players.Where(p => p.userId != localId).ToList();
 
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_contentRoot);
-    }
-
-    private void MakeScrollViewportTransparent()
-    {
-        var scroll = GetComponentInChildren<ScrollRect>();
-        if (scroll?.viewport != null)
+        for (var i = 0; i < SlotCount; i++)
         {
-            var img = scroll.viewport.GetComponent<Image>();
-            if (img != null)
+            var btn = i < _slots.Length ? _slots[i] : null;
+            if (btn == null) continue;
+
+            if (i >= _players.Count)
             {
-                img.color = new Color(1, 1, 1, 0.01f);
-                img.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
+                btn.gameObject.SetActive(false);
+                continue;
             }
+
+            btn.gameObject.SetActive(true);
+            var p = _players[i];
+            var label = FormatSlotLabel(p);
+            SetButtonLabel(btn, label);
+            btn.interactable = true;
         }
     }
 
-    private void EnsureContentLayout()
+    private string FormatSlotLabel(IConnectedPlayer p)
     {
-        var vlg = _contentRoot!.GetComponent<VerticalLayoutGroup>();
-        if (vlg == null)
+        var raw = p.userName ?? p.userId ?? "?";
+        if (_mode == Mode.Mute && !string.IsNullOrEmpty(p.userId) && _muteManager.IsMuted(p.userId))
         {
-            vlg = _contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            vlg.spacing = 4;
-            vlg.childForceExpandWidth = true;
-            vlg.childControlWidth = true;
-            vlg.childControlHeight = true;
-            vlg.childForceExpandHeight = false;
-            vlg.padding = new RectOffset(4, 4, 4, 4);
+            const string suffix = " (muted)";
+            var baseName = TrimName(raw, Math.Max(1, MaxNameLen - suffix.Length));
+            return baseName + suffix;
         }
-        vlg.childForceExpandWidth = true;
-        vlg.childControlWidth = true;
+        return TrimName(raw, MaxNameLen);
     }
 
-    private GameObject CreatePlayerButton(string label, IConnectedPlayer player)
+    private static void SetButtonLabel(Button btn, string text)
     {
-        var go = new GameObject("PlayerButton");
-        var rect = go.transform as RectTransform ?? go.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0, 1);
-        rect.anchorMax = new Vector2(1, 1);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.sizeDelta = new Vector2(0, 36);
-
-        var image = go.AddComponent<Image>();
-        image.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
-        image.color = new Color(0.15f, 0.2f, 0.3f, 0.95f);
-        image.raycastTarget = true;
-
-        var button = go.AddComponent<Button>();
-        button.targetGraphic = image;
-        button.onClick.AddListener(() => OnPlayerClicked(player));
-
-        var textRect = (RectTransform)go.transform;
-        var tmp = BeatSaberMarkupLanguage.BeatSaberUI.CreateText(textRect, label, Vector2.zero, new Vector2(400, 36));
-        tmp.rectTransform.anchorMin = Vector2.zero;
-        tmp.rectTransform.anchorMax = Vector2.one;
-        tmp.rectTransform.offsetMin = new Vector2(8, 4);
-        tmp.rectTransform.offsetMax = new Vector2(-8, -4);
-        tmp.fontSize = 6;
-        tmp.alignment = TextAlignmentOptions.Left;
-        tmp.color = new Color(1f, 1f, 1f, 1f);
-        tmp.enableWordWrapping = false;
-        tmp.overflowMode = TextOverflowModes.Overflow;
-        tmp.raycastTarget = false;
-        tmp.transform.SetAsLastSibling();
-
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 36;
-        le.minHeight = 36;
-        le.minWidth = 100;
-        le.flexibleWidth = 1;
-
-        return go;
+        var tmp = btn.GetComponentInChildren<TMP_Text>(true);
+        if (tmp != null)
+            tmp.text = text;
     }
 
-    private GameObject CreateLabel(string text)
+    private void OnPlayerSelected(IConnectedPlayer player)
     {
-        var go = new GameObject("Label");
-        var rect = go.AddComponent<RectTransform>();
-        var tmp = BeatSaberMarkupLanguage.BeatSaberUI.CreateText(rect, text, Vector2.zero, new Vector2(400, 24));
-        tmp.fontSize = 3;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(0.7f, 0.7f, 0.7f);
-        tmp.raycastTarget = false;
-
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 24;
-        le.flexibleWidth = 1;
-
-        return go;
-    }
-
-    private GameObject CreateLabelButton(string label, Action onClick)
-    {
-        var go = new GameObject("LabelButton");
-        var rect = go.transform as RectTransform ?? go.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0, 1);
-        rect.anchorMax = new Vector2(1, 1);
-        rect.pivot = new Vector2(0.5f, 1f);
-        rect.sizeDelta = new Vector2(0, 36);
-
-        var image = go.AddComponent<Image>();
-        image.sprite = BeatSaberMarkupLanguage.Utilities.ImageResources.BlankSprite;
-        image.color = new Color(0.2f, 0.15f, 0.25f, 0.95f);
-        image.raycastTarget = true;
-
-        var button = go.AddComponent<Button>();
-        button.targetGraphic = image;
-        button.onClick.AddListener(() => onClick());
-
-        var tmp = BeatSaberMarkupLanguage.BeatSaberUI.CreateText((RectTransform)go.transform, label, Vector2.zero, new Vector2(400, 36));
-        tmp.rectTransform.anchorMin = Vector2.zero;
-        tmp.rectTransform.anchorMax = Vector2.one;
-        tmp.rectTransform.offsetMin = new Vector2(8, 4);
-        tmp.rectTransform.offsetMax = new Vector2(-8, -4);
-        tmp.fontSize = 5;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = new Color(0.9f, 0.6f, 0.6f);
-        tmp.raycastTarget = false;
-        tmp.transform.SetAsLastSibling();
-
-        var le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = 36;
-        le.minHeight = 36;
-        le.minWidth = 100;
-        le.flexibleWidth = 1;
-
-        return go;
-    }
-
-    private void OnPlayerClicked(IConnectedPlayer player)
-    {
-        if (player == null || string.IsNullOrEmpty(player.userId)) return;
+        if (player == null || string.IsNullOrEmpty(player.userId))
+            return;
 
         if (_mode == Mode.Mute)
         {
+            var wasMuted = _muteManager.IsMuted(player.userId);
             _muteManager.ToggleMute(player.userId);
-            ReloadList();
+            var nowMuted = _muteManager.IsMuted(player.userId);
+            if (wasMuted != nowMuted)
+                ChatManager.Instance?.SendMuteNotifyTo(player.userId, nowMuted);
+            ReloadGrid();
         }
         else
         {
-            _dmState.SetDMTarget(player.userId, player.userName);
+            if (!_chatPlayerIdRegistry.TryGetChatId(player.userId, out var targetChatId))
+            {
+                _chatManager.PostSystemMessage("That player's Chat ID isn't known yet. Wait until they appear in the lobby, then try again.");
+                return;
+            }
+
+            _dmState.SetDMTarget(player.userId, player.userName, targetChatId);
             _onDismiss?.Invoke();
         }
     }
@@ -335,6 +219,7 @@ public class PlayerListViewController : BSMLAutomaticViewController
                 if (p != null && !string.IsNullOrEmpty(p.userId) && !list.Any(x => x.userId == p.userId))
                     list.Add(p);
             }
+
             foreach (var place in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarPlace>())
             {
                 var p = GetPlayerFromPlace(place);
@@ -358,6 +243,7 @@ public class PlayerListViewController : BSMLAutomaticViewController
             if (f != null && typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
                 return f.GetValue(ctrl) as IConnectedPlayer;
         }
+
         foreach (var f in t.GetFields(Flags))
             if (typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
                 return f.GetValue(ctrl) as IConnectedPlayer;
@@ -374,9 +260,17 @@ public class PlayerListViewController : BSMLAutomaticViewController
             if (f != null && typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
                 return f.GetValue(place) as IConnectedPlayer;
         }
+
         foreach (var f in t.GetFields(Flags))
             if (typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
                 return f.GetValue(place) as IConnectedPlayer;
         return null;
+    }
+
+    private static string TrimName(string name, int maxLen)
+    {
+        if (string.IsNullOrEmpty(name)) return "";
+        if (name.Length <= maxLen) return name;
+        return name.Substring(0, maxLen) + "...";
     }
 }
