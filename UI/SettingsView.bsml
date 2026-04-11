@@ -5,6 +5,7 @@
     <text text="Multiplayer Chat Settings" font-size="5" align="Center"/>
     <slider-setting id="BubbleDuration" text="Chat bubble duration (seconds)" value="BubbleDuration" min="15" max="60" increment="1" show-value="true"/>
     <toggle-setting id="ChatBubbleSoundsToggle" text="Chat bubble sounds" value="ChatBubbleSoundsEnabled"/>
+    <dropdown-list-setting id="MicInput" text="Mic input" options="MicOptions"/>
     <horizontal>
       <text text="Name color" font-size="4"/>
       <string-setting id="NameColorInput" text="HEX (6 chars)" value="NameColor" show-buttons="false"/>

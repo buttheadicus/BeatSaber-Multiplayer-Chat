@@ -3,6 +3,7 @@ using System.Collections;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.GameplaySetup;
 using MultiplayerChat.Core;
+using MultiplayerChat.Settings;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -365,7 +366,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         if (_isRecording)
             return;
 
-        _micDevice = null;
+        _micDevice = ResolveMicDeviceNameForRecording();
         Microphone.GetDeviceCaps(_micDevice, out var minFreq, out var maxFreq);
         var hz = 44100;
         if (maxFreq > 0)
@@ -386,6 +387,19 @@ public class LobbyChatTabRegistrar : MonoBehaviour
             StopCoroutine(_recordCapCoroutine);
         _recordCapCoroutine = StartCoroutine(RecordingCapCoroutine());
         UpdateRecordButtonLabel();
+    }
+
+    /// <summary>Null means use the system default input device (Unity).</summary>
+    private static string? ResolveMicDeviceNameForRecording()
+    {
+        var name = ModSettings.MicInputDeviceName;
+        if (string.IsNullOrEmpty(name)) return null;
+        foreach (var d in Microphone.devices ?? Array.Empty<string>())
+        {
+            if (d == name) return name;
+        }
+
+        return null;
     }
 
     private void StopRecordingInternal()

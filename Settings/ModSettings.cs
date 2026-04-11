@@ -15,6 +15,7 @@ public static class ModSettings
     private const string KeyLobbyChatPosX = "MultiplayerChat.LobbyChatPosX";
     private const string KeyLobbyChatPosY = "MultiplayerChat.LobbyChatPosY";
     private const string KeyChatBubbleSounds = "MultiplayerChat.ChatBubbleSounds";
+    private const string KeyMicInputDevice = "MultiplayerChat.MicInputDevice";
 
     private const float DefaultBubbleDuration = 15f;
     private const bool DefaultShowSystemMessages = true;
@@ -103,6 +104,19 @@ public static class ModSettings
         set
         {
             PlayerPrefs.SetInt(KeyChatBubbleSounds, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>
+    /// Windows recording device name from <see cref="UnityEngine.Microphone.devices"/>, or empty to use the system default device.
+    /// </summary>
+    public static string MicInputDeviceName
+    {
+        get => PlayerPrefs.GetString(KeyMicInputDevice, "");
+        set
+        {
+            PlayerPrefs.SetString(KeyMicInputDevice, value ?? "");
             PlayerPrefs.Save();
         }
     }
