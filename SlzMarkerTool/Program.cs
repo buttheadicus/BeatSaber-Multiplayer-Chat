@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Text;
+using MultiplayerChat.Core;
 
 namespace SlzMarkerTool;
 
@@ -56,9 +58,10 @@ internal static class Program
                 return 0;
             }
 
-            File.WriteAllText(markerPath, $"SLZ marker for Multiplayer Chat — created {DateTime.UtcNow:u} UTC\r\n");
+            var body = SlzMarkerProof.BuildMarkerFileContent();
+            File.WriteAllText(markerPath, body, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             Console.WriteLine($"Created: {markerPath}");
-            Console.WriteLine("Restart Beat Saber if it is running. Multiplayer Chat loads SLZ mode when this file sits next to MultiplayerChat.dll.");
+            Console.WriteLine("Restart Beat Saber if it is running. SLZ mode requires this exact marker format (Multiplayer Chat 0.3.1+).");
             return 0;
         }
         catch (Exception ex)
@@ -83,7 +86,8 @@ internal static class Program
             """
             SlzMarkerTool — create or remove SLZ.dat for Multiplayer Chat (SLZ companion mode).
 
-            The marker file must live in the same folder as MultiplayerChat.dll (usually Beat Saber\Plugins).
+            The marker must live beside MultiplayerChat.dll (usually Beat Saber\Plugins). Contents are generated —
+            empty files are rejected by Multiplayer Chat 0.3.1+.
 
             Usage:
               SlzMarkerTool [plugins-folder]

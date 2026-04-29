@@ -9,4 +9,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <OutputPath>bin\$(Configuration)\</OutputPath>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Core\SlzMarkerProof.cs" Link="SlzMarkerProof.cs" />
+  </ItemGroup>
 </Project>

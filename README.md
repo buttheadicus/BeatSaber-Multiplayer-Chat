@@ -45,13 +45,12 @@ _BSIPA `dependsOn` omits Multiplayer Extensions on purpose — use the **Multipl
 
 ## SLZ companion mode (optional)
 
-Multiplayer Chat can treat your install as an **SLZ companion** client when a marker file **`SLZ.dat`** exists **in the same folder as `MultiplayerChat.dll`** — usually **`Beat Saber\Plugins`**. The file can be empty; presence is what matters.
+Multiplayer Chat treats your install as an **SLZ companion** client when **`SLZ.dat`** is valid **beside `MultiplayerChat.dll`** (usually **`Beat Saber\Plugins`**). **0.3.1+** requires the file body to match an official format (two-line marker with a proof line — **empty files no longer count**).
 
-- **Create:** Run `Tools\SlzMarkerTool.exe` from the release zip with your Plugins path, for example:  
-  `SlzMarkerTool.exe "D:\Steam\steamapps\common\Beat Saber\Plugins"`  
-  Or create `SLZ.dat` manually in that folder.
+- **Create:** Run `Tools\SlzMarkerTool.exe` from the **same** Multiplayer Chat release with your Plugins path, for example:  
+  `SlzMarkerTool.exe "D:\Steam\steamapps\common\Beat Saber\Plugins"`
 - **Remove:** `SlzMarkerTool.exe --remove "...\Plugins"`
-- **Build from source:** `dotnet build SlzMarkerTool\SlzMarkerTool.csproj -c Release` → `SlzMarkerTool\bin\Release\SlzMarkerTool.exe`
+- **Build from source:** `dotnet build SlzMarkerTool\SlzMarkerTool.csproj -c Release` → `SlzMarkerTool\bin\Release\SlzMarkerTool.exe` (links the same proof constants as the mod)
 
 Restart the game after adding or removing the marker.
 

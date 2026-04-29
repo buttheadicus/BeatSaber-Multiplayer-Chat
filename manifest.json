@@ -2,9 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/beat-saber-modding-group/BSIPA-MetadataFileSchema/master/Schema.json",
   "id": "MultiplayerChat",
   "name": "Multiplayer Chat",
-  "version": "0.3.0",
-  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice. Multiplayer Extensions (EnderdracheLP v1.1.0) is recommended for lobby features; it is not a hard dependency — Multiplayer Chat can auto-download it on first launch when missing (see README).",
-  "author": "Butthead",
+  "version": "0.3.1",
+  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice!
   "gameVersion": "1.40.1",
   "dependsOn": {
     "BSIPA": "^4.2.0",

@@ -1,22 +1,26 @@
 using System;
 using System.IO;
+using MultiplayerChat;
 
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// When <see cref="MarkerFileName"/> exists in the same directory as this assembly (Beat Saber Plugins folder),
-/// optional "SLZ mode" behavior is enabled. The companion <c>SlzMarker</c> tool creates that file.
+/// When <see cref="MarkerFileName"/> exists in the same directory as this assembly (Beat Saber Plugins folder)
+/// and passes <see cref="SlzMarkerProof.TryValidateMarkerContent"/>, optional "SLZ mode" behavior is enabled.
+/// Use <c>SlzMarkerTool</c> from the same release to create a valid marker (0.3.1+).
 /// </summary>
 /// <remarks>
 /// Keep fork-specific SLZ behavior out of git: use the gitignored <c>SlzPrivate/</c> folder for extra sources or
-/// a local MSBuild props file; this file only performs the marker-file check shipped with the mod.
+/// a local MSBuild props file; marker validation lives in <see cref="SlzMarkerProof"/>.
 /// </remarks>
 public static class SlzMode
 {
     public const string MarkerFileName = "SLZ.dat";
 
-    /// <summary>True after <see cref="Refresh"/> if the marker file is present next to the mod DLL.</summary>
+    /// <summary>True after <see cref="Refresh"/> if the marker file is present and passes <see cref="SlzMarkerProof.TryValidateMarkerContent"/>.</summary>
     public static bool IsEnabled { get; private set; }
+
+    private static bool _warnedInvalidMarker;
 
     public static void Refresh()
     {
@@ -36,7 +40,32 @@ public static class SlzMode
                 return;
             }
 
-            IsEnabled = File.Exists(Path.Combine(dir, MarkerFileName));
+            var path = Path.Combine(dir, MarkerFileName);
+            if (!File.Exists(path))
+            {
+                IsEnabled = false;
+                return;
+            }
+
+            string contents;
+            try
+            {
+                contents = File.ReadAllText(path);
+            }
+            catch
+            {
+                IsEnabled = false;
+                return;
+            }
+
+            IsEnabled = SlzMarkerProof.TryValidateMarkerContent(contents);
+
+            if (!IsEnabled && !_warnedInvalidMarker)
+            {
+                _warnedInvalidMarker = true;
+                Plugin.Log?.Warn(
+                    $"[MPChat] {MarkerFileName} is present but contents are not valid for this mod version. Remove it or recreate with SlzMarkerTool from Multiplayer Chat 0.3.1+.");
+            }
         }
         catch
         {
