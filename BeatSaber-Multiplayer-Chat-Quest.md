@@ -1,10 +1,16 @@
-# Beat Saber Multiplayer Chat — Quest (QMod) port notes
+# Beat Saber Multiplayer Chat - Quest (QMod) port notes
 
-This file is a **planning anchor** for a future **Quest standalone** build (`qmod`). The PC mod (`MultiplayerChat`, BSIPA + Zenject) will **not** share the same host: expect a **separate project/solution** (e.g. `BeatSaber-Multiplayer-Chat-Quest`) once 0.3.0 PC is released.
+This file is a **planning anchor** for a future **Quest standalone** build (`qmod`). The PC mod (`MultiplayerChat`, BSIPA + Zenject) will **not** share the same host: expect a **separate project/solution**.
+
+## Quest repository location
+
+**Suggested checkout:** `c:\Users\goria\BeatSaber-Multiplayer-Chat-Quest` (sibling of this PC repo; **avoid spaces in the folder path** so build scripts behave).
+
+Clone your GitHub Quest repo there, then follow **`BeatSaber-Multiplayer-Chat-Quest/docs/NEXT_STEPS.md`** inside that repo (`README` links it).
 
 ## High-impact differences to expect
 
-- **Bootstrap**: QMod entry instead of IPA `Plugin`; no Zenject scene installers — manual service location, scene hooks, or a tiny DI container.
+- **Bootstrap**: QMod entry instead of IPA `Plugin`; no Zenject scene installers. Use manual service location, scene hooks, or a tiny DI container.
 - **XR / input**: No desktop `KeyCode.Space` PTT assumption; Quest uses controller / system UI patterns. `VrPttInput` paths need Quest-valid usages.
 - **File paths**: `Assembly.Location` + `Plugins/Sounds` layout differs; keep a single `SoundPathResolver` (PC already searches multiple roots).
 - **Networking**: Confirm MultiplayerCore / BeatTogether equivalents on Quest; packet IDs and encryption must stay compatible if cross-play matters.

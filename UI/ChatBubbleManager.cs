@@ -41,7 +41,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private GameObject? _moveHandle;
     private Coroutine? _moveModeHelperCoroutine;
 
-    /// <summary>Full scene scans for avatar caption anchors — capped so lobby idle does not hitch every ~0.12–0.5s.</summary>
+    /// <summary>Full scene scans for avatar caption anchors  -  capped so lobby idle does not hitch every ~0.12–0.5s.</summary>
     private float _nextNametagEnsureRealtime = -999f;
     private const float NametagEnsureMinIntervalSec = 2.75f;
 
@@ -122,7 +122,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         ShowStackedBubble(name, msg, e.NameColor);
     }
 
-    /// <summary>Previous iteration&apos;s <see cref="IsInLobby"/> — avoids an extra <c>GameObject.Find</c> pass before each wait.</summary>
+    /// <summary>Previous iteration&apos;s <see cref="IsInLobby"/>  -  avoids an extra <c>GameObject.Find</c> pass before each wait.</summary>
     private bool _lastPollInLobby;
 
     private IEnumerator EnsureLobbyHeaderRoot()

@@ -91,7 +91,7 @@ public class ChatManager : IInitializable, IDisposable
     private const float HotMicJitterPrefetchTimeoutSec = 0.09f;
     private const float HotMicInterChunkSpinTimeoutSec = 0.65f;
     private const float HotMicJitterEmptyQueueGiveUpSec = 0.4f;
-    /// <summary>Short coalesce tail — scheduling removes the need for long merge waits.</summary>
+    /// <summary>Short coalesce tail  -  scheduling removes the need for long merge waits.</summary>
     private const float HotMicCoalesceMergeTailWaitSec = 0.028f;
     /// <summary>Cap coalesced clips scheduled in one pump so a deep queue cannot stall the main thread.</summary>
     private const int MaxHotMicClipsScheduledPerPump = 32;
@@ -110,7 +110,7 @@ public class ChatManager : IInitializable, IDisposable
             _lobbyScopeChatManager = this;
         VoiceReceiveDiagnostics.ResetSession();
         if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
-            MultiplayerChat.Plugin.Log?.Info("[MPChat] Voice receive diagnostics (throttled) — look for [VoiceRx DROP], [HotMicRx]");
+            MultiplayerChat.Plugin.Log?.Info("[MPChat] Voice receive diagnostics (throttled)  -  look for [VoiceRx DROP], [HotMicRx]");
         if (VoiceBareStreamMode.Enabled)
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] VoiceBareStreamMode.Enabled: throttled recv diagnostic lines suppressed until disabled.");
         RegisterPacketCallbacks();

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>Verbose trace lines for diagnosing VHOT (send → queue → sequential play). Off by default — logging every chunk hurts frame time.</summary>
+/// <summary>Verbose trace lines for diagnosing VHOT (send → queue → sequential play). Off by default  -  logging every chunk hurts frame time.</summary>
 public static class VoipPipelineTrace
 {
     /// <summary>Dev-only. When true, logs every outbound/inbound chunk (very noisy).</summary>

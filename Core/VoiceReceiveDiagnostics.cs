@@ -37,7 +37,7 @@ internal static class VoiceReceiveDiagnostics
         MultiplayerChat.Plugin.Log?.Warn($"[MPChat][VoiceRx DROP] {reason}{(detail != null ? " " + detail : "")}");
     }
 
-    /// <summary>Decrypt failed after retry — log sorted session key fingerprint (throttled separately from generic decrypt_failed).</summary>
+    /// <summary>Decrypt failed after retry  -  log sorted session key fingerprint (throttled separately from generic decrypt_failed).</summary>
     public static void LogDecryptFailedWithFingerprintThrottled(string? senderUserId, string sessionStateFingerprint)
     {
         if (VoiceBareStreamMode.Enabled) return;

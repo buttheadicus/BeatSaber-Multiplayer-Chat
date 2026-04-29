@@ -8,7 +8,7 @@ namespace MultiplayerChat.Core;
 /// (same file is compile-linked into that project).
 /// </summary>
 /// <remarks>
-/// Plain marker strings are not stored as IL string literals — XOR-encoded blobs plus split key masks.
+/// Plain marker strings are not stored as IL string literals  -  XOR-encoded blobs plus split key masks.
 /// This deters casual extraction; it is not cryptographic protection against a determined reverser.
 /// </remarks>
 public static class SlzMarkerProof

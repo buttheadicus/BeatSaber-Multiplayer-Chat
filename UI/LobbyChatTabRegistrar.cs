@@ -562,7 +562,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     {
         if (_capturedSamples == null || _capturedSamples.Length == 0)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing recorded — use Record, then Stop.");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing recorded  -  use Record, then Stop.");
             return;
         }
 
@@ -579,7 +579,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     {
         if (_capturedSamples == null || _capturedSamples.Length == 0)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing to send — record a voice message first.");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing to send  -  record a voice message first.");
             return;
         }
 

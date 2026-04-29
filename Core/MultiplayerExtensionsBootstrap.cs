@@ -58,7 +58,7 @@ public static class MultiplayerExtensionsBootstrap
 
         ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
 
-        log.Warn($"[MPChat][MPEX] {TargetDll} not found — downloading Multiplayer Extensions v1.1.0 for BS 1.37.5–1.40.8…");
+        log.Warn($"[MPChat][MPEX] {TargetDll} not found  -  downloading Multiplayer Extensions v1.1.0 for BS 1.37.5–1.40.8…");
 
         try
         {
@@ -78,7 +78,7 @@ public static class MultiplayerExtensionsBootstrap
             catch (Exception exHttp)
             {
                 log.Error(
-                    $"[MPChat][MPEX] Download failed from {ReleaseTagUrl} — {exHttp.Message}");
+                    $"[MPChat][MPEX] Download failed from {ReleaseTagUrl}  -  {exHttp.Message}");
                 log.Error("[MPChat][MPEX] Install MultiplayerExtensions manually from GitHub, then restart.");
                 return true;
             }
@@ -102,7 +102,7 @@ public static class MultiplayerExtensionsBootstrap
 
                 File.Copy(extractedDll, dllPath, overwrite: true);
                 log.Warn(
-                    $"[MPChat][MPEX] Installed {TargetDll} into {pluginsDir}. Beat Saber will close — relaunch once so MultiplayerExtensions loads.");
+                    $"[MPChat][MPEX] Installed {TargetDll} into {pluginsDir}. Beat Saber will close  -  relaunch once so MultiplayerExtensions loads.");
                 ScheduleHardExitSoon();
                 return false;
             }

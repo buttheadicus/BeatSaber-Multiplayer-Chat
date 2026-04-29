@@ -9,7 +9,7 @@ namespace MultiplayerChat.Core;
 /// VR push-to-talk cross-referenced with EasyOffset (<see href="https://github.com/Reezonate/EasyOffset"/>):
 /// <list type="bullet">
 /// <item><description><b>Devices:</b> EasyOffset <c>ReeInputDevice</c> uses <see cref="InputDevices.GetDevicesAtXRNode"/> and
-/// <c>devices[0]</c> per hand — we do the same via <see cref="PrimaryDeviceAt"/> (not <see cref="InputDevices.GetDeviceAtXRNode"/>,
+/// <c>devices[0]</c> per hand  -  we do the same via <see cref="PrimaryDeviceAt"/> (not <see cref="InputDevices.GetDeviceAtXRNode"/>,
 /// which can disagree when multiple devices are registered).</description></item>
 /// <item><description><b>Buttons:</b> same Unity <see cref="CommonUsages"/> booleans EasyOffset maps from feature names
 /// (<c>PrimaryButton</c>, <c>SecondaryButton</c>, <c>GripButton</c>).</description></item>

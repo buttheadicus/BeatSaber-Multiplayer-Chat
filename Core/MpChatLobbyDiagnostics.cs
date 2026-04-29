@@ -10,14 +10,14 @@ namespace MultiplayerChat.Core;
 public static class MpChatLobbyDiagnostics
 {
     /// <summary>
-    /// Default off: verbose paths walk every <c>TMP_Text</c>, repeatedly call GameObject.Find and FindObjectOfType — destroys frame time.
+    /// Default off: verbose paths walk every <c>TMP_Text</c>, repeatedly call GameObject.Find and FindObjectOfType  -  destroys frame time.
     /// Set <c>true</c> only temporarily when debugging transitions.
     /// </summary>
     /// Setting <see langword="false"/> skips expensive scene/TMP walks and avoids unreachable-code warnings in dev builds when logging is compiled out.
     public static readonly bool DetailedVoipSnapshots = false;
 
     /// <summary>
-    /// Extra <c>[MPChat][VoIP]</c> lines during reload (TryRunVoipReload, pipeline context, mic force-reload). Default off — reduces log I/O and string work in lobby.
+    /// Extra <c>[MPChat][VoIP]</c> lines during reload (TryRunVoipReload, pipeline context, mic force-reload). Default off  -  reduces log I/O and string work in lobby.
     /// </summary>
     public static bool VerboseVoipReloadLogs;
 
@@ -93,7 +93,7 @@ public static class MpChatLobbyDiagnostics
         return false;
     }
 
-    /// <summary>Clears TTL caches for lobby/song heuristics — call on scene transitions so mute policy / UI react immediately.</summary>
+    /// <summary>Clears TTL caches for lobby/song heuristics  -  call on scene transitions so mute policy / UI react immediately.</summary>
     public static void InvalidateSceneHeuristicCaches()
     {
         _lobbyHeuristicCacheTime = -999f;
@@ -107,11 +107,11 @@ public static class MpChatLobbyDiagnostics
 
     private static float _songGameplayCacheTime = -999f;
     private static bool _songGameplayCached;
-    /// <summary>Many systems queried SongGameplayLikelyActive twice per tick — cache avoids paired hitches ~0.5s apart (felt ~1s).</summary>
+    /// <summary>Many systems queried SongGameplayLikelyActive twice per tick  -  cache avoids paired hitches ~0.5s apart (felt ~1s).</summary>
     private const float SongGameplayCacheTtlSec = 0.35f;
 
     /// <summary>
-    /// True during active beatmap / arena gameplay. Uses scene name, audio sync, and spawn controller — MP arena may omit <c>GameCore</c> or audio sync until late.
+    /// True during active beatmap / arena gameplay. Uses scene name, audio sync, and spawn controller  -  MP arena may omit <c>GameCore</c> or audio sync until late.
     /// Result is TTL-cached (~300ms); call <see cref="InvalidateSceneHeuristicCaches"/> after scene transitions if you need an immediate refresh.
     /// </summary>
     public static bool SongGameplayLikelyActive()
@@ -128,7 +128,7 @@ public static class MpChatLobbyDiagnostics
     {
         if (AnyGameCoreLoaded())
             return true;
-        // Multiplayer lobby UI: not beatmap gameplay — avoids repeated FindObjectOfType scans on policy ticks.
+        // Multiplayer lobby UI: not beatmap gameplay  -  avoids repeated FindObjectOfType scans on policy ticks.
         if (LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
             return false;
         try

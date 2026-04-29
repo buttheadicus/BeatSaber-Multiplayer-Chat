@@ -41,11 +41,11 @@ Lobby features (solo-style environment, lobby visuals, gameplay tweaks) come fro
 - [MultiplayerCore](https://github.com/Goobwabber/MultiplayerCore) 1.6.0+
 - [BeatTogether](https://github.com/BeatTogether/BeatTogether) (or compatible server)
 
-_BSIPA `dependsOn` omits Multiplayer Extensions on purpose — use the **Multiplayer Extensions** section above for auto or manual install._
+_BSIPA `dependsOn` omits Multiplayer Extensions on purpose  -  use the **Multiplayer Extensions** section above for auto or manual install._
 
 ## SLZ companion mode (optional)
 
-Multiplayer Chat treats your install as an **SLZ companion** client when **`SLZ.dat`** is valid **beside `MultiplayerChat.dll`** (usually **`Beat Saber\Plugins`**). **0.3.1+** requires the file body to match an official format (two-line marker with a proof line — **empty files no longer count**).
+Multiplayer Chat treats your install as an **SLZ companion** client when **`SLZ.dat`** is valid **beside `MultiplayerChat.dll`** (usually **`Beat Saber\Plugins`**). **0.3.1+** requires the file body to match an official format (two-line marker with a proof line  -  **empty files no longer count**).
 
 - **Create:** Run `Tools\SlzMarkerTool.exe` from the **same** Multiplayer Chat release with your Plugins path, for example:  
   `SlzMarkerTool.exe "D:\Steam\steamapps\common\Beat Saber\Plugins"`

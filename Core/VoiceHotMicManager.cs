@@ -61,7 +61,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     public void Initialize()
     {
         // GameCore host always owns Instance during gameplay. Lobby host must not overwrite Instance while a
-        // GameCore VoiceHotMicManager exists (additive scenes / VoIP reload order) — that caused open mic + broken PTT.
+        // GameCore VoiceHotMicManager exists (additive scenes / VoIP reload order)  -  that caused open mic + broken PTT.
         if (MpChatSceneScope.IsGameCoreHost(this))
         {
             Instance = this;
@@ -430,7 +430,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         Array.Copy(chunk, chunk.Length - k, _hotMicSendCrossfadeTail, 0, k);
     }
 
-    /// <summary>RMS voice gate — always on; no bypass (see <see cref="VoiceHotMicTransport"/> class remarks).</summary>
+    /// <summary>RMS voice gate  -  always on; no bypass (see <see cref="VoiceHotMicTransport"/> class remarks).</summary>
     private bool ShouldTransmitVoiceChunk(float[] chunk)
     {
         var rms = ComputeRms(chunk, chunk.Length);

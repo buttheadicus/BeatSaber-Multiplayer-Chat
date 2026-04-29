@@ -49,7 +49,7 @@ internal static class Program
             {
                 if (!File.Exists(markerPath))
                 {
-                    Console.WriteLine($"Nothing to do — file not found: {markerPath}");
+                    Console.WriteLine($"Nothing to do  -  file not found: {markerPath}");
                     return 0;
                 }
 
@@ -84,9 +84,9 @@ internal static class Program
     {
         Console.WriteLine(
             """
-            SlzMarkerTool — create or remove SLZ.dat for Multiplayer Chat (SLZ companion mode).
+            SlzMarkerTool  -  create or remove SLZ.dat for Multiplayer Chat (SLZ companion mode).
 
-            The marker must live beside MultiplayerChat.dll (usually Beat Saber\Plugins). Contents are generated —
+            The marker must live beside MultiplayerChat.dll (usually Beat Saber\Plugins). Contents are generated  - 
             empty files are rejected by Multiplayer Chat 0.3.1+.
 
             Usage:

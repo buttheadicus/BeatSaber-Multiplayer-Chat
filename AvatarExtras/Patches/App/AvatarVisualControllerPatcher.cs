@@ -14,7 +14,7 @@ namespace MultiplayerChat.AvatarExtras.Patches.App;
 
 /// <summary>
 /// Packed glasses/beard in <see cref="AvatarData.facialHairId"/>: vanilla <see cref="BeatAvatarVisualController.UpdateAvatarVisual"/>
-/// assigns meshes before our postfix — facial <see cref="AvatarData.facialHairId"/> breaks <c>GetById</c>, so the stock
+/// assigns meshes before our postfix  -  facial <see cref="AvatarData.facialHairId"/> breaks <c>GetById</c>, so the stock
 /// <c>UpdateAvatarColors</c> inside visual runs on the wrong mesh. Prefix syncs <c>glassesId</c>; postfix corrects meshes then
 /// re-runs stock <c>UpdateAvatarColors</c> when meshes change (<see cref="AvatarPropertyBlockColorSetter"/> + MPB).
 /// </summary>
@@ -264,7 +264,7 @@ public class AvatarVisualControllerPatcher : IAffinity
 
     /// <summary>
     /// Rainbow / flat fallback. With packed optional parts, third-party avatar shader replacers (e.g. Naluluna) can
-    /// leave stock <see cref="AvatarPropertyBlockColorSetter"/> tints black — <paramref name="forceFlatOverride"/>
+    /// leave stock <see cref="AvatarPropertyBlockColorSetter"/> tints black  -  <paramref name="forceFlatOverride"/>
     /// swaps to a dedicated unlit (or safe fallback) material so wheel colors always show.
     /// </summary>
     private static void ApplyCustomPartColor(MeshRenderer mesh, AvatarPropertyBlockColorSetter? setter,

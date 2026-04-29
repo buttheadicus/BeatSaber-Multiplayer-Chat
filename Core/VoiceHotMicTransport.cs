@@ -3,7 +3,7 @@ namespace MultiplayerChat.Core;
 /// <summary>Hot-mic capture tuning (VHOT wire format and encryption live in <see cref="VoiceHotMicCodec"/> / <see cref="ChatManager"/>).</summary>
 /// <remarks>
 /// <b>Voice activity gate is mandatory and not optional.</b> Do not reintroduce a <c>Disable*</c> flag or any bypass in
-/// <see cref="VoiceHotMicManager"/> — gating stays always on; past toggles caused regressions and confusion.
+/// <see cref="VoiceHotMicManager"/>  -  gating stays always on; past toggles caused regressions and confusion.
 /// </remarks>
 public static class VoiceHotMicTransport
 {

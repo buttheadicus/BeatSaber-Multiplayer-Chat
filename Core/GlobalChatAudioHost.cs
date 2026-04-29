@@ -60,7 +60,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     /// <summary>Non–MPChat sources being ducked (instance id → snapshot taken when duck engaged / periodic merge).</summary>
     private readonly Dictionary<int, DuckSourceEntry> _duckGameSourceBaselines = new(256);
 
-    /// <summary>IDs still present after one enumerator pass — used when pruning dead duck baselines.</summary>
+    /// <summary>IDs still present after one enumerator pass  -  used when pruning dead duck baselines.</summary>
     private readonly HashSet<int> _duckSeenSourceIdsScratch = new(256);
 
     private readonly List<int> _baselineDeadSweep = new(32);
@@ -108,7 +108,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         MpChatLobbyDiagnostics.LogVoipTransition($"OnSceneLoaded:{scene.name}", $"mode={mode}");
         if (string.Equals(scene.name, "GameCore", System.StringComparison.Ordinal))
         {
-            StartCoroutine(ReloadVoipDeferred("[MPChat] VoIP reloaded (GameCore loaded — arena / song)"));
+            StartCoroutine(ReloadVoipDeferred("[MPChat] VoIP reloaded (GameCore loaded  -  arena / song)"));
             StartCoroutine(DeferredSongVoicePolicySync("GameCore loaded"));
             return;
         }
@@ -133,12 +133,12 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
             $"old={oldScene.name} new={newScene.name}");
         if (string.Equals(oldScene.name, "GameCore", System.StringComparison.Ordinal))
         {
-            StartCoroutine(ReloadVoipDeferred("[MPChat] VoIP reloaded (left GameCore — lobby / menu)"));
+            StartCoroutine(ReloadVoipDeferred("[MPChat] VoIP reloaded (left GameCore  -  lobby / menu)"));
             StartCoroutine(DeferredSongVoicePolicySync("active scene left GameCore"));
         }
 
         if (!string.Equals(newScene.name, "GameCore", System.StringComparison.Ordinal))
-            StartCoroutine(ReloadVoipIfMultiplayerLobbyDeferred("[MPChat] VoIP reloaded (active scene — multiplayer lobby)"));
+            StartCoroutine(ReloadVoipIfMultiplayerLobbyDeferred("[MPChat] VoIP reloaded (active scene  -  multiplayer lobby)"));
     }
 
     private static bool HierarchyLooksLikeMultiplayerLobby() =>
@@ -206,17 +206,17 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
             Plugin.Log?.Info($"[MPChat][VoIP] TryRunVoipReload end: {logLine}");
 
-        // Arena entry: GameCore is loaded and this reload just ran — apply mute/deaf-during-song in lockstep with the new ChatManager / mic pipeline.
+        // Arena entry: GameCore is loaded and this reload just ran  -  apply mute/deaf-during-song in lockstep with the new ChatManager / mic pipeline.
         ApplySongVoicePolicy();
     }
 
     private void ApplySongVoicePolicy()
     {
-        // SongGameplayLikelyActive can call FindObjectOfType repeatedly — throttle; song-edge timing error is negligible.
+        // SongGameplayLikelyActive can call FindObjectOfType repeatedly  -  throttle; song-edge timing error is negligible.
         var nowRlPolicy = Time.realtimeSinceStartup;
         if (nowRlPolicy >= _songPolicyNextGameplaySampleRealtime)
         {
-            // In menu / lobby, SongGameplayLikelyActive may fall back to FindObjectOfType — sample less often than in GameCore.
+            // In menu / lobby, SongGameplayLikelyActive may fall back to FindObjectOfType  -  sample less often than in GameCore.
             var interval = MpChatLobbyDiagnostics.AnyGameCoreLoaded() ? 0.08f : 0.28f;
             _songPolicyNextGameplaySampleRealtime = nowRlPolicy + interval;
             _songPolicyCachedGameplayLikely = MpChatLobbyDiagnostics.SongGameplayLikelyActive();

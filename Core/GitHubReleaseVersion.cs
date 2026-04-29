@@ -7,7 +7,7 @@ namespace MultiplayerChat.Core;
 
 /// <summary>
 /// GitHub release API helpers. Rules must match <c>ChatAutoUpdater</c> (duplicate filter logic there).
-/// Only "MultiplayerChat" mod zips — not CAU, not GitHub "Source code" archives.
+/// Only "MultiplayerChat" mod zips  -  not CAU, not GitHub "Source code" archives.
 /// </summary>
 internal static class GitHubReleaseVersion
 {
