@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MultiplayerChat;
 using UnityEngine;
 using Zenject;
 
@@ -21,7 +22,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
     [Inject] private readonly ModPresenceManager _modPresence = null!;
     [Inject] private readonly CoroutineHost _coroutineHost = null!;
 
-    private readonly List<(string Name, string? NameColorHex)> _pendingEntries = new();
+    private readonly List<(string Name, string? NameColorHex, bool IsSlzCompanion)> _pendingEntries = new();
     private Coroutine? _batchCoroutine;
 
     public void Initialize()
@@ -46,7 +47,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
         }
         var trimmed = TrimName(e.UserName, 30);
         MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: adding {trimmed} to batch");
-        _pendingEntries.Add((trimmed, e.NameColorHex));
+        _pendingEntries.Add((trimmed, e.NameColorHex, e.IsSlzCompanionClient));
         ScheduleBatch();
     }
 
@@ -71,12 +72,30 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
         FlushBatch();
     }
 
+    private const string SlzCompanionPresenceLine =
+        "Oh hey! You're in a server with an SLZ AI player! SLZ will have commands in the future; for now it will just do its normal thing (play maps).";
+
     private void FlushBatch()
     {
         if (_pendingEntries.Count == 0) return;
 
         var entries = _pendingEntries.ToList();
         _pendingEntries.Clear();
+
+        var anySlzForNonSlzViewer = entries.Any(e => e.IsSlzCompanion) && !SlzMode.IsEnabled;
+        if (anySlzForNonSlzViewer)
+        {
+            foreach (var e in entries)
+            {
+                var one = $"{RichPresenceName(e.Name, e.NameColorHex)} has chat! They can see your messages!";
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] ChatPresenceNotifier: posting presence line (split batch, SLZ mix)");
+                _chatManager.PostSystemMessageRich(one);
+                if (e.IsSlzCompanion)
+                    _chatManager.PostSystemMessageRich(SlzCompanionPresenceLine);
+            }
+
+            return;
+        }
 
         var coloredNames = entries.Count == 1
             ? RichPresenceName(entries[0].Name, entries[0].NameColorHex)
@@ -91,7 +110,7 @@ public class ChatPresenceNotifier : IInitializable, IDisposable
     private static string RichPresenceName(string displayName, string? hex6)
     {
         var raw = hex6?.Trim();
-        var h = string.IsNullOrEmpty(raw) ? "87CEEB" : raw;
+        var h = string.IsNullOrEmpty(raw) ? "87CEEB" : raw!;
         if (h.StartsWith("#")) h = h.Substring(1);
         if (h.Length > 6) h = h.Substring(0, 6);
         if (h.Length != 6) h = "87CEEB";

@@ -8,13 +8,14 @@ using UnityEngine;
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// Loads UI sounds from Plugins/MultiplayerChat/Sounds (shipped next to the plugin DLL).
+/// Loads UI sounds from <c>Plugins/Sounds</c>, <c>Plugins/MultiplayerChat/Sounds</c>, or next to the DLL (see load routine).
 /// </summary>
 public static class ChatSoundEffects
 {
     public static AudioClip? ChatClip { get; private set; }
     public static AudioClip? MutedClip { get; private set; }
     public static AudioClip? UnmutedClip { get; private set; }
+    public static AudioClip? ErrorClip { get; private set; }
 
     private static bool _loadStarted;
 
@@ -29,10 +30,31 @@ public static class ChatSoundEffects
         if (string.IsNullOrEmpty(pluginDir))
             yield break;
 
-        var soundsDir = Path.Combine(pluginDir, "Sounds");
-        yield return LoadOgg(Path.Combine(soundsDir, "Chat.ogg"), c => ChatClip = c);
-        yield return LoadOgg(Path.Combine(soundsDir, "Muted.ogg"), c => MutedClip = c);
-        yield return LoadOgg(Path.Combine(soundsDir, "Unmuted.ogg"), c => UnmutedClip = c);
+        yield return LoadOggFromSearchRoots(pluginDir, "Chat.ogg", c => ChatClip = c);
+        yield return LoadOggFromSearchRoots(pluginDir, "Muted.ogg", c => MutedClip = c);
+        yield return LoadOggFromSearchRoots(pluginDir, "Unmuted.ogg", c => UnmutedClip = c);
+        yield return LoadOggFromSearchRoots(pluginDir, "Error.ogg", c => ErrorClip = c);
+    }
+
+    private static IEnumerator LoadOggFromSearchRoots(string pluginDir, string fileName, Action<AudioClip?> setClip)
+    {
+        var candidates = new[]
+        {
+            Path.Combine(pluginDir, "Sounds", fileName),
+            Path.Combine(pluginDir, "..", "Sounds", fileName),
+            Path.Combine(pluginDir, "MultiplayerChat", "Sounds", fileName)
+        };
+
+        foreach (var path in candidates)
+        {
+            if (!File.Exists(path))
+                continue;
+            yield return LoadOgg(path, setClip);
+            yield break;
+        }
+
+        MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Sound missing (searched next to DLL, ../Sounds, MultiplayerChat/Sounds): {fileName}");
+        setClip(null);
     }
 
     private static IEnumerator LoadOgg(string path, Action<AudioClip?> setClip)
@@ -77,6 +99,13 @@ public static class ChatSoundEffects
         if (!ModSettings.ChatBubbleSoundsEnabled || UnmutedClip == null)
             return;
         PlayOneShot(UnmutedClip, 1f);
+    }
+
+    /// <summary>Error feedback (not gated by chat bubble sounds toggle).</summary>
+    public static void PlayError()
+    {
+        if (ErrorClip == null) return;
+        PlayOneShot(ErrorClip, 1f);
     }
 
     private static void PlayOneShot(AudioClip clip, float volume01)

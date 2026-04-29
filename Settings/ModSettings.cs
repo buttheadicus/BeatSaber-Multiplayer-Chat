@@ -4,7 +4,9 @@ using UnityEngine;
 namespace MultiplayerChat.Settings;
 
 /// <summary>
-/// Persists mod settings using PlayerPrefs.
+/// Persists mod settings using Unity <see cref="PlayerPrefs"/> (Windows: typically registry under
+/// <c>HKCU\Software\Hyperbolic Magnetism\Beat Saber</c>, not the LocalLow folder). Chat id files use
+/// <see cref="ChatIdFilePaths.RootDirectory"/> instead.
 /// </summary>
 public static class ModSettings
 {
@@ -16,6 +18,13 @@ public static class ModSettings
     private const string KeyLobbyChatPosY = "MultiplayerChat.LobbyChatPosY";
     private const string KeyChatBubbleSounds = "MultiplayerChat.ChatBubbleSounds";
     private const string KeyMicInputDevice = "MultiplayerChat.MicInputDevice";
+    private const string KeyPushToTalk = "MultiplayerChat.PushToTalk";
+    private const string KeyPttBinding = "MultiplayerChat.PttBinding";
+    private const string KeyVoiceDuckEnabled = "MultiplayerChat.VoiceDuckEnabled";
+    private const string KeyVoiceDuckTargetPercent = "MultiplayerChat.VoiceDuckTargetPercent";
+    private const string KeyMuteMicDuringSongPlaying = "MultiplayerChat.MuteMicDuringSongPlaying";
+    private const string KeyDeafDuringSongPlaying = "MultiplayerChat.DeafDuringSongPlaying";
+    private const string KeyEnableAvatarExtensions = "MultiplayerChat.EnableAvatarExtensions";
 
     private const float DefaultBubbleDuration = 15f;
     private const bool DefaultShowSystemMessages = true;
@@ -48,7 +57,9 @@ public static class ModSettings
         get
         {
             var fromJson = MultiplayerExtensionsJson.GetPlayerColorHex();
-            return !string.IsNullOrEmpty(fromJson) ? fromJson : PlayerPrefs.GetString(KeyNameColor, DefaultNameColor);
+            return !string.IsNullOrEmpty(fromJson)
+                ? fromJson!
+                : PlayerPrefs.GetString(KeyNameColor, DefaultNameColor);
         }
         set
         {
@@ -117,6 +128,84 @@ public static class ModSettings
         set
         {
             PlayerPrefs.SetString(KeyMicInputDevice, value ?? "");
+            PlayerPrefs.Save();
+        }
+    }
+
+    public static bool PushToTalkEnabled
+    {
+        get => PlayerPrefs.HasKey(KeyPushToTalk) && PlayerPrefs.GetInt(KeyPushToTalk) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyPushToTalk, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>0–3: Primary, Secondary, Trigger, Grip.</summary>
+    public static int PttBindingIndex
+    {
+        get => Mathf.Clamp(PlayerPrefs.GetInt(KeyPttBinding, 0), 0, 3);
+        set
+        {
+            PlayerPrefs.SetInt(KeyPttBinding, Mathf.Clamp(value, 0, 3));
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>Lower selected game <see cref="UnityEngine.AudioSource"/> volumes while incoming voice is active; MPChat playback sources are excluded by hierarchy name.</summary>
+    public static bool VoiceDuckingEnabled
+    {
+        get => PlayerPrefs.HasKey(KeyVoiceDuckEnabled) && PlayerPrefs.GetInt(KeyVoiceDuckEnabled) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyVoiceDuckEnabled, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>Game audio multiplier while ducked (5–100), as percent of baseline per-source volume.</summary>
+    public static int VoiceDuckTargetPercent
+    {
+        get => Mathf.Clamp(PlayerPrefs.GetInt(KeyVoiceDuckTargetPercent, 35), 5, 100);
+        set
+        {
+            PlayerPrefs.SetInt(KeyVoiceDuckTargetPercent, Mathf.Clamp(value, 5, 100));
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>During active song / arena (GameCore or beatmap gameplay objects), force hot-mic mute; re-synced after VoIP reload and every frame. Restores when gameplay ends.</summary>
+    public static bool MuteMicDuringSongPlaying
+    {
+        get => PlayerPrefs.HasKey(KeyMuteMicDuringSongPlaying) && PlayerPrefs.GetInt(KeyMuteMicDuringSongPlaying) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyMuteMicDuringSongPlaying, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>During active song / arena, force deafen (incoming voice off; restores when leaving). Does not broadcast deafen packets.</summary>
+    public static bool DeafDuringSongPlaying
+    {
+        get => PlayerPrefs.HasKey(KeyDeafDuringSongPlaying) && PlayerPrefs.GetInt(KeyDeafDuringSongPlaying) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyDeafDuringSongPlaying, value ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+    }
+
+    /// <summary>
+    /// Off by default. When on, Avatar Extras load at startup (editor + packed networking). Changing this requires a game restart.
+    /// </summary>
+    public static bool EnableAvatarExtensions
+    {
+        get => PlayerPrefs.HasKey(KeyEnableAvatarExtensions) && PlayerPrefs.GetInt(KeyEnableAvatarExtensions) != 0;
+        set
+        {
+            PlayerPrefs.SetInt(KeyEnableAvatarExtensions, value ? 1 : 0);
             PlayerPrefs.Save();
         }
     }

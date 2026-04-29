@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using MultiplayerChat.Core;
 using MultiplayerChat.Settings;
 using HMUI;
@@ -26,34 +27,77 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly ChatManager _chatManager = null!;
-    [Inject] private readonly ModPresenceManager _modPresence = null!;
+
+    /// <summary>Whichever <see cref="ChatManager"/> we subscribed to for messages (lobby vs GameCore instance).</summary>
+    private ChatManager? _messageSubscriptionTarget;
 
     private readonly List<ChatBubble> _stackedBubbles = new();
+    private readonly Dictionary<string, ChatBubble> _ephemeralTypingByUserId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ChatBubble> _ephemeralRecordingByUserId = new(StringComparer.Ordinal);
     private Transform? _lobbyHeaderRoot;
+    private int _lobbyBannerMissStreak;
     private bool _wasInLobby;
     private bool _isMoveMode;
     private GameObject? _moveHandle;
     private Coroutine? _moveModeHelperCoroutine;
 
+    /// <summary>Full scene scans for avatar caption anchors — capped so lobby idle does not hitch every ~0.12–0.5s.</summary>
+    private float _nextNametagEnsureRealtime = -999f;
+    private const float NametagEnsureMinIntervalSec = 2.75f;
+
+    /// <summary>While a beatmap is playing, skip lobby polling (GameObject.Find / nametag scans).</summary>
+    private const float SongLobbyPollSleepSec = 2f;
+
     public bool IsMoveMode => _isMoveMode;
 
     public void Initialize()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
-        _chatManager.MessageReceived += OnMessageReceived;
+        DontDestroyOnLoad(gameObject);
+        RebindToActiveChatManager();
         SceneManager.sceneLoaded += OnSceneLoaded;
         StartCoroutine(ChatSoundEffects.LoadClipsRoutine());
         StartCoroutine(EnsureLobbyHeaderRoot());
     }
 
+    /// <summary>After arena → lobby (or manual VoIP reset), <see cref="ChatManager.Instance"/> may be a new object; re-subscribe so chat lines still flow.</summary>
+    public void RebindToActiveChatManager()
+    {
+        var live = ChatManager.Instance ?? _chatManager;
+        if (live == null) return;
+        if (_messageSubscriptionTarget == live)
+            return;
+        var prev = _messageSubscriptionTarget?.GetHashCode().ToString() ?? "null";
+        MpChatLobbyDiagnostics.LogVoipTransition("ChatBubbleManager:Rebind",
+            $"prevSub={prev} nextSub={live.GetHashCode()} lobby={MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby()} resultsLike={MpChatLobbyDiagnostics.ResultsLikeUiVisible()}");
+        if (_messageSubscriptionTarget != null)
+            _messageSubscriptionTarget.MessageReceived -= OnMessageReceived;
+        _messageSubscriptionTarget = live;
+        _messageSubscriptionTarget.MessageReceived += OnMessageReceived;
+    }
+
     public void Dispose()
     {
+        // Zenject disposes lobby-scoped bindings when leaving MP UI; we migrate to DontDestroyOnLoad in Initialize.
+        if (ReferenceEquals(Instance, this) && gameObject.scene.IsValid() &&
+            gameObject.scene.name.IndexOf("DontDestroy", StringComparison.OrdinalIgnoreCase) >= 0)
+            return;
+
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Instance == this)
             Instance = null;
         _isMoveMode = false;
         RemoveMoveHandle();
-        _chatManager.MessageReceived -= OnMessageReceived;
+        if (_messageSubscriptionTarget != null)
+            _messageSubscriptionTarget.MessageReceived -= OnMessageReceived;
+        _messageSubscriptionTarget = null;
+        ClearEphemeralPresenceMaps();
         foreach (var bubble in _stackedBubbles)
         {
             if (bubble != null)
@@ -66,7 +110,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private void OnMessageReceived(object? sender, ChatMessageEventArgs e)
     {
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] OnMessageReceived: {e.UserName}: {e.Message}");
         if (e.IsSystem)
         {
             ShowStackedBubble("", e.Message);
@@ -79,19 +122,39 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         ShowStackedBubble(name, msg, e.NameColor);
     }
 
+    /// <summary>Previous iteration&apos;s <see cref="IsInLobby"/> — avoids an extra <c>GameObject.Find</c> pass before each wait.</summary>
+    private bool _lastPollInLobby;
+
     private IEnumerator EnsureLobbyHeaderRoot()
     {
+        _lastPollInLobby = false;
         while (true)
         {
-            yield return new WaitForSeconds(0.5f);
-            var inLobby = IsInLobby();
+            var quickBannerRetry = _lobbyHeaderRoot == null && _lastPollInLobby && _lobbyBannerMissStreak < 40;
+            yield return new WaitForSeconds(quickBannerRetry ? 0.12f : 0.5f);
+
             var inSong = IsInSong();
+            if (inSong)
+            {
+                if (_stackedBubbles.Count > 0)
+                    ClearChat();
+                _wasInLobby = false;
+                _lastPollInLobby = false;
+                yield return new WaitForSeconds(SongLobbyPollSleepSec);
+                continue;
+            }
+
+            var inLobby = IsInLobby();
+            _lastPollInLobby = inLobby;
 
             if (_wasInLobby && !inLobby)
                 ClearChat();
-            // GameCore is often additively loaded; IsInSong checks all loaded scenes.
-            if (inSong && _stackedBubbles.Count > 0)
-                ClearChat();
+
+            if (inLobby && !_wasInLobby)
+            {
+                _nextNametagEnsureRealtime = -999f;
+                RebindToActiveChatManager();
+            }
 
             _wasInLobby = inLobby;
 
@@ -108,14 +171,22 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 {
                     var root = FindOrCreateLobbyHeaderChatRoot();
                     if (root != null)
+                    {
                         _lobbyHeaderRoot = root;
+                        _lobbyBannerMissStreak = 0;
+                    }
+                    else
+                        _lobbyBannerMissStreak++;
                 }
+
                 if (_lobbyHeaderRoot != null)
                 {
                     EnsureNametagIcons();
                     ApplyPlacementMode();
                 }
             }
+            else
+                _lobbyBannerMissStreak = 0;
         }
     }
 
@@ -293,6 +364,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     /// <summary>Force clear all chat bubbles (e.g. from user button). Keeps root to avoid layout corruption.</summary>
     public void ForceClearChat()
     {
+        ClearEphemeralPresenceMaps();
         foreach (var bubble in _stackedBubbles)
         {
             if (bubble != null && bubble.gameObject != null)
@@ -305,6 +377,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private void ClearChat()
     {
+        ClearEphemeralPresenceMaps();
         foreach (var bubble in _stackedBubbles)
         {
             if (bubble != null && bubble.gameObject != null)
@@ -320,6 +393,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private void EnsureNametagIcons()
     {
+        var now = Time.realtimeSinceStartup;
+        if (now < _nextNametagEnsureRealtime)
+            return;
+        _nextNametagEnsureRealtime = now + NametagEnsureMinIntervalSec;
+
         foreach (var ctrl in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarController>())
         {
             if (ctrl == null) continue;
@@ -394,10 +472,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
         foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
         {
-            if (tmp == null) continue;
+            if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
             var text = (tmp.text ?? "").ToUpperInvariant().Trim();
-            if (text.Contains("HOST SETUP") || text.Contains("HOSTSETUP") || text.Contains("CLIENT SETUP") ||
-                text.Contains("QUICK PLAY LOBBY") || text == "HOST SETUP" || text == "CLIENT SETUP")
+            if (BannerTextLooksLikeLobbyHeader(text))
             {
                 var canvas = tmp.GetComponentInParent<Canvas>();
                 if (AcceptCanvas(canvas))
@@ -406,10 +483,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
         foreach (var curved in UnityEngine.Object.FindObjectsOfType<CurvedTextMeshPro>())
         {
-            if (curved == null) continue;
+            if (curved == null || !curved.gameObject.activeInHierarchy) continue;
             var text = (curved.text ?? "").ToUpperInvariant().Trim();
-            if (text.Contains("HOST SETUP") || text.Contains("HOSTSETUP") || text.Contains("CLIENT SETUP") ||
-                text.Contains("QUICK PLAY LOBBY") || text == "HOST SETUP" || text == "CLIENT SETUP")
+            if (BannerTextLooksLikeLobbyHeader(text))
             {
                 var canvas = curved.GetComponentInParent<Canvas>();
                 if (AcceptCanvas(canvas))
@@ -444,10 +520,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         {
             foreach (var tmp in titleView.GetComponentsInChildren<TMPro.TMP_Text>(true))
             {
-                if (tmp == null) continue;
+                if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
                 var text = (tmp.text ?? "").ToUpperInvariant();
-                if (text.Contains("HOST SETUP") || text.Contains("HOSTSETUP") || text.Contains("CLIENT SETUP") ||
-                    text.Contains("QUICK PLAY LOBBY"))
+                if (BannerTextLooksLikeLobbyHeader(text))
                 {
                     var c = tmp.GetComponentInParent<Canvas>();
                     if (AcceptCanvas(c))
@@ -459,6 +534,16 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 return titleView.transform;
         }
         return null;
+    }
+
+    private static bool BannerTextLooksLikeLobbyHeader(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        return text.Contains("HOST SETUP") || text.Contains("HOSTSETUP") || text.Contains("CLIENT SETUP") ||
+               text.Contains("QUICK PLAY LOBBY") || text.Contains("SERVER SETUP") ||
+               text.Contains("MULTIPLAYER LOBBY") || text.Contains("PRIVATE LOBBY") ||
+               text.Contains("ROOM CODE") || text.Contains("INVITE CODE") || text.Contains("BEAT TOGETHER") ||
+               text == "HOST SETUP" || text == "CLIENT SETUP";
     }
 
     private static void EnsureCanvasRaycaster(Transform parent)
@@ -520,6 +605,122 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return rootObj.transform;
     }
 
+    /// <summary>Remote-only ephemeral lines (typing / recording voice message).</summary>
+    public void SetEphemeralTypingLine(string senderUserId, bool visible, string richText)
+    {
+        SetEphemeralLine(_ephemeralTypingByUserId, senderUserId, visible, richText);
+    }
+
+    public void SetEphemeralRecordingVoiceLine(string senderUserId, bool visible, string richText)
+    {
+        SetEphemeralLine(_ephemeralRecordingByUserId, senderUserId, visible, richText);
+    }
+
+    private void ClearEphemeralPresenceMaps()
+    {
+        foreach (var kv in _ephemeralTypingByUserId.ToList())
+        {
+            if (kv.Value == null) continue;
+            RemoveBubbleFromStack(kv.Value);
+            kv.Value.DismissEphemeral();
+        }
+
+        _ephemeralTypingByUserId.Clear();
+        foreach (var kv in _ephemeralRecordingByUserId.ToList())
+        {
+            if (kv.Value == null) continue;
+            RemoveBubbleFromStack(kv.Value);
+            kv.Value.DismissEphemeral();
+        }
+
+        _ephemeralRecordingByUserId.Clear();
+    }
+
+    private void RemoveBubbleFromStack(ChatBubble bubble)
+    {
+        if (bubble == null) return;
+        _stackedBubbles.Remove(bubble);
+    }
+
+    private void SetEphemeralLine(Dictionary<string, ChatBubble> map, string senderUserId, bool visible, string richText)
+    {
+        if (string.IsNullOrEmpty(senderUserId)) return;
+        if (!visible)
+        {
+            if (map.TryGetValue(senderUserId, out var old) && old != null)
+            {
+                RemoveBubbleFromStack(old);
+                old.DismissEphemeral();
+                map.Remove(senderUserId);
+            }
+
+            if (_lobbyHeaderRoot != null)
+            {
+                var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
+                if (rt != null)
+                    LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+            }
+
+            return;
+        }
+
+        if (!IsInLobby()) return;
+
+        if (_lobbyHeaderRoot == null)
+        {
+            var newRoot = FindOrCreateLobbyHeaderChatRoot();
+            if (newRoot == null) return;
+            _lobbyHeaderRoot = newRoot;
+            if (_isMoveMode)
+                EnsureMoveHandle();
+        }
+
+        if (map.TryGetValue(senderUserId, out var existing) && existing != null && existing.gameObject != null)
+        {
+            existing.SetText(richText);
+            var rt0 = _lobbyHeaderRoot.GetComponent<RectTransform>();
+            if (rt0 != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rt0);
+            return;
+        }
+
+        var bubble = CreateStackedBubble(_lobbyHeaderRoot);
+        if (bubble == null) return;
+        bubble.SetText(richText);
+        bubble.ShowStackedPersistent();
+        bubble.transform.SetAsFirstSibling();
+        _stackedBubbles.Insert(0, bubble);
+        map[senderUserId] = bubble;
+
+        var rt1 = _lobbyHeaderRoot.GetComponent<RectTransform>();
+        if (rt1 != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rt1);
+
+        while (_stackedBubbles.Count > MaxVisibleBubbles)
+        {
+            var oldest = _stackedBubbles[_stackedBubbles.Count - 1];
+            _stackedBubbles.RemoveAt(_stackedBubbles.Count - 1);
+            if (oldest == null) continue;
+            RemoveFromEphemeralMaps(oldest);
+            UnityEngine.Object.Destroy(oldest.gameObject);
+        }
+    }
+
+    private void RemoveFromEphemeralMaps(ChatBubble bubble)
+    {
+        foreach (var kv in _ephemeralTypingByUserId.ToList())
+        {
+            if (kv.Value == bubble)
+                _ephemeralTypingByUserId.Remove(kv.Key);
+        }
+
+        foreach (var kv in _ephemeralRecordingByUserId.ToList())
+        {
+            if (kv.Value == bubble)
+                _ephemeralRecordingByUserId.Remove(kv.Key);
+        }
+    }
+
     private void ShowStackedBubble(string userName, string message, string? nameColorHex = null)
     {
         if (!IsInLobby()) return;
@@ -545,7 +746,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
         else if (!string.IsNullOrEmpty(nameColorHex))
         {
-            var hex = nameColorHex.Trim();
+            var hex = nameColorHex!.Trim();
             if (hex.StartsWith("#")) hex = hex.Substring(1);
             if (hex.Length > 6) hex = hex.Substring(0, 6);
             if (hex.Length != 6) hex = "87CEEB";
@@ -568,7 +769,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             var oldest = _stackedBubbles[_stackedBubbles.Count - 1];
             _stackedBubbles.RemoveAt(_stackedBubbles.Count - 1);
             if (oldest != null)
+            {
+                RemoveFromEphemeralMaps(oldest);
                 UnityEngine.Object.Destroy(oldest.gameObject);
+            }
         }
     }
 
@@ -630,24 +834,14 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return false;
     }
 
-    /// <summary>True when the gameplay scene is loaded (often additive; active scene may still be Menu).</summary>
-    private static bool IsInSong()
-    {
-        try
-        {
-            for (var i = 0; i < SceneManager.sceneCount; i++)
-            {
-                var s = SceneManager.GetSceneAt(i);
-                if (s.isLoaded && s.name == "GameCore")
-                    return true;
-            }
-            return false;
-        }
-        catch { return false; }
-    }
+    /// <summary>True during beatmap play (GameCore and/or <see cref="MpChatLobbyDiagnostics.SongGameplayLikelyActive"/>).</summary>
+    private static bool IsInSong() => MpChatLobbyDiagnostics.SongGameplayLikelyActive();
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
+        RebindToActiveChatManager();
+        _lobbyBannerMissStreak = 0;
         if (scene.name != "GameCore" || _stackedBubbles.Count == 0)
             return;
         ClearChat();

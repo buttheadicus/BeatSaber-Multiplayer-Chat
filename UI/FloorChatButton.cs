@@ -21,6 +21,10 @@ public class FloorChatButton : MonoBehaviour
 
     private GameObject? _buttonRoot;
 
+    private float _nextLobbyPresencePollAt = -999f;
+
+    private bool _cachedInLobbyState;
+
     private void Start()
     {
         CreateFloorButton();
@@ -34,14 +38,19 @@ public class FloorChatButton : MonoBehaviour
 
     private void Update()
     {
-        var inLobby = IsInMultiplayerLobby();
-        if (inLobby && _buttonRoot == null)
-        {
-            // Retry creating button when we enter lobby (elements may not have been ready at Start)
-            CreateFloorButton();
-        }
+        var now = Time.realtimeSinceStartup;
         if (_buttonRoot != null)
-            _buttonRoot.SetActive(inLobby);
+            _buttonRoot.SetActive(_cachedInLobbyState);
+
+        if (now < _nextLobbyPresencePollAt)
+            return;
+        _nextLobbyPresencePollAt = now + 0.25f;
+
+        _cachedInLobbyState = IsInMultiplayerLobby();
+        if (_cachedInLobbyState && _buttonRoot == null)
+            CreateFloorButton();
+        if (_buttonRoot != null)
+            _buttonRoot.SetActive(_cachedInLobbyState);
     }
 
     private bool IsInMultiplayerLobby()

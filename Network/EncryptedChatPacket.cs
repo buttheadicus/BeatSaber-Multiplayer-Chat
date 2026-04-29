@@ -109,9 +109,9 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
     private static string? NormalizeHex(string? hex)
     {
         if (string.IsNullOrEmpty(hex)) return null;
-        hex = hex.Trim();
-        if (hex.StartsWith("#")) hex = hex.Substring(1);
-        if (hex.Length > 6) hex = hex.Substring(0, 6);
-        return hex.Length == 6 ? hex : null;
+        var h = hex!.Trim();
+        if (h.StartsWith("#")) h = h.Substring(1);
+        if (h.Length > 6) h = h.Substring(0, 6);
+        return h.Length == 6 ? h : null;
     }
 }

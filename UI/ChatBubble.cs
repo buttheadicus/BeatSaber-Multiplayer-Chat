@@ -61,6 +61,47 @@ public class ChatBubble : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    /// <summary>Stacked bubble that stays until <see cref="DismissEphemeral"/> (no timed fade-out).</summary>
+    public void ShowStackedPersistent()
+    {
+        if (_rectTransform == null || _canvasGroup == null || _textMesh == null)
+            return;
+
+        _rectTransform.localScale = Vector3.one;
+        _rectTransform.localRotation = Quaternion.identity;
+
+        if (_curvedText != null)
+            _curvedText.ForceMeshUpdate();
+        else
+            _textMesh?.ForceMeshUpdate();
+
+        _canvasGroup.alpha = 0f;
+        gameObject.SetActive(true);
+        StopAllCoroutines();
+        StartCoroutine(FadeInPersistent());
+    }
+
+    private IEnumerator FadeInPersistent()
+    {
+        if (_canvasGroup == null)
+            yield break;
+        var elapsed = 0f;
+        while (elapsed < 0.15f)
+        {
+            elapsed += Time.deltaTime;
+            _canvasGroup.alpha = Mathf.Clamp01(elapsed / 0.15f);
+            yield return null;
+        }
+
+        _canvasGroup.alpha = 1f;
+    }
+
+    public void DismissEphemeral()
+    {
+        StopAllCoroutines();
+        Destroy(gameObject);
+    }
+
     public void SetText(string text)
     {
         if (_textMesh != null)

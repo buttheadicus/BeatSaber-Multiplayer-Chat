@@ -1,4 +1,5 @@
 using HMUI;
+using MultiplayerChat.Core;
 using Zenject;
 
 namespace MultiplayerChat.UI;
@@ -23,7 +24,17 @@ public class PlayerListFlowCoordinator : FlowCoordinator
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         showBackButton = true;
-        SetTitle(Mode == PlayerListViewController.Mode.Mute ? "Mute / Unmute" : "DM PLAYER");
+        SetTitle(Mode switch
+        {
+            PlayerListViewController.Mode.Mute => "Mute / Unmute",
+            PlayerListViewController.Mode.DM => "DM PLAYER",
+            PlayerListViewController.Mode.Volume => "Player volume",
+            PlayerListViewController.Mode.Listen => "'Hear' - Listen",
+            PlayerListViewController.Mode.TalkTo => "'Hear' - Talk to",
+            _ => "Players"
+        });
+        if (Mode == PlayerListViewController.Mode.Volume)
+            PlayerVoiceVolumeStore.ReloadFromDisk();
         _playerListViewController.SetMode(Mode, () => ParentFlow?.DismissFlowCoordinator(this));
         ProvideInitialViewControllers(_playerListViewController);
     }
@@ -36,6 +47,8 @@ public class PlayerListFlowCoordinator : FlowCoordinator
 
     protected override void BackButtonWasPressed(ViewController topViewController)
     {
+        if (Mode == PlayerListViewController.Mode.Volume)
+            PlayerVoiceVolumeStore.ReloadFromDisk();
         ParentFlow?.DismissFlowCoordinator(this);
     }
 }

@@ -31,7 +31,6 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     public void Initialize()
     {
         CreateFloatingScreen();
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] FloatingChatPanel.Initialize done, _contentRoot={_contentRoot != null}");
         _chatManager.MessageReceived += OnMessageReceived;
     }
 
@@ -196,7 +195,6 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     {
         if (_contentRoot == null) return;
 
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] AddMessage: {userName}: {message}");
         var row = CreateMessageRow(userName, message, nameColorHex, systemMessageRichText);
         row.transform.SetParent(_contentRoot, false);
         _messageRows.Add(row);
@@ -255,10 +253,10 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     {
         if (!string.IsNullOrEmpty(hex))
         {
-            hex = hex.Trim();
-            if (hex.StartsWith("#")) hex = hex.Substring(1);
-            if (hex.Length > 6) hex = hex.Substring(0, 6);
-            if (hex.Length == 6) return hex;
+            var h = hex!.Trim();
+            if (h.StartsWith("#")) h = h.Substring(1);
+            if (h.Length > 6) h = h.Substring(0, 6);
+            if (h.Length == 6) return h;
         }
         return ColorUtility.ToHtmlStringRGB(UsernameColor);
     }

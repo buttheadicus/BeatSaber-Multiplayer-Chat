@@ -21,12 +21,16 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
     /// <summary>Sender's username color as 6-char hex without # (optional; old clients omit).</summary>
     public string? SenderNameColor;
 
+    /// <summary>When true, sender is an SLZ companion build; non-SLZ peers show an extra system line (0.3.0+ wire).</summary>
+    public bool IsSlzCompanionClient;
+
     public override void Serialize(NetDataWriter writer)
     {
         writer.Put(TargetUserId ?? "");
         writer.Put((byte)(IsIgnoredFromSong ? 1 : 0));
         writer.Put(SenderChatId ?? "");
         writer.Put(SenderNameColor ?? "");
+        writer.Put((byte)(IsSlzCompanionClient ? 1 : 0));
     }
 
     public override void Deserialize(NetDataReader reader)
@@ -58,5 +62,7 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
             if (!string.IsNullOrEmpty(c))
                 SenderNameColor = c;
         }
+
+        IsSlzCompanionClient = reader.AvailableBytes > 0 && reader.GetByte() != 0;
     }
 }

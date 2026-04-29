@@ -21,8 +21,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     private const string ApiUrl = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
     private const string ReleasesUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases";
 
-    private static readonly Regex VersionRegex = new(@"v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
-
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;
 
@@ -160,22 +158,12 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
     private static string? ParseVersionFromJson(string json)
     {
-        // Find all versions in the JSON (from name, tag_name, asset names) and return the highest
-        var matches = VersionRegex.Matches(json);
-        string? maxVersion = null;
-        foreach (Match m in matches)
-        {
-            var v = m.Groups[1].Value;
-            if (string.IsNullOrEmpty(maxVersion) || IsNewerVersion(v, maxVersion!))
-                maxVersion = v;
-        }
-        return maxVersion;
-    }
-
-    private static string? ExtractVersion(string s)
-    {
-        var m = VersionRegex.Match(s);
-        return m.Success ? m.Groups[1].Value : null;
+        // Align with CAU: only mod release zips (MultiplayerChat-*.zip / MultiplayerChat.zip), not CAU/source archives.
+        if (GitHubReleaseVersion.TryGetLatestVersionFromModZips(json, out var fromZips))
+            return fromZips;
+        if (GitHubReleaseVersion.TryGetLatestVersionLoose(json, out var loose))
+            return loose;
+        return null;
     }
 
     private static bool IsNewerVersion(string latest, string current)

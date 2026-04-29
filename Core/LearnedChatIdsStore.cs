@@ -84,7 +84,7 @@ public class LearnedChatIdsStore : IInitializable
                     {
                         if (string.IsNullOrEmpty(e.PlatformUserId) || !ChatPersistentId.IsValidFormat(e.ChatId))
                             continue;
-                        _platformUserIdToChatId[e.PlatformUserId] = e.ChatId!;
+                        _platformUserIdToChatId[e.PlatformUserId!] = e.ChatId!;
                     }
                 }
             }

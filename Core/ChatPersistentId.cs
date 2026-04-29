@@ -48,8 +48,8 @@ public static class ChatPersistentId
     public static bool IsValidFormat(string? value)
     {
         if (string.IsNullOrEmpty(value)) return false;
-        if (value.Length != 8) return false;
-        if (!int.TryParse(value, out var n)) return false;
+        if (value!.Length != 8) return false;
+        if (!int.TryParse(value!, out var n)) return false;
         return n >= MinId && n <= MaxId;
     }
 

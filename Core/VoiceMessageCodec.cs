@@ -12,6 +12,12 @@ namespace MultiplayerChat.Core;
 public static class VoiceMessageCodec
 {
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("VMSG");
+
+    public static bool IsVoiceMessageBlob(byte[]? blob)
+    {
+        if (blob == null || blob.Length < 4) return false;
+        return blob[0] == Magic[0] && blob[1] == Magic[1] && blob[2] == Magic[2] && blob[3] == Magic[3];
+    }
     private const byte Version = 1;
     private const int HeaderSize = 4 + 1 + 4 + 2 + 4;
 
@@ -85,15 +91,44 @@ public static class VoiceMessageCodec
         return true;
     }
 
+    /// <summary>PCM duration from the wire header only (no sample decode). Used to cap playout buffer latency.</summary>
+    public static bool TryGetDurationMs(byte[] blob, out float ms)
+    {
+        ms = 0f;
+        if (blob == null || blob.Length < HeaderSize)
+            return false;
+        if (blob[0] != Magic[0] || blob[1] != Magic[1] || blob[2] != Magic[2] || blob[3] != Magic[3])
+            return false;
+        if (blob[4] != Version)
+            return false;
+        var sampleRate = BitConverter.ToInt32(blob, 5);
+        var channels = BitConverter.ToUInt16(blob, 9);
+        var frameCount = BitConverter.ToInt32(blob, 11);
+        if (sampleRate < 8000 || channels < 1 || frameCount < 1)
+            return false;
+        if (blob.Length != HeaderSize + frameCount * channels * 4)
+            return false;
+        ms = (float)(frameCount * 1000.0 / sampleRate);
+        return true;
+    }
+
     /// <summary>Builds a one-shot <see cref="AudioClip"/> for playback.</summary>
     public static AudioClip? CreateAudioClip(byte[] blob)
     {
         if (!TryDecodeToFloatSamples(blob, out var samples, out var rate, out var ch))
             return null;
 
-        var frameCount = samples.Length / ch;
-        var clip = AudioClip.Create("VoiceMessage", frameCount, ch, rate, false);
-        clip.SetData(samples, 0);
+        return CreateAudioClipFromDecodedSamples(samples, ch, rate);
+    }
+
+    public static AudioClip? CreateAudioClipFromDecodedSamples(float[] interleavedSamples, int channels, int sampleRate)
+    {
+        if (interleavedSamples == null || interleavedSamples.Length == 0 || channels < 1 || sampleRate < 8000)
+            return null;
+        if (interleavedSamples.Length % channels != 0) return null;
+        var frameCount = interleavedSamples.Length / channels;
+        var clip = AudioClip.Create("VoiceMessage", frameCount, channels, sampleRate, false);
+        clip.SetData(interleavedSamples, 0);
         return clip;
     }
 }

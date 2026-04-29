@@ -62,6 +62,10 @@ public class UpdaterForm : Form
     private const string ReleasesUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
     private const string LatestReleaseApi = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
 
+    private static readonly Regex VersionedModZipFileRegex = new(
+        @"MultiplayerChat-(\d+)\.(\d+)\.(\d+)\.zip",
+        RegexOptions.IgnoreCase);
+
     public UpdaterForm(string beatSaberPath)
     {
         _beatSaberPath = beatSaberPath ?? Environment.CurrentDirectory;
@@ -134,9 +138,10 @@ public class UpdaterForm : Form
             client.Headers.Set("Accept", "application/vnd.github.v3+json");
 
             var json = await client.DownloadStringTaskAsync(LatestReleaseApi);
-            var zipUrl = PickReleaseZipUrl(json);
+            var zipUrl = PickBestModReleaseZipUrl(json);
             if (string.IsNullOrEmpty(zipUrl))
-                throw new Exception("No suitable .zip release asset found on GitHub (check repo releases).");
+                throw new Exception(
+                    "No suitable mod release zip found. Upload MultiplayerChat-X.Y.Z.zip or MultiplayerChat.zip as a release asset (not CAU, not GitHub's Source code archive).");
 
             var zipBytes = await client.DownloadDataTaskAsync(zipUrl);
             File.WriteAllBytes(tempZip, zipBytes);
@@ -189,39 +194,110 @@ public class UpdaterForm : Form
         }
     }
 
-    /// <summary>GitHub JSON has many browser_download_url fields; pick the mod release .zip, not API zipballs.</summary>
-    private static string PickReleaseZipUrl(string json)
+    /// <summary>Mod release zip only (matches MultiplayerChat GitHubReleaseVersion rules), highest semver.</summary>
+    private static string PickBestModReleaseZipUrl(string json)
     {
-        var matches = Regex.Matches(json, @"""browser_download_url""\s*:\s*""(https://[^""]+\.zip)""", RegexOptions.IgnoreCase);
-        var candidates = new List<string>();
-        foreach (Match m in matches)
-        {
-            if (m.Success)
-                candidates.Add(m.Groups[1].Value);
-        }
-
-        if (candidates.Count == 0)
+        var urls = ExtractReleaseZipUrls(json).Where(IsModMultiplayerChatZipUrl).ToList();
+        if (urls.Count == 0)
             return string.Empty;
 
-        // Prefer GitHub "releases/download" assets (uploaded release zips)
-        var releaseDownloads = candidates
-            .Where(u => u.IndexOf("/releases/download/", StringComparison.OrdinalIgnoreCase) >= 0)
-            .ToList();
+        string bestUrl = null;
+        string bestVer = null;
 
-        IEnumerable<string> pool = releaseDownloads.Count > 0 ? releaseDownloads : candidates;
+        foreach (var url in urls)
+        {
+            var fn = GetLastUrlPathSegment(url);
+            string v = null;
+            var vm = VersionedModZipFileRegex.Match(fn);
+            if (vm.Success)
+                v = $"{vm.Groups[1].Value}.{vm.Groups[2].Value}.{vm.Groups[3].Value}";
+            else if (TryParseVersionFromMultiplayerChatZipUrl(url, out var fromTag))
+                v = fromTag;
 
-        // Prefer filename containing MultiplayerChat (mod zip)
-        var named = pool.FirstOrDefault(u => u.IndexOf("MultiplayerChat", StringComparison.OrdinalIgnoreCase) >= 0);
-        if (named != null)
-            return named;
+            if (v == null) continue;
+            if (bestVer == null || CompareSemver(v, bestVer) > 0)
+            {
+                bestVer = v;
+                bestUrl = url;
+            }
+        }
 
-        // Prefer BeatSaber / repo name in URL
-        named = pool.FirstOrDefault(u => u.IndexOf("BeatSaber", StringComparison.OrdinalIgnoreCase) >= 0
-            || u.IndexOf("Multiplayer-Chat", StringComparison.OrdinalIgnoreCase) >= 0);
-        if (named != null)
-            return named;
+        return bestUrl ?? string.Empty;
+    }
 
-        return pool.FirstOrDefault() ?? string.Empty;
+    private static IEnumerable<string> ExtractReleaseZipUrls(string json)
+    {
+        foreach (Match m in Regex.Matches(json, @"""browser_download_url""\s*:\s*""(https://[^""]+\.zip)""",
+                     RegexOptions.IgnoreCase))
+            yield return m.Groups[1].Value;
+    }
+
+    private static bool IsModMultiplayerChatZipUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return false;
+        if (url.IndexOf("/releases/download/", StringComparison.OrdinalIgnoreCase) < 0)
+            return false;
+        if (url.IndexOf("/archive/", StringComparison.OrdinalIgnoreCase) >= 0)
+            return false;
+        if (url.IndexOf("codeload.github.com", StringComparison.OrdinalIgnoreCase) >= 0)
+            return false;
+
+        var fn = GetLastUrlPathSegment(url);
+        if (string.IsNullOrEmpty(fn)) return false;
+
+        if (fn.Equals("CAU.zip", StringComparison.OrdinalIgnoreCase)) return false;
+        if (fn.Equals("CAU.exe", StringComparison.OrdinalIgnoreCase)) return false;
+        if (fn.Equals("Chat Auto Updater (CAU).exe", StringComparison.OrdinalIgnoreCase)) return false;
+        if (fn.StartsWith("Source code", StringComparison.OrdinalIgnoreCase)) return false;
+
+        if (fn.Equals("MultiplayerChat.zip", StringComparison.OrdinalIgnoreCase)) return true;
+        return VersionedModZipFileRegex.IsMatch(fn);
+    }
+
+    private static string GetLastUrlPathSegment(string url)
+    {
+        try
+        {
+            var i = url.LastIndexOf('?');
+            var path = i >= 0 ? url.Substring(0, i) : url;
+            var slash = path.LastIndexOf('/');
+            if (slash < 0 || slash >= path.Length - 1) return "";
+            return Uri.UnescapeDataString(path.Substring(slash + 1));
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private static bool TryParseVersionFromMultiplayerChatZipUrl(string url, out string version)
+    {
+        version = "";
+        if (!GetLastUrlPathSegment(url).Equals("MultiplayerChat.zip", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var m = Regex.Match(url, @"/releases/download/([^/]+)/MultiplayerChat\.zip", RegexOptions.IgnoreCase);
+        if (!m.Success) return false;
+
+        var tag = m.Groups[1].Value.Trim();
+        if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) && tag.Length > 1)
+            tag = tag.Substring(1);
+        if (!Regex.IsMatch(tag, @"^\d+\.\d+\.\d+$")) return false;
+        version = tag;
+        return true;
+    }
+
+    private static int CompareSemver(string a, string b)
+    {
+        var ap = a.Split('.');
+        var bp = b.Split('.');
+        for (var i = 0; i < Math.Max(ap.Length, bp.Length); i++)
+        {
+            var av = i < ap.Length && int.TryParse(ap[i], out var x) ? x : 0;
+            var bv = i < bp.Length && int.TryParse(bp[i], out var y) ? y : 0;
+            if (av != bv) return av.CompareTo(bv);
+        }
+        return 0;
     }
 
     private static string FindFileRecursive(string root, string fileName)

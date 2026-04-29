@@ -47,11 +47,9 @@ public class KeyboardFlowCoordinator : FlowCoordinator
 
     private void Dismiss()
     {
+        _keyboardViewController.FlushTypingPresenceToPeers();
         BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator.DismissFlowCoordinator(this);
     }
 
-    protected override void BackButtonWasPressed(ViewController topViewController)
-    {
-        Dismiss();
-    }
+    protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();
 }

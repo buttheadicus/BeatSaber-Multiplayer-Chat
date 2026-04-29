@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components.Settings;
@@ -16,8 +15,6 @@ namespace MultiplayerChat.UI;
 [ViewDefinition("MultiplayerChat.UI.SettingsView.bsml")]
 public class SettingsViewController : BSMLAutomaticViewController
 {
-    private const string MicDefaultLabel = "Default (system)";
-
     public event EventHandler? ApplyClicked;
 
     [UIComponent("BubbleDuration")]
@@ -29,14 +26,8 @@ public class SettingsViewController : BSMLAutomaticViewController
     [UIComponent("ChatBubbleSoundsToggle")]
     private ToggleSetting? _chatBubbleSoundsToggle;
 
-    [UIComponent("MicInput")]
-    private DropDownListSetting? _micInput;
-
-    private readonly List<object> _micOptionObjects = new() { MicDefaultLabel };
-
-    /// <summary>Required by BSML <c>dropdown-list-setting</c> <c>options</c> binding; rebuilt when the view opens.</summary>
-    [UIValue("MicOptions")]
-    public IList MicOptions => _micOptionObjects;
+    [UIComponent("AvatarExtensionsToggle")]
+    private ToggleSetting? _avatarExtensionsToggle;
 
     [UIValue("BubbleDuration")]
     private float BubbleDuration
@@ -65,49 +56,11 @@ public class SettingsViewController : BSMLAutomaticViewController
         set => ModSettings.ChatBubbleSoundsEnabled = value;
     }
 
-    [UIAction("#post-parse")]
-    private void PostParse()
+    [UIValue("EnableAvatarExtensions")]
+    public bool EnableAvatarExtensions
     {
-        BuildMicList();
-    }
-
-    protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
-    {
-        base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
-        BuildMicList();
-    }
-
-    private void BuildMicList()
-    {
-        if (_micInput == null) return;
-
-        _micOptionObjects.Clear();
-        _micOptionObjects.Add(MicDefaultLabel);
-        foreach (var d in Microphone.devices ?? Array.Empty<string>())
-            _micOptionObjects.Add(d);
-
-        _micInput.Values = _micOptionObjects;
-        _micInput.UpdateChoices();
-
-        var saved = ModSettings.MicInputDeviceName;
-        if (string.IsNullOrEmpty(saved))
-            _micInput.Value = MicDefaultLabel;
-        else
-        {
-            var found = false;
-            foreach (var d in Microphone.devices ?? Array.Empty<string>())
-            {
-                if (d != saved) continue;
-                _micInput.Value = saved;
-                found = true;
-                break;
-            }
-
-            if (!found)
-                _micInput.Value = MicDefaultLabel;
-        }
-
-        _micInput.ReceiveValue();
+        get => ModSettings.EnableAvatarExtensions;
+        set => ModSettings.EnableAvatarExtensions = value;
     }
 
     [UIAction("ApplyClicked")]
@@ -126,11 +79,9 @@ public class SettingsViewController : BSMLAutomaticViewController
         if (tgl != null)
             ModSettings.ChatBubbleSoundsEnabled = tgl.isOn;
 
-        if (_micInput != null)
-        {
-            var v = _micInput.Value?.ToString() ?? "";
-            ModSettings.MicInputDeviceName = v == MicDefaultLabel || string.IsNullOrEmpty(v) ? "" : v;
-        }
+        var extTgl = _avatarExtensionsToggle?.GetComponentInChildren<Toggle>(true);
+        if (extTgl != null)
+            ModSettings.EnableAvatarExtensions = extTgl.isOn;
 
         ApplyClicked?.Invoke(this, EventArgs.Empty);
     }

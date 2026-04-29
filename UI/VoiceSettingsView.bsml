@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="10" spacing="4">
+    <dropdown-list-setting id="MicInput" text="Mic input:" options="MicOptions"/>
+    <horizontal spacing="6" vertical-fit="Unconstrained">
+      <text text="Push to talk" font-size="3.5" align="Left"/>
+      <toggle-setting id="PushToTalkToggle" value="PushToTalk"/>
+    </horizontal>
+    <dropdown-list-setting id="PttBindDropdown" text="PTT button" options="PttOptions"/>
+    <horizontal spacing="6" vertical-fit="Unconstrained">
+      <text text="Mute during song playing" font-size="3.5" align="Left"/>
+      <toggle-setting id="MuteMicDuringSongToggle" value="MuteMicDuringSong"/>
+    </horizontal>
+    <horizontal spacing="6" vertical-fit="Unconstrained">
+      <text text="Deaf during song playing" font-size="3.5" align="Left"/>
+      <toggle-setting id="DeafDuringSongToggle" value="DeafDuringSong"/>
+    </horizontal>
+    <horizontal spacing="6" horizontal-fit="PreferredSize">
+      <text text="Lower volume when player speaks" font-size="3.5" align="Left"/>
+      <button text="Configure" pad="2" on-click="ConfigureLowerVolumeWhenSpeakingClicked"/>
+    </horizontal>
+    <button text="APPLY" on-click="ApplyClicked"/>
+  </vertical>
+</bg>

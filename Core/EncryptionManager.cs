@@ -150,4 +150,7 @@ public class EncryptionManager
     }
 
     public bool HasSessionKey => _sessionKey != null;
+
+    /// <summary>Sorted comma-separated user ids last used to derive the session key (for decrypt diagnostics).</summary>
+    public string LastSessionStateFingerprint => _lastSessionState;
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MultiplayerChat;
 using MultiplayerChat.Network;
 using MultiplayerChat.Settings;
 using MultiplayerCore.Models;
@@ -19,6 +20,8 @@ public class ModPresenceManager : IInitializable, IDisposable
 {
     public static ModPresenceManager? Instance { get; private set; }
 
+    private static ModPresenceManager? _lobbyScopeInstance;
+
     private readonly HashSet<string> _playersWithMod = new();
     private readonly object _lock = new();
     private Coroutine? _presenceRetryCoroutine;
@@ -33,7 +36,9 @@ public class ModPresenceManager : IInitializable, IDisposable
     public void Initialize()
     {
         Instance = this;
-        _packetSerializer.RegisterCallback<ModPresencePacket>(OnModPresenceReceived);
+        if (!IsGameCoreContext())
+            _lobbyScopeInstance = this;
+        RegisterPresencePacketHandler();
         _sessionManager.playerConnectedEvent += OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent += OnPlayerDisconnected;
 
@@ -62,14 +67,47 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     public void Dispose()
     {
-        Instance = null;
+        var lobbyPeer = _lobbyScopeInstance;
+        var iAmLobby = ReferenceEquals(_lobbyScopeInstance, this);
+        var gameCore = IsGameCoreContext();
+
+        if (iAmLobby)
+            _lobbyScopeInstance = null;
+
+        if (Instance == this)
+        {
+            if (gameCore && lobbyPeer != null && !ReferenceEquals(lobbyPeer, this))
+                Instance = lobbyPeer;
+            else
+                Instance = null;
+        }
+
         _hasReceivedPresenceReply = false;
         CancelPresenceRetry();
         _packetSerializer.UnregisterCallback<ModPresencePacket>();
         _sessionManager.playerConnectedEvent -= OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent -= OnPlayerDisconnected;
         lock (_lock) _playersWithMod.Clear();
+
+        if (gameCore && lobbyPeer != null && !ReferenceEquals(lobbyPeer, this))
+        {
+            try
+            {
+                lobbyPeer.RegisterPresencePacketHandler();
+                MultiplayerChat.Plugin.Log?.Info("[MPChat] Lobby ModPresenceManager: re-registered ModPresencePacket after GameCore dispose");
+            }
+            catch (Exception ex)
+            {
+                MultiplayerChat.Plugin.Log?.Error($"[MPChat] Lobby ModPresence re-register failed: {ex.Message}");
+            }
+        }
     }
+
+    private bool IsGameCoreContext() =>
+        _coroutineHost != null && MpChatSceneScope.IsGameCoreHost(_coroutineHost);
+
+    private void RegisterPresencePacketHandler() =>
+        _packetSerializer.RegisterCallback<ModPresencePacket>(OnModPresenceReceived);
 
     public bool HasMod(string userId)
     {
@@ -131,7 +169,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             }
             // Proper reply - they have the mod. Lyra waits 6 seconds before showing "X has chat".
             _hasReceivedPresenceReply = true;
-            _coroutineHost.StartCoroutine(ShowPlayerWithModAfter6Seconds(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor));
+            _coroutineHost.StartCoroutine(ShowPlayerWithModAfter6Seconds(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient));
             CancelPresenceRetry();
             return;
         }
@@ -155,7 +193,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             {
                 MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {sender.userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor));
+                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient));
             }
         }
 
@@ -186,7 +224,7 @@ public class ModPresenceManager : IInitializable, IDisposable
     }
 
     /// <summary>Lyra waits 6 seconds before showing "X has chat" when she receives a reply.</summary>
-    private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName, string? senderNameColor)
+    private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName, string? senderNameColor, bool isSlzCompanionClient)
     {
         yield return new WaitForSeconds(6f);
         // Don't add if they left during the delay
@@ -199,7 +237,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             {
                 MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence reply: {userName} has chat mod");
                 PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor));
+                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor, isSlzCompanionClient));
             }
         }
     }
@@ -211,17 +249,18 @@ public class ModPresenceManager : IInitializable, IDisposable
             TargetUserId = targetUserId,
             IsIgnoredFromSong = ignoredFromSong,
             SenderChatId = ChatPersistentId.Current,
-            SenderNameColor = NormalizeNameColorForPacket(ModSettings.NameColor)
+            SenderNameColor = NormalizeNameColorForPacket(ModSettings.NameColor),
+            IsSlzCompanionClient = SlzMode.IsEnabled
         };
     }
 
     private static string? NormalizeNameColorForPacket(string? hex)
     {
         if (string.IsNullOrEmpty(hex)) return null;
-        hex = hex.Trim();
-        if (hex.StartsWith("#")) hex = hex.Substring(1);
-        if (hex.Length > 6) hex = hex.Substring(0, 6);
-        return hex.Length == 6 ? hex : null;
+        var h = hex!.Trim();
+        if (h.StartsWith("#")) h = h.Substring(1);
+        if (h.Length > 6) h = h.Substring(0, 6);
+        return h.Length == 6 ? h : null;
     }
 
     /// <summary>Sends "ignored from song" - recipient should retry in 3 seconds.</summary>
@@ -241,7 +280,8 @@ public class ModPresenceManager : IInitializable, IDisposable
         if (lobby != null && lobby.activeInHierarchy) return true;
         var alt = GameObject.Find("CenterStage");
         if (alt != null && alt.activeInHierarchy) return true;
-        return false;
+        var host = GameObject.Find("HostSetup");
+        return host != null && host.activeInHierarchy;
     }
 
     /// <summary>Sends presence only to the specified user (targeted reply).</summary>
@@ -267,10 +307,14 @@ public class PlayerWithModEventArgs : EventArgs
     /// <summary>6-char hex without # from presence packet; null if unknown or old client.</summary>
     public string? NameColorHex { get; }
 
-    public PlayerWithModEventArgs(string userId, string userName, string? nameColorHex = null)
+    /// <summary>True when the sender runs SLZ companion mode (separate system line for non-SLZ clients).</summary>
+    public bool IsSlzCompanionClient { get; }
+
+    public PlayerWithModEventArgs(string userId, string userName, string? nameColorHex = null, bool isSlzCompanionClient = false)
     {
         UserId = userId;
         UserName = userName;
         NameColorHex = nameColorHex;
+        IsSlzCompanionClient = isSlzCompanionClient;
     }
 }

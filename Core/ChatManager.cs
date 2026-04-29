@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MultiplayerChat.Network;
 using MultiplayerChat.Settings;
+using MultiplayerChat.UI;
 using MultiplayerCore.Models;
 using MultiplayerCore.Networking;
 using UnityEngine;
@@ -15,6 +16,9 @@ public class ChatManager : IInitializable, IDisposable
 {
     public static ChatManager? Instance { get; private set; }
 
+    /// <summary>Lobby/menu-scoped instance (GameCore gets a separate <see cref="ChatManager"/>; see <see cref="Dispose"/>).</summary>
+    private static ChatManager? _lobbyScopeChatManager;
+
     public event EventHandler<ChatMessageEventArgs>? MessageReceived;
 
     [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
@@ -25,7 +29,7 @@ public class ChatManager : IInitializable, IDisposable
     [Inject] private readonly CoroutineHost _coroutineHost = null!;
     [Inject] private readonly ChatPlayerIdRegistry _chatPlayerIdRegistry = null!;
 
-    private readonly Queue<byte[]> _voicePlaybackQueue = new();
+    private readonly Queue<(string UserId, byte[] Blob)> _voicePlaybackQueue = new();
     private bool _voicePlaybackRunning;
     private GameObject? _voicePlaybackGameObject;
     private Coroutine? _voicePlaybackCoroutine;
@@ -34,20 +38,82 @@ public class ChatManager : IInitializable, IDisposable
     private float? _lastMuteNotifyShownAt;
     private float? _lastUnmuteNotifyShownAt;
 
-    private const float OutgoingChatOrVoiceCooldownSeconds = 5f;
-    private float? _lastOutgoingChatOrVoiceAt;
+    private const float TalkToNotifyDisplayCooldownSeconds = 60f;
+    private float? _lastTalkToIntroDisplayAt;
+    private float? _lastTalkToStopDisplayAt;
+
+    /// <summary>Senders who notified us they talk-to'd us before we added them; used for mutual line when we add them back.</summary>
+    private readonly HashSet<string> _talkToMutualPendingFrom = new(StringComparer.Ordinal);
+
+    private const float OutgoingTalkToNotifyCooldownSeconds = 60f;
+    private readonly Dictionary<string, float> _lastOutgoingTalkToNotifyAtByTarget = new(StringComparer.Ordinal);
+
+    private const float ListenToNotifyDisplayCooldownSeconds = 60f;
+    private float? _lastListenToIntroDisplayAt;
+    private float? _lastListenToStopDisplayAt;
+
+    /// <summary>Senders who notified us they listen-filtered us before we added them; used for mutual line when we add them back.</summary>
+    private readonly HashSet<string> _listenToMutualPendingFrom = new(StringComparer.Ordinal);
+
+    private const float OutgoingListenToNotifyCooldownSeconds = 60f;
+    private readonly Dictionary<string, float> _lastOutgoingListenToNotifyAtByTarget = new(StringComparer.Ordinal);
+
+    private const float OutgoingSpamCooldownSeconds = 5f;
+    private float? _lastOutgoingTextChatAt;
+    private float? _lastOutgoingVoiceMessageAt;
 
     private const float OutgoingMuteNotifyCooldownSeconds = 60f;
-    private float? _lastOutgoingMuteNotifyAt;
+    private float? _lastOutgoingMutePlayerNotifyAt;
+    private float? _lastOutgoingUnmutePlayerNotifyAt;
+
+    private const float VoiceDeafenBroadcastCooldownSeconds = 20f;
+    private readonly Dictionary<string, float> _lastDeafenNotifyAtByUser = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, float> _lastUndeafenNotifyAtByUser = new(StringComparer.Ordinal);
+
+    private readonly Dictionary<string, Queue<byte[]>> _hotMicIncoming = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Coroutine> _hotMicUserCoroutines = new(StringComparer.Ordinal);
+    /// <summary>Per remote sender: parent for one-shot <see cref="AudioSource"/> children (Unity cannot safely stack <see cref="AudioSource.PlayScheduled"/> on one source by reassigning <see cref="AudioSource.clip"/>).</summary>
+    private readonly Dictionary<string, HotMicSequentialPlayer> _hotMicSequentialPlayers = new(StringComparer.Ordinal);
+    /// <summary>Next <see cref="AudioSettings.dspTime"/> at which this sender's following hot-mic clip should start (end of previous clip).</summary>
+    private readonly Dictionary<string, double> _hotMicNextPlayDsp = new(StringComparer.Ordinal);
+    /// <summary>Last PCM frame of the previous <see cref="AudioSource.PlayScheduled"/> segment (per sender) for boundary crossfades.</summary>
+    private readonly Dictionary<string, float[]> _hotMicLastScheduledFrameByUserId = new(StringComparer.Ordinal);
+
+    /// <summary>Pre-encrypt VHOT blobs waiting until <see cref="IsHotMicEncryptionSessionReady"/> (same key as receivers).</summary>
+    private readonly Queue<byte[]> _hotMicOutboundPending = new();
+
+    private const int MaxHotMicOutboundPendingChunks = 48;
+
+    private const int MaxHotMicCoalesceChunks = 24;
+    private const int HotMicCoalesceCrossfadeFrames = 96;
+    /// <summary>Minimal prefetch; <see cref="AudioSource.PlayScheduled"/> covers inter-chunk alignment.</summary>
+    private const int HotMicJitterPrefetchPackets = 1;
+    private const float HotMicJitterPrefetchTimeoutSec = 0.09f;
+    private const float HotMicInterChunkSpinTimeoutSec = 0.65f;
+    private const float HotMicJitterEmptyQueueGiveUpSec = 0.4f;
+    /// <summary>Short coalesce tail — scheduling removes the need for long merge waits.</summary>
+    private const float HotMicCoalesceMergeTailWaitSec = 0.028f;
+    /// <summary>Cap coalesced clips scheduled in one pump so a deep queue cannot stall the main thread.</summary>
+    private const int MaxHotMicClipsScheduledPerPump = 32;
+    /// <summary>First-clip delay (seconds) so enough packets arrive and following chunks can be scheduled before playout. 0.5 = 500 ms if you want even more cushion.</summary>
+    private const double HotMicPlayScheduleLeadSec = 0.25;
+    private const double HotMicPlayScheduleMinLeadSec = 0.002;
+    /// <summary>If the chain head is this far behind <see cref="AudioSettings.dspTime"/>, treat as a new burst.</summary>
+    private const double HotMicPlayScheduleStaleChainSec = 0.08;
+    /// <summary>Cosine blend at the start of each scheduled clip vs the end of the previous (reduces boundary clicks).</summary>
+    private const int HotMicScheduledBoundaryCrossfadeFrames = 44;
 
     public void Initialize()
     {
         Instance = this;
-        _packetSerializer.RegisterCallback<EncryptedChatPacket>(OnPacketReceived);
-        _packetSerializer.RegisterCallback<VoiceMessagePacket>(OnVoicePacketReceived);
-        _packetSerializer.RegisterCallback<DmIntroNotifyPacket>(OnDmIntroNotifyReceived);
-        _packetSerializer.RegisterCallback<MuteNotifyPacket>(OnMuteNotifyReceived);
-        _packetSerializer.RegisterCallback<DmStoppedNotifyPacket>(OnDmStoppedNotifyReceived);
+        if (!IsGameCoreSceneContext())
+            _lobbyScopeChatManager = this;
+        VoiceReceiveDiagnostics.ResetSession();
+        if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+            MultiplayerChat.Plugin.Log?.Info("[MPChat] Voice receive diagnostics (throttled) — look for [VoiceRx DROP], [HotMicRx]");
+        if (VoiceBareStreamMode.Enabled)
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] VoiceBareStreamMode.Enabled: throttled recv diagnostic lines suppressed until disabled.");
+        RegisterPacketCallbacks();
         _sessionManager.playerConnectedEvent += OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent += OnPlayerDisconnected;
         UpdateEncryptionKey();
@@ -55,21 +121,201 @@ public class ChatManager : IInitializable, IDisposable
 
     public void Dispose()
     {
-        Instance = null;
-        _packetSerializer.UnregisterCallback<EncryptedChatPacket>();
-        _packetSerializer.UnregisterCallback<VoiceMessagePacket>();
-        _packetSerializer.UnregisterCallback<DmIntroNotifyPacket>();
-        _packetSerializer.UnregisterCallback<MuteNotifyPacket>();
-        _packetSerializer.UnregisterCallback<DmStoppedNotifyPacket>();
+        var lobbyPeer = _lobbyScopeChatManager;
+        var iAmLobbyScope = ReferenceEquals(_lobbyScopeChatManager, this);
+        var gameCoreInstance = IsGameCoreSceneContext();
+
+        VoiceReceiveDiagnostics.ResetSession();
+        if (iAmLobbyScope)
+            _lobbyScopeChatManager = null;
+
+        if (Instance == this)
+        {
+            if (gameCoreInstance && lobbyPeer != null && !ReferenceEquals(lobbyPeer, this))
+                Instance = lobbyPeer;
+            else
+                Instance = null;
+        }
+
+        UnregisterPacketCallbacks();
+        VoiceChatRuntimeState.ClearListenFilterOnly();
+        _talkToMutualPendingFrom.Clear();
+        _listenToMutualPendingFrom.Clear();
         _sessionManager.playerConnectedEvent -= OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent -= OnPlayerDisconnected;
         ForceStopVoicePlayback();
         _voicePlaybackQueue.Clear();
         _voicePlaybackRunning = false;
+        StopAllHotMicPlayback();
+        ClearHotMicOutboundPending();
+
+        if (gameCoreInstance && lobbyPeer != null && !ReferenceEquals(lobbyPeer, this))
+        {
+            try
+            {
+                lobbyPeer.ReloadVoiceHotMicPipeline();
+                if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+                    MultiplayerChat.Plugin.Log?.Info("[MPChat] Lobby ChatManager: ReloadVoiceHotMicPipeline after GameCore dispose (restore packet handlers)");
+            }
+            catch (Exception ex)
+            {
+                MultiplayerChat.Plugin.Log?.Error($"[MPChat] Lobby ChatManager reload after GameCore failed: {ex.Message}");
+            }
+        }
     }
 
-    private void OnPlayerConnected(IConnectedPlayer player) => UpdateEncryptionKey();
-    private void OnPlayerDisconnected(IConnectedPlayer player) => UpdateEncryptionKey();
+    private bool IsGameCoreSceneContext() =>
+        _coroutineHost != null && MpChatSceneScope.IsGameCoreHost(_coroutineHost);
+
+    /// <summary>
+    /// Clears voice playback state and refreshes the session key (scene transitions).
+    /// Hot mic uses the same AudioClip path as voice messages so it works in GameCore.
+    /// Re-binds <strong>all</strong> chat packet callbacks: a stale GameCore <see cref="ChatManager"/> dispose can unregister
+    /// shared serializer handlers and leave the lobby instance without <see cref="EncryptedChatPacket"/> routing.
+    /// </summary>
+    public void ReloadVoiceHotMicPipeline()
+    {
+        LogVoipReloadContext("ReloadVoiceHotMicPipeline enter");
+        StopAllHotMicPlayback();
+        ForceStopVoicePlayback();
+        ClearHotMicOutboundPending();
+        UpdateEncryptionKey();
+        UnregisterPacketCallbacks();
+        RegisterPacketCallbacks();
+        LogVoipReloadContext("ReloadVoiceHotMicPipeline exit");
+    }
+
+    /// <summary>Hard reset: stops all hot mic and voice-message playback, clears queues, rebinds packet handlers, refreshes crypto.</summary>
+    public void ForceFullVoipReset()
+    {
+        MpChatLobbyDiagnostics.LogVoipTransition("ChatManager:ForceFullVoipReset:enter", null);
+        LogVoipReloadContext("ForceFullVoipReset enter");
+        ReloadVoiceHotMicPipeline();
+        LogVoipReloadContext("ForceFullVoipReset exit");
+        MpChatLobbyDiagnostics.LogVoipTransition("ChatManager:ForceFullVoipReset:exit", null);
+    }
+
+    /// <summary>Verbose diagnostics when VoIP pipeline is rebound (arena → lobby regressions).</summary>
+    public void LogVoipReloadContext(string tag)
+    {
+        if (!MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+            return;
+        var scene = _coroutineHost != null ? _coroutineHost.gameObject.scene.name : "?";
+        var localId = _sessionManager.localPlayer?.userId ?? "(null)";
+        MultiplayerChat.Plugin.Log?.Info(
+            $"[MPChat][VoIP] {tag} scene={scene} chatMgr={GetHashCode()} coroutineHost={(_coroutineHost != null)} localPlayerId={localId} hotMicPlayers={_hotMicSequentialPlayers.Count} hotMicQueues={_hotMicIncoming.Count}");
+    }
+
+    private void RegisterPacketCallbacks()
+    {
+        _packetSerializer.RegisterCallback<EncryptedChatPacket>(OnPacketReceived);
+        _packetSerializer.RegisterCallback<VoiceMessagePacket>(OnVoicePacketReceived);
+        _packetSerializer.RegisterCallback<DmIntroNotifyPacket>(OnDmIntroNotifyReceived);
+        _packetSerializer.RegisterCallback<MuteNotifyPacket>(OnMuteNotifyReceived);
+        _packetSerializer.RegisterCallback<DmStoppedNotifyPacket>(OnDmStoppedNotifyReceived);
+        _packetSerializer.RegisterCallback<TalkToNotifyPacket>(OnTalkToNotifyReceived);
+        _packetSerializer.RegisterCallback<VoiceDeafenStatePacket>(OnVoiceDeafenStateReceived);
+        _packetSerializer.RegisterCallback<ChatActivityPacket>(OnChatActivityReceived);
+        // New packet types must be registered last so existing packet IDs stay stable across mod updates.
+        _packetSerializer.RegisterCallback<ListenToNotifyPacket>(OnListenToNotifyReceived);
+    }
+
+    private void UnregisterPacketCallbacks()
+    {
+        _packetSerializer.UnregisterCallback<EncryptedChatPacket>();
+        _packetSerializer.UnregisterCallback<VoiceMessagePacket>();
+        _packetSerializer.UnregisterCallback<DmIntroNotifyPacket>();
+        _packetSerializer.UnregisterCallback<MuteNotifyPacket>();
+        _packetSerializer.UnregisterCallback<DmStoppedNotifyPacket>();
+        _packetSerializer.UnregisterCallback<TalkToNotifyPacket>();
+        _packetSerializer.UnregisterCallback<VoiceDeafenStatePacket>();
+        _packetSerializer.UnregisterCallback<ChatActivityPacket>();
+        _packetSerializer.UnregisterCallback<ListenToNotifyPacket>();
+    }
+
+    private void OnPlayerConnected(IConnectedPlayer player)
+    {
+        // Include connecting user in key material immediately; connectedPlayers / GetLobbyPlayers can lag the event by a frame.
+        UpdateEncryptionKey(player?.userId);
+        TryFlushHotMicOutboundQueue();
+    }
+
+    private void OnPlayerDisconnected(IConnectedPlayer player)
+    {
+        if (player != null && !string.IsNullOrEmpty(player.userId))
+        {
+            ClearHotMicForUser(player.userId);
+            VoiceChatRuntimeState.RemoveListenUserId(player.userId);
+        }
+
+        UpdateEncryptionKey();
+        if (!HasRemotePeerInSession())
+        {
+            ClearHotMicOutboundPending();
+            VoiceChatRuntimeState.ClearListenFilterOnly();
+        }
+    }
+
+    private void ClearHotMicForUser(string userId)
+    {
+        if (_hotMicUserCoroutines.TryGetValue(userId, out var c) && c != null)
+            _coroutineHost.StopCoroutine(c);
+        _hotMicUserCoroutines.Remove(userId);
+        _hotMicIncoming.Remove(userId);
+        _hotMicNextPlayDsp.Remove(userId);
+        _hotMicLastScheduledFrameByUserId.Remove(userId);
+        DestroyHotMicSequentialSource(userId);
+    }
+
+    /// <summary>Estimated ms of hot-mic audio still queued for this sender (excludes the clip currently playing).</summary>
+    public float GetHotMicQueuedDurationMs(string userId)
+    {
+        if (string.IsNullOrEmpty(userId) || !_hotMicIncoming.TryGetValue(userId, out var q))
+            return 0f;
+        return EstimateHotMicQueueDurationMs(q);
+    }
+
+    /// <summary>True while incoming voice message or hot mic is playing, queued, or actively being drained (for ducking / activity).</summary>
+    public bool IsIncomingVoiceAudible()
+    {
+        if (_voicePlaybackGameObject != null)
+        {
+            var src = _voicePlaybackGameObject.GetComponent<AudioSource>();
+            if (src != null && src.isPlaying)
+                return true;
+        }
+
+        if (_voicePlaybackQueue.Count > 0)
+            return true;
+        if (_voicePlaybackRunning && _voicePlaybackCoroutine != null)
+            return true;
+
+        foreach (var player in _hotMicSequentialPlayers.Values)
+        {
+            if (player?.Root == null) continue;
+            for (var i = 0; i < player.Root.transform.childCount; i++)
+            {
+                var ch = player.Root.transform.GetChild(i);
+                var s = ch.GetComponent<AudioSource>();
+                if (s != null && s.isPlaying)
+                    return true;
+            }
+        }
+
+        foreach (var kv in _hotMicIncoming)
+        {
+            if (kv.Value.Count > 0)
+                return true;
+        }
+
+        foreach (var c in _hotMicUserCoroutines.Values)
+        {
+            if (c != null)
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Returns all players in the lobby (connected + local). Use this for player list UIs.
@@ -84,25 +330,66 @@ public class ChatManager : IInitializable, IDisposable
         return list.ToArray();
     }
 
-    private void UpdateEncryptionKey()
+    /// <summary>
+    /// True if a multiplayer peer is present for broadcast VHOT (not solo). Uses both
+    /// <see cref="GetLobbyPlayers"/> and <see cref="IMultiplayerSessionManager.connectedPlayers"/> because either can
+    /// briefly lead the other around <see cref="IMultiplayerSessionManager.playerConnectedEvent"/>.
+    /// </summary>
+    private bool HasRemotePeerInSession()
     {
-        // connectedPlayers typically excludes local; include local so solo host can derive key
-        var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
+        if (GetLobbyPlayers().Length >= 2)
+            return true;
+
+        var localId = _sessionManager.localPlayer?.userId;
+        foreach (var p in _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>())
+        {
+            if (p == null || string.IsNullOrEmpty(p.userId)) continue;
+            if (localId != null && p.userId == localId) continue;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Builds the participant id set for session key derivation: <see cref="GetLobbyPlayers"/>,
+    /// <see cref="IMultiplayerSessionManager.connectedPlayers"/>, local player, and any extra ids (sender, DM target, etc.).
+    /// </summary>
+    private List<string> CollectEncryptionParticipantIds(params string?[] extraUserIds)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var p in GetLobbyPlayers())
+        {
+            if (p != null && !string.IsNullOrEmpty(p.userId))
+                ids.Add(p.userId);
+        }
+
+        foreach (var p in _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>())
+        {
+            if (p != null && !string.IsNullOrEmpty(p.userId))
+                ids.Add(p.userId);
+        }
+
         var local = _sessionManager.localPlayer;
-        var allPlayerIds = connected
-            .Where(p => p != null && !string.IsNullOrEmpty(p.userId))
-            .Select(p => p!.userId)
-            .Distinct()
-            .ToList();
-        if (local != null && !string.IsNullOrEmpty(local.userId) && !allPlayerIds.Contains(local.userId))
-            allPlayerIds.Add(local.userId);
+        if (local != null && !string.IsNullOrEmpty(local.userId))
+            ids.Add(local.userId);
 
-        // Fallback: when alone in lobby, connected can be empty and local may not be ready yet.
-        // Use a placeholder so we can still encrypt (key updates when others join).
-        if (allPlayerIds.Count == 0)
-            allPlayerIds.Add("local");
+        foreach (var id in extraUserIds)
+        {
+            if (!string.IsNullOrEmpty(id))
+                ids.Add(id!);
+        }
 
-        _encryption.UpdateSessionKey(allPlayerIds);
+        if (ids.Count == 0)
+            ids.Add("local");
+
+        return ids.ToList();
+    }
+
+    /// <summary>Derives the AES session key from lobby membership + extras (sender, DM target, …).</summary>
+    private void UpdateEncryptionKey(params string?[] extraUserIds)
+    {
+        _encryption.UpdateSessionKey(CollectEncryptionParticipantIds(extraUserIds));
     }
 
     /// <summary>Sends an encrypted chat message. In DM mode, <see cref="EncryptedChatPacket.TargetUserId"/> is the intended recipient.</summary>
@@ -118,7 +405,7 @@ public class ChatManager : IInitializable, IDisposable
             return false;
 
         var now = Time.realtimeSinceStartup;
-        if (_lastOutgoingChatOrVoiceAt.HasValue && now - _lastOutgoingChatOrVoiceAt.Value < OutgoingChatOrVoiceCooldownSeconds)
+        if (_lastOutgoingTextChatAt.HasValue && now - _lastOutgoingTextChatAt.Value < OutgoingSpamCooldownSeconds)
         {
             PostSystemMessage("Woah there! Sorry about this, some sort of spam prevention had to be in place...");
             return false;
@@ -184,8 +471,7 @@ public class ChatManager : IInitializable, IDisposable
         }
 
         _sessionManager.Send(packet);
-        _lastOutgoingChatOrVoiceAt = Time.realtimeSinceStartup;
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Sent message, invoking MessageReceived");
+        _lastOutgoingTextChatAt = Time.realtimeSinceStartup;
 
         // Show our own message locally for immediate feedback
         var localPlayer = _sessionManager.localPlayer;
@@ -217,10 +503,21 @@ public class ChatManager : IInitializable, IDisposable
             return;
 
         var now = Time.realtimeSinceStartup;
-        if (_lastOutgoingMuteNotifyAt.HasValue && now - _lastOutgoingMuteNotifyAt.Value < OutgoingMuteNotifyCooldownSeconds)
+        if (nowMuted)
         {
-            PostSystemMessage("nice try, i thought of this too, cant spam system messages to players! ;3");
-            return;
+            if (_lastOutgoingMutePlayerNotifyAt.HasValue && now - _lastOutgoingMutePlayerNotifyAt.Value < OutgoingMuteNotifyCooldownSeconds)
+            {
+                PostSystemMessage("nice try, i thought of this too, cant spam system messages to players! ;3");
+                return;
+            }
+        }
+        else
+        {
+            if (_lastOutgoingUnmutePlayerNotifyAt.HasValue && now - _lastOutgoingUnmutePlayerNotifyAt.Value < OutgoingMuteNotifyCooldownSeconds)
+            {
+                PostSystemMessage("nice try, i thought of this too, cant spam system messages to players! ;3");
+                return;
+            }
         }
 
         _sessionManager.Send(new MuteNotifyPacket
@@ -231,7 +528,10 @@ public class ChatManager : IInitializable, IDisposable
             SenderChatId = ChatPersistentId.Current,
             SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor)
         });
-        _lastOutgoingMuteNotifyAt = Time.realtimeSinceStartup;
+        if (nowMuted)
+            _lastOutgoingMutePlayerNotifyAt = Time.realtimeSinceStartup;
+        else
+            _lastOutgoingUnmutePlayerNotifyAt = Time.realtimeSinceStartup;
     }
 
     /// <summary>Notifies the DM partner that the local player ended DM mode.</summary>
@@ -269,15 +569,116 @@ public class ChatManager : IInitializable, IDisposable
             _voicePlaybackGameObject = null;
         }
         _voicePlaybackRunning = false;
+        StopAllHotMicPlayback();
+    }
+
+    private void StopAllHotMicPlayback()
+    {
+        foreach (var kv in _hotMicUserCoroutines)
+        {
+            if (kv.Value != null)
+                _coroutineHost.StopCoroutine(kv.Value);
+        }
+
+        _hotMicUserCoroutines.Clear();
+        _hotMicIncoming.Clear();
+        _hotMicNextPlayDsp.Clear();
+        _hotMicLastScheduledFrameByUserId.Clear();
+        DestroyAllHotMicSequentialSources();
+    }
+
+    /// <summary>Notify lobby that the local player toggled deafen (others show a system line, with cooldown).</summary>
+    public void SendVoiceDeafenStateNotify(bool isDeaf)
+    {
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            return;
+        _sessionManager.Send(new VoiceDeafenStatePacket
+        {
+            IsDeaf = isDeaf,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor)
+        });
+    }
+
+    /// <summary>Broadcast ephemeral lobby presence (typing / recording voice). See <see cref="ChatActivityPacket"/> kinds.</summary>
+    public void BroadcastChatActivity(byte activityKind)
+    {
+        if (activityKind == 0) return;
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            return;
+        _sessionManager.Send(new ChatActivityPacket
+        {
+            Activity = activityKind,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor)
+        });
+    }
+
+    private void OnChatActivityReceived(ChatActivityPacket packet, IConnectedPlayer sender)
+    {
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+            return;
+
+        var local = _sessionManager.localPlayer;
+        if (local != null && sender.userId == local.userId)
+            return;
+
+        var bubbles = ChatBubbleManager.Instance;
+        if (bubbles == null) return;
+
+        var name = string.IsNullOrEmpty(sender.userName) ? "Player" : sender.userName;
+        var uid = sender.userId ?? "";
+        if (uid.Length == 0) return;
+
+        switch (packet.Activity)
+        {
+            case ChatActivityPacket.TypingStart:
+                bubbles.SetEphemeralTypingLine(uid, true,
+                    SystemLineWithColoredPlayerName(name, " is typing...", packet.SenderNameColor));
+                break;
+            case ChatActivityPacket.TypingStop:
+                bubbles.SetEphemeralTypingLine(uid, false, "");
+                break;
+            case ChatActivityPacket.RecordingVoiceStart:
+                bubbles.SetEphemeralRecordingVoiceLine(uid, true,
+                    SystemLineWithColoredPlayerName(name, " is recording a voice message...", packet.SenderNameColor));
+                break;
+            case ChatActivityPacket.RecordingVoiceStop:
+                bubbles.SetEphemeralRecordingVoiceLine(uid, false, "");
+                break;
+        }
+    }
+
+    private void OnVoiceDeafenStateReceived(VoiceDeafenStatePacket packet, IConnectedPlayer sender)
+    {
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+            return;
+
+        var local = _sessionManager.localPlayer;
+        if (local != null && sender.userId == local.userId)
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        var dict = packet.IsDeaf ? _lastDeafenNotifyAtByUser : _lastUndeafenNotifyAtByUser;
+        if (dict.TryGetValue(sender.userId, out var last) &&
+            now - last < VoiceDeafenBroadcastCooldownSeconds)
+            return;
+        dict[sender.userId] = now;
+
+        var name = string.IsNullOrEmpty(sender.userName) ? "Player" : sender.userName;
+        var line = packet.IsDeaf
+            ? SystemLineWithColoredPlayerName(name, " has deafened.", packet.SenderNameColor)
+            : SystemLineWithColoredPlayerName(name, " has undeafened.", packet.SenderNameColor);
+        PostSystemMessageRich(line);
     }
 
     private static string? NormalizeHexForPacket(string? hex)
     {
         if (string.IsNullOrEmpty(hex)) return null;
-        hex = hex.Trim();
-        if (hex.StartsWith("#")) hex = hex.Substring(1);
-        if (hex.Length > 6) hex = hex.Substring(0, 6);
-        return hex.Length == 6 ? hex : null;
+        var h = hex!.Trim();
+        if (h.StartsWith("#")) h = h.Substring(1);
+        if (h.Length > 6) h = h.Substring(0, 6);
+        return h.Length == 6 ? h : null;
     }
 
     private void OnDmIntroNotifyReceived(DmIntroNotifyPacket packet, IConnectedPlayer sender)
@@ -346,6 +747,149 @@ public class ChatManager : IInitializable, IDisposable
         PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has stopped DMing you.", packet.SenderNameColor));
     }
 
+    private void OnTalkToNotifyReceived(TalkToNotifyPacket packet, IConnectedPlayer sender)
+    {
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+            return;
+        if (string.IsNullOrEmpty(packet.TargetUserId))
+            return;
+        var localPlayer = _sessionManager.localPlayer;
+        if (localPlayer == null || localPlayer.userId != packet.TargetUserId)
+            return;
+        if (!ChatPersistentId.IsValidFormat(packet.TargetChatId) || ChatPersistentId.Current != packet.TargetChatId)
+            return;
+
+        var name = string.IsNullOrEmpty(sender.userName) ? "Someone" : sender.userName;
+        var now = Time.realtimeSinceStartup;
+
+        if (packet.IsStopped)
+        {
+            _talkToMutualPendingFrom.Remove(sender.userId);
+            if (_lastTalkToStopDisplayAt.HasValue &&
+                now - _lastTalkToStopDisplayAt.Value < TalkToNotifyDisplayCooldownSeconds)
+                return;
+            _lastTalkToStopDisplayAt = now;
+            PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has stopped talking to you.", packet.SenderNameColor));
+            return;
+        }
+
+        if (VoiceChatRuntimeState.IsTalkingTo(sender.userId))
+        {
+            PostSystemMessageRich(BuildMutualTalkToLine(name, packet.SenderNameColor));
+            _talkToMutualPendingFrom.Remove(sender.userId);
+            return;
+        }
+
+        _talkToMutualPendingFrom.Add(sender.userId);
+
+        if (_lastTalkToIntroDisplayAt.HasValue &&
+            now - _lastTalkToIntroDisplayAt.Value < TalkToNotifyDisplayCooldownSeconds)
+            return;
+        _lastTalkToIntroDisplayAt = now;
+
+        const string introTail =
+            " is now talking to you. To talk back, press Hear → Talk to and select their username.";
+        var alsoOthers = BuildTalkToAlsoOthersSuffix(packet.AlsoTalkingToOthersCsv);
+        PostSystemMessageRich(SystemLineWithColoredPlayerName(name, introTail + alsoOthers, packet.SenderNameColor));
+    }
+
+    private void OnListenToNotifyReceived(ListenToNotifyPacket packet, IConnectedPlayer sender)
+    {
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+            return;
+        if (string.IsNullOrEmpty(packet.TargetUserId))
+            return;
+        var localPlayer = _sessionManager.localPlayer;
+        if (localPlayer == null || localPlayer.userId != packet.TargetUserId)
+            return;
+        if (!ChatPersistentId.IsValidFormat(packet.TargetChatId) || ChatPersistentId.Current != packet.TargetChatId)
+            return;
+
+        var name = string.IsNullOrEmpty(sender.userName) ? "Someone" : sender.userName;
+        var now = Time.realtimeSinceStartup;
+
+        if (packet.IsStopped)
+        {
+            _listenToMutualPendingFrom.Remove(sender.userId);
+            if (_lastListenToStopDisplayAt.HasValue &&
+                now - _lastListenToStopDisplayAt.Value < ListenToNotifyDisplayCooldownSeconds)
+                return;
+            _lastListenToStopDisplayAt = now;
+            PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has stopped listening to you.", packet.SenderNameColor));
+            return;
+        }
+
+        if (VoiceChatRuntimeState.IsListeningTo(sender.userId))
+        {
+            PostSystemMessageRich(BuildMutualListenLine(name, packet.SenderNameColor));
+            _listenToMutualPendingFrom.Remove(sender.userId);
+            return;
+        }
+
+        _listenToMutualPendingFrom.Add(sender.userId);
+
+        if (_lastListenToIntroDisplayAt.HasValue &&
+            now - _lastListenToIntroDisplayAt.Value < ListenToNotifyDisplayCooldownSeconds)
+            return;
+        _lastListenToIntroDisplayAt = now;
+
+        const string introTail =
+            " has started listening to you.";
+        var alsoOthers = BuildListenToAlsoOthersSuffix(packet.AlsoListeningToOthersCsv);
+        PostSystemMessageRich(SystemLineWithColoredPlayerName(name, introTail + alsoOthers, packet.SenderNameColor));
+    }
+
+    private static string BuildOxfordAmpersandList(IReadOnlyList<string> escapedDisplayNames)
+    {
+        if (escapedDisplayNames.Count == 0) return "";
+        if (escapedDisplayNames.Count == 1) return escapedDisplayNames[0];
+        if (escapedDisplayNames.Count == 2) return $"{escapedDisplayNames[0]} & {escapedDisplayNames[1]}";
+        return string.Join(", ", escapedDisplayNames.Take(escapedDisplayNames.Count - 1)) + " & " +
+               escapedDisplayNames[escapedDisplayNames.Count - 1];
+    }
+
+    private string BuildTalkToAlsoOthersSuffix(string? csv)
+    {
+        if (string.IsNullOrEmpty(csv))
+            return "";
+        var ids = csv!.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        var names = new List<string>();
+        foreach (var raw in ids)
+        {
+            var id = (raw ?? "").Trim();
+            if (string.IsNullOrEmpty(id))
+                continue;
+            var n = ResolveConnectedDisplayName(id);
+            var label = string.IsNullOrEmpty(n) ? id : n;
+            names.Add((label ?? "").Replace("<", "&lt;").Replace(">", "&gt;"));
+        }
+
+        if (names.Count == 0)
+            return "";
+        return " They are also talking to " + BuildOxfordAmpersandList(names) + ".";
+    }
+
+    private string BuildListenToAlsoOthersSuffix(string? csv)
+    {
+        if (string.IsNullOrEmpty(csv))
+            return "";
+        var ids = csv!.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        var names = new List<string>();
+        foreach (var raw in ids)
+        {
+            var id = (raw ?? "").Trim();
+            if (string.IsNullOrEmpty(id))
+                continue;
+            var n = ResolveConnectedDisplayName(id);
+            var label = string.IsNullOrEmpty(n) ? id : n;
+            names.Add((label ?? "").Replace("<", "&lt;").Replace(">", "&gt;"));
+        }
+
+        if (names.Count == 0)
+            return "";
+        return " They are also listening to " + BuildOxfordAmpersandList(names) + ".";
+    }
+
     private void OnPacketReceived(EncryptedChatPacket packet, IConnectedPlayer sender)
     {
         if (packet.EncryptedPayload == null || packet.EncryptedPayload.Length == 0)
@@ -364,11 +908,19 @@ public class ChatManager : IInitializable, IDisposable
         if (!ChatPacketIdValidation.IsLocalParticipant(packet.TargetUserId, packet.TargetChatId, isDm, localPlayer?.userId, sender.userId))
             return;
 
-        UpdateEncryptionKey();
-
+        UpdateEncryptionKey(sender.userId, packet.TargetUserId);
         var decrypted = _encryption.Decrypt(packet.EncryptedPayload);
         if (decrypted == null)
+        {
+            UpdateEncryptionKey(sender.userId, packet.TargetUserId, localPlayer?.userId);
+            decrypted = _encryption.Decrypt(packet.EncryptedPayload);
+        }
+
+        if (decrypted == null)
+        {
+            VoiceReceiveDiagnostics.LogDecryptFailedWithFingerprintThrottled(sender.userId, _encryption.LastSessionStateFingerprint);
             return;
+        }
 
         decrypted = decrypted.Replace("<", "&lt;").Replace(">", "&gt;");
         NotifyMessageReceived(new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
@@ -406,6 +958,201 @@ public class ChatManager : IInitializable, IDisposable
         return "You and " + $"<color=#{hex}>{safeName}</color> are now DMing eachother.";
     }
 
+    /// <summary>Rich system line when both players have each other in talk-to.</summary>
+    public static string BuildMutualTalkToLine(string peerDisplayName, string? peerNameColorHex)
+    {
+        var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
+        var safeName = (peerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        return "You and " + $"<color=#{hex}>{safeName}</color> are now talking to each other.";
+    }
+
+    /// <summary>Rich system line when both players have each other in listen-only filter.</summary>
+    public static string BuildMutualListenLine(string peerDisplayName, string? peerNameColorHex)
+    {
+        var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
+        var safeName = (peerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        return "You and " + $"<color=#{hex}>{safeName}</color> are now listening to each other.";
+    }
+
+    /// <summary>Call after <see cref="VoiceChatRuntimeState.ToggleTalkTo"/> to notify peers (add/remove).</summary>
+    public void AfterTalkToSelectionChanged(HashSet<string> previousTalkToIds)
+    {
+        var current = VoiceChatRuntimeState.CopyTalkToUserIds();
+        foreach (var id in previousTalkToIds)
+        {
+            if (!current.Contains(id))
+            {
+                _talkToMutualPendingFrom.Remove(id);
+                TrySendTalkToNotify(id, stopped: true);
+            }
+        }
+
+        foreach (var id in current)
+        {
+            if (previousTalkToIds.Contains(id))
+                continue;
+            if (_talkToMutualPendingFrom.Contains(id))
+            {
+                var n = ResolveConnectedDisplayName(id);
+                PostSystemMessageRich(BuildMutualTalkToLine(string.IsNullOrEmpty(n) ? "Player" : n!, null));
+                _talkToMutualPendingFrom.Remove(id);
+            }
+
+            TrySendTalkToNotify(id, stopped: false);
+        }
+    }
+
+    private string? ResolveConnectedDisplayName(string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
+            return null;
+        foreach (var p in GetLobbyPlayers())
+        {
+            if (p != null && p.userId == userId)
+                return string.IsNullOrEmpty(p.userName) ? userId : p.userName;
+        }
+
+        return null;
+    }
+
+    private void TrySendTalkToNotify(string targetPlatformUserId, bool stopped)
+    {
+        if (string.IsNullOrEmpty(targetPlatformUserId))
+            return;
+        var local = _sessionManager.localPlayer;
+        if (local == null || targetPlatformUserId == local.userId)
+            return;
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            return;
+        if (!_chatPlayerIdRegistry.TryGetChatId(targetPlatformUserId, out var targetCid) ||
+            !ChatPersistentId.IsValidFormat(targetCid))
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        if (!stopped)
+        {
+            if (_lastOutgoingTalkToNotifyAtByTarget.TryGetValue(targetPlatformUserId, out var last) &&
+                now - last < OutgoingTalkToNotifyCooldownSeconds)
+            {
+                PostSystemMessage("nice try, i thought of this too, cant spam system messages to players! ;3");
+                return;
+            }
+        }
+
+        string? othersCsv = null;
+        if (!stopped)
+        {
+            var parts = new List<string>();
+            foreach (var id in VoiceChatRuntimeState.TalkToUserIds)
+            {
+                if (string.IsNullOrEmpty(id) || id == targetPlatformUserId)
+                    continue;
+                parts.Add(id);
+            }
+
+            if (parts.Count > 0)
+                othersCsv = string.Join(",", parts);
+        }
+
+        _sessionManager.Send(new TalkToNotifyPacket
+        {
+            TargetUserId = targetPlatformUserId,
+            TargetChatId = targetCid,
+            IsStopped = stopped,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor),
+            AlsoTalkingToOthersCsv = othersCsv
+        });
+
+        if (!stopped)
+            _lastOutgoingTalkToNotifyAtByTarget[targetPlatformUserId] = now;
+        else
+            _lastOutgoingTalkToNotifyAtByTarget.Remove(targetPlatformUserId);
+    }
+
+    /// <summary>Call after <see cref="VoiceChatRuntimeState.ToggleListen"/> to notify peers (add/remove).</summary>
+    public void AfterListenSelectionChanged(HashSet<string> previousListenUserIds)
+    {
+        var current = VoiceChatRuntimeState.CopyListenUserIds();
+        foreach (var id in previousListenUserIds)
+        {
+            if (!current.Contains(id))
+            {
+                _listenToMutualPendingFrom.Remove(id);
+                TrySendListenToNotify(id, stopped: true);
+            }
+        }
+
+        foreach (var id in current)
+        {
+            if (previousListenUserIds.Contains(id))
+                continue;
+            if (_listenToMutualPendingFrom.Contains(id))
+            {
+                var n = ResolveConnectedDisplayName(id);
+                PostSystemMessageRich(BuildMutualListenLine(string.IsNullOrEmpty(n) ? "Player" : n!, null));
+                _listenToMutualPendingFrom.Remove(id);
+            }
+
+            TrySendListenToNotify(id, stopped: false);
+        }
+    }
+
+    private void TrySendListenToNotify(string targetPlatformUserId, bool stopped)
+    {
+        if (string.IsNullOrEmpty(targetPlatformUserId))
+            return;
+        var local = _sessionManager.localPlayer;
+        if (local == null || targetPlatformUserId == local.userId)
+            return;
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            return;
+        if (!_chatPlayerIdRegistry.TryGetChatId(targetPlatformUserId, out var targetCid) ||
+            !ChatPersistentId.IsValidFormat(targetCid))
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        if (!stopped)
+        {
+            if (_lastOutgoingListenToNotifyAtByTarget.TryGetValue(targetPlatformUserId, out var last) &&
+                now - last < OutgoingListenToNotifyCooldownSeconds)
+            {
+                PostSystemMessage("nice try, i thought of this too, cant spam system messages to players! ;3");
+                return;
+            }
+        }
+
+        string? othersCsv = null;
+        if (!stopped)
+        {
+            var parts = new List<string>();
+            foreach (var id in VoiceChatRuntimeState.ListenUserIds)
+            {
+                if (string.IsNullOrEmpty(id) || id == targetPlatformUserId)
+                    continue;
+                parts.Add(id);
+            }
+
+            if (parts.Count > 0)
+                othersCsv = string.Join(",", parts);
+        }
+
+        _sessionManager.Send(new ListenToNotifyPacket
+        {
+            TargetUserId = targetPlatformUserId,
+            TargetChatId = targetCid,
+            IsStopped = stopped,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor),
+            AlsoListeningToOthersCsv = othersCsv
+        });
+
+        if (!stopped)
+            _lastOutgoingListenToNotifyAtByTarget[targetPlatformUserId] = now;
+        else
+            _lastOutgoingListenToNotifyAtByTarget.Remove(targetPlatformUserId);
+    }
+
     /// <summary>Sends encrypted voice. In DM mode, <see cref="VoiceMessagePacket.TargetUserId"/> is the intended recipient.</summary>
     /// <returns>True if the voice packet was sent.</returns>
     /// <remarks>Same broadcast + client filter model as text chat; see <see cref="SendMessage"/>.</remarks>
@@ -415,7 +1162,7 @@ public class ChatManager : IInitializable, IDisposable
             return false;
 
         var now = Time.realtimeSinceStartup;
-        if (_lastOutgoingChatOrVoiceAt.HasValue && now - _lastOutgoingChatOrVoiceAt.Value < OutgoingChatOrVoiceCooldownSeconds)
+        if (_lastOutgoingVoiceMessageAt.HasValue && now - _lastOutgoingVoiceMessageAt.Value < OutgoingSpamCooldownSeconds)
         {
             PostSystemMessage("Woah there! Sorry about this, some sort of spam prevention had to be in place...");
             return false;
@@ -427,7 +1174,7 @@ public class ChatManager : IInitializable, IDisposable
             return false;
         }
 
-        if (_dmState.IsInDMMode)
+        if (VoiceChatRuntimeState.TalkToUserIds.Count == 0 && _dmState.IsInDMMode)
         {
             if (string.IsNullOrEmpty(_dmState.DMTargetUserId) || !ChatPersistentId.IsValidFormat(_dmState.DMTargetChatId))
             {
@@ -444,27 +1191,19 @@ public class ChatManager : IInitializable, IDisposable
             return false;
         }
 
-        var voicePacket = new VoiceMessagePacket
-        {
-            EncryptedPayload = encrypted,
-            NameColor = NormalizeHexForPacket(ModSettings.NameColor),
-            SenderChatId = ChatPersistentId.Current
-        };
-        if (_dmState.IsInDMMode)
-        {
-            voicePacket.TargetUserId = _dmState.DMTargetUserId;
-            voicePacket.TargetChatId = _dmState.DMTargetChatId;
-        }
+        if (!TrySendEncryptedVoiceToTargets(encrypted))
+            return false;
 
-        _sessionManager.Send(voicePacket);
-        _lastOutgoingChatOrVoiceAt = Time.realtimeSinceStartup;
+        _lastOutgoingVoiceMessageAt = Time.realtimeSinceStartup;
 
         var localPlayer = _sessionManager.localPlayer;
         if (localPlayer != null)
         {
             var name = string.IsNullOrEmpty(localPlayer.userName) ? "Player" : localPlayer.userName;
             var localHex = NormalizeHexForPacket(ModSettings.NameColor);
-            if (_dmState.IsInDMMode)
+            if (VoiceChatRuntimeState.TalkToUserIds.Count > 0)
+                PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has sent a voice message", localHex));
+            else if (_dmState.IsInDMMode)
                 PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " sent a DM Voice Message", localHex));
             else
                 PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has sent a voice message", localHex));
@@ -473,28 +1212,221 @@ public class ChatManager : IInitializable, IDisposable
         return true;
     }
 
+    private void ClearHotMicOutboundPending() => _hotMicOutboundPending.Clear();
+
+    private void EnqueueHotMicOutboundPending(byte[] voicePlainBlob)
+    {
+        while (_hotMicOutboundPending.Count >= MaxHotMicOutboundPendingChunks)
+            _hotMicOutboundPending.Dequeue();
+        _hotMicOutboundPending.Enqueue((byte[])voicePlainBlob.Clone());
+    }
+
+    /// <summary>
+    /// Broadcast hot mic: with normal encryption, session key must match receivers (queued until ready).
+    /// </summary>
+    private bool IsHotMicEncryptionSessionReady()
+    {
+        if (VoiceChatRuntimeState.TalkToUserIds.Count > 0)
+            return true;
+        if (_dmState.IsInDMMode)
+            return true;
+        return HasRemotePeerInSession();
+    }
+
+    private void TryFlushHotMicOutboundQueue()
+    {
+        if (!IsHotMicEncryptionSessionReady())
+            return;
+        while (_hotMicOutboundPending.Count > 0)
+        {
+            var b = _hotMicOutboundPending.Dequeue();
+            SendVoiceHotMicChunkInternal(b);
+        }
+    }
+
+    private bool SendVoiceHotMicChunkInternal(byte[] voicePlainBlob)
+    {
+        UpdateEncryptionKey();
+        var encrypted = _encryption.Encrypt(voicePlainBlob);
+        if (encrypted == null)
+        {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Hot mic encrypt failed (no session key?)");
+            return false;
+        }
+
+        var ok = TrySendEncryptedVoiceToTargets(encrypted);
+        if (ok)
+            VoipPipelineTrace.TxDispatch(voicePlainBlob.Length, encrypted.Length);
+        return ok;
+    }
+
+    /// <summary>Hot mic chunks: no chat/voice cooldown; same encryption and DM/talk-to routing as voice messages.</summary>
+    public bool SendVoiceHotMicChunk(byte[] voicePlainBlob)
+    {
+        if (voicePlainBlob == null || voicePlainBlob.Length == 0)
+            return false;
+
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+        {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Cannot send hot mic: invalid local Chat ID.");
+            return false;
+        }
+
+        if (VoiceChatRuntimeState.TalkToUserIds.Count == 0 && _dmState.IsInDMMode)
+        {
+            if (string.IsNullOrEmpty(_dmState.DMTargetUserId) || !ChatPersistentId.IsValidFormat(_dmState.DMTargetChatId))
+            {
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Cannot send hot mic in DM: invalid target Chat ID.");
+                return false;
+            }
+        }
+
+        if (!IsHotMicEncryptionSessionReady())
+        {
+            EnqueueHotMicOutboundPending(voicePlainBlob);
+            return true;
+        }
+
+        TryFlushHotMicOutboundQueue();
+        return SendVoiceHotMicChunkInternal(voicePlainBlob);
+    }
+
+    /// <summary>One encrypted voice blob, one or more packets (multi talk-to or broadcast / single DM).</summary>
+    private bool TrySendEncryptedVoiceToTargets(byte[] encrypted)
+    {
+        var nameColor = NormalizeHexForPacket(ModSettings.NameColor);
+        var senderChatId = ChatPersistentId.Current;
+
+        if (VoiceChatRuntimeState.TalkToUserIds.Count > 0)
+        {
+            var any = false;
+            foreach (var uid in VoiceChatRuntimeState.TalkToUserIds)
+            {
+                if (!_chatPlayerIdRegistry.TryGetChatId(uid, out var cid) || !ChatPersistentId.IsValidFormat(cid))
+                {
+                    MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Talk-to: missing or invalid Chat ID for {uid}");
+                    continue;
+                }
+
+                SendVoiceMessagePacket(new VoiceMessagePacket
+                {
+                    EncryptedPayload = encrypted,
+                    NameColor = nameColor,
+                    SenderChatId = senderChatId,
+                    TargetUserId = uid,
+                    TargetChatId = cid
+                });
+                any = true;
+            }
+
+            if (!any)
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Talk-to voice: no recipients with known Chat IDs.");
+            return any;
+        }
+
+        var voicePacket = new VoiceMessagePacket
+        {
+            EncryptedPayload = encrypted,
+            NameColor = nameColor,
+            SenderChatId = senderChatId
+        };
+        if (_dmState.IsInDMMode)
+        {
+            voicePacket.TargetUserId = _dmState.DMTargetUserId;
+            voicePacket.TargetChatId = _dmState.DMTargetChatId;
+        }
+
+        SendVoiceMessagePacket(voicePacket);
+        return true;
+    }
+
+    /// <summary>
+    /// Outgoing voice uses <see cref="IMultiplayerSessionManager.Send"/> (same custom-packet channel as MultiplayerCore).
+    /// A full bypass of that stack for VoIP would need a parallel transport (e.g. Steam P2P or negotiated UDP) and matching receive.
+    /// </summary>
+    private void SendVoiceMessagePacket(VoiceMessagePacket voicePacket) => _sessionManager.Send(voicePacket);
+
+    private static bool IsEffectivelyDeafForIncomingVoice() => VoiceChatRuntimeState.IsDeaf;
+
     private void OnVoicePacketReceived(VoiceMessagePacket packet, IConnectedPlayer sender)
     {
         if (packet.EncryptedPayload == null || packet.EncryptedPayload.Length == 0)
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("empty_voice_payload", null);
             return;
+        }
 
         if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("reject_sender_chat_id", sender.userId);
             return;
+        }
 
         if (_muteManager.IsMuted(sender.userId))
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("sender_muted", sender.userId);
             return;
+        }
 
         if (!ChatPacketIdValidation.TryParseDmRouting(packet.TargetUserId, packet.TargetChatId, out var isDm))
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("dm_routing_parse_failed", null);
             return;
+        }
 
         var localPlayer = _sessionManager.localPlayer;
         if (!ChatPacketIdValidation.IsLocalParticipant(packet.TargetUserId, packet.TargetChatId, isDm, localPlayer?.userId, sender.userId))
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("not_local_dm_target_or_routing",
+                $"isDm={isDm} local={localPlayer?.userId} from={sender.userId}");
             return;
+        }
 
-        UpdateEncryptionKey();
-        var decrypted = _encryption.DecryptToBytes(packet.EncryptedPayload);
+        var enc = packet.EncryptedPayload!;
+        UpdateEncryptionKey(sender.userId, packet.TargetUserId);
+        var decrypted = _encryption.DecryptToBytes(enc);
         if (decrypted == null)
+        {
+            UpdateEncryptionKey(sender.userId, packet.TargetUserId, localPlayer?.userId);
+            decrypted = _encryption.DecryptToBytes(enc);
+        }
+
+        if (decrypted == null)
+        {
+            VoiceReceiveDiagnostics.LogDecryptFailedWithFingerprintThrottled(sender.userId, _encryption.LastSessionStateFingerprint);
             return;
+        }
+
+        if (!VoiceChatRuntimeState.ShouldPlayIncomingVoiceFrom(sender.userId))
+        {
+            VoiceReceiveDiagnostics.LogFilterSnapshotForBlockedSender(sender.userId);
+            return;
+        }
+
+        if (VoiceHotMicCodec.IsHotMicBlob(decrypted))
+        {
+            if (IsEffectivelyDeafForIncomingVoice())
+            {
+                VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("local_deaf_hot_mic", sender.userId);
+                return;
+            }
+
+            VoiceReceiveDiagnostics.LogHotMicFirstChunkFromUser(sender.userId, decrypted.Length);
+            EnqueueIncomingHotMic(sender.userId, decrypted);
+            return;
+        }
+
+        if (IsEffectivelyDeafForIncomingVoice())
+        {
+            VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("local_deaf", null);
+            return;
+        }
+
+        if (!VoiceMessageCodec.IsVoiceMessageBlob(decrypted))
+        {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Voice payload is neither VMSG nor VHOT; dropping.");
+            return;
+        }
 
         var name = string.IsNullOrEmpty(sender.userName) ? "Player" : sender.userName;
         if (isDm)
@@ -502,14 +1434,32 @@ public class ChatManager : IInitializable, IDisposable
         else
             PostSystemMessageRich(SystemLineWithColoredPlayerName(name, " has sent a voice message", packet.NameColor));
 
-        EnqueueVoicePlayback(decrypted);
+        EnqueueVoicePlayback(sender.userId, decrypted);
     }
 
-    private void EnqueueVoicePlayback(byte[] decodedBlob)
+    private void EnqueueVoicePlayback(string userId, byte[] decodedBlob)
     {
-        _voicePlaybackQueue.Enqueue(decodedBlob);
+        _voicePlaybackQueue.Enqueue((userId, decodedBlob));
+        TrimVoiceMessageQueueToTargetLatency();
         if (!_voicePlaybackRunning)
             _voicePlaybackCoroutine = _coroutineHost.StartCoroutine(VoicePlaybackQueueRunner());
+    }
+
+    /// <summary>Disabled: dropping queued voice messages caused audible truncation/clicks; backlog plays in full.</summary>
+    private void TrimVoiceMessageQueueToTargetLatency()
+    {
+    }
+
+    private static float EstimateHotMicQueueDurationMs(Queue<byte[]> q)
+    {
+        var total = 0f;
+        foreach (var b in q)
+        {
+            if (VoiceHotMicCodec.TryGetDurationMs(b, out var ms))
+                total += ms;
+        }
+
+        return total;
     }
 
     private IEnumerator VoicePlaybackQueueRunner()
@@ -519,14 +1469,11 @@ public class ChatManager : IInitializable, IDisposable
         {
             while (_voicePlaybackQueue.Count > 0)
             {
-                var blob = _voicePlaybackQueue.Dequeue();
-                var clip = VoiceMessageCodec.CreateAudioClip(blob);
-                if (clip == null)
-                {
-                    MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not decode voice message");
-                    continue;
-                }
-                yield return PlayVoiceClipCoroutine(clip);
+                TrimVoiceMessageQueueToTargetLatency();
+                if (_voicePlaybackQueue.Count == 0)
+                    break;
+                var (uid, blob) = _voicePlaybackQueue.Dequeue();
+                yield return PlayVoiceClipCoroutine(blob, uid);
             }
         }
         finally
@@ -538,8 +1485,118 @@ public class ChatManager : IInitializable, IDisposable
         }
     }
 
-    private IEnumerator PlayVoiceClipCoroutine(AudioClip clip)
+    /// <summary>Waits until the clip has finished on the audio device. Using <see cref="WaitForSeconds"/> with
+    /// <see cref="AudioClip.length"/> drifts from real playback over time (Time vs DSP clock).</summary>
+    private static IEnumerator WaitForAudioSourceClipEnd(AudioSource src, AudioClip clip)
     {
+        if (src == null || clip == null)
+            yield break;
+
+        src.Play();
+        GlobalChatAudioHost.NotifyIncomingVoiceActivity();
+        yield return null;
+
+        var deadline = Time.realtimeSinceStartup + clip.length + 2f;
+        while (src != null && src.isPlaying && Time.realtimeSinceStartup < deadline)
+            yield return null;
+    }
+
+    private HotMicSequentialPlayer GetOrCreateHotMicSequentialPlayer(string userId)
+    {
+        if (_hotMicSequentialPlayers.TryGetValue(userId, out var existing) && existing != null && existing.Root != null)
+            return existing;
+
+        _hotMicSequentialPlayers.Remove(userId);
+        var player = new HotMicSequentialPlayer(_coroutineHost.transform);
+        _hotMicSequentialPlayers[userId] = player;
+        return player;
+    }
+
+    private void DestroyHotMicSequentialSource(string userId)
+    {
+        if (!_hotMicSequentialPlayers.TryGetValue(userId, out var player))
+            return;
+        _hotMicSequentialPlayers.Remove(userId);
+        _hotMicNextPlayDsp.Remove(userId);
+        _hotMicLastScheduledFrameByUserId.Remove(userId);
+        if (player?.Root != null)
+            UnityEngine.Object.Destroy(player.Root);
+    }
+
+    private void DestroyAllHotMicSequentialSources()
+    {
+        foreach (var kv in _hotMicSequentialPlayers)
+        {
+            if (kv.Value?.Root != null)
+                UnityEngine.Object.Destroy(kv.Value.Root);
+        }
+
+        _hotMicSequentialPlayers.Clear();
+    }
+
+    /// <summary>Append interleaved <paramref name="next"/> to <paramref name="merged"/>, crossfading over the overlap (cosine curve).</summary>
+    private static void AppendSamplesWithCrossfade(List<float> merged, float[] next, int channels)
+    {
+        if (next == null || next.Length == 0 || channels < 1)
+            return;
+        if (merged.Count == 0)
+        {
+            merged.AddRange(next);
+            return;
+        }
+
+        var crossFrames = Mathf.Min(HotMicCoalesceCrossfadeFrames, merged.Count / channels, next.Length / channels);
+        if (crossFrames < 2)
+        {
+            merged.AddRange(next);
+            return;
+        }
+
+        var cross = crossFrames * channels;
+        for (var f = 0; f < crossFrames; f++)
+        {
+            var u = (f + 1f) / crossFrames;
+            var t = 0.5f - 0.5f * Mathf.Cos(Mathf.PI * u);
+            for (var c = 0; c < channels; c++)
+            {
+                var idxOld = merged.Count - cross + f * channels + c;
+                var idxNew = f * channels + c;
+                merged[idxOld] = merged[idxOld] * (1f - t) + next[idxNew] * t;
+            }
+        }
+
+        for (var i = cross; i < next.Length; i++)
+            merged.Add(next[i]);
+    }
+
+    private IEnumerator PlayVoiceClipCoroutine(byte[] blob, string senderUserId)
+    {
+        if (!VoiceMessageCodec.TryDecodeToFloatSamples(blob, out var samples, out var rate, out var ch))
+        {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not decode voice message");
+            yield break;
+        }
+
+        var peakDecodeVm = ComputePeakAbs(samples);
+        var gainVm = VoiceChatAudioLevel.GetVoiceChatPlaybackGain(senderUserId);
+        if (!VoiceBareStreamMode.Enabled)
+        {
+            if (VoiceReceiveDiagnostics.ShouldLogVoiceMessageChunkLine(senderUserId))
+            {
+                var vpc = PlayerVoiceVolumeStore.GetVolumePercent(senderUserId);
+                VoiceReceiveDiagnostics.LogVoiceMessageChunkLine(senderUserId, vpc, gainVm, peakDecodeVm, rate, ch, samples.Length);
+            }
+        }
+
+        VoiceChatAudioLevel.ApplyReceiveGainToSamples(samples, senderUserId);
+
+        var clip = VoiceMessageCodec.CreateAudioClipFromDecodedSamples(samples, ch, rate);
+        if (clip == null)
+        {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not build voice message clip");
+            yield break;
+        }
+
         var go = new GameObject("MPChatVoicePlayback");
         _voicePlaybackGameObject = go;
         var src = go.AddComponent<AudioSource>();
@@ -549,12 +1606,290 @@ public class ChatManager : IInitializable, IDisposable
         src.bypassEffects = true;
         src.bypassListenerEffects = true;
         src.bypassReverbZones = true;
-        src.Play();
-        yield return new WaitForSeconds(clip.length + 0.08f);
+        yield return WaitForAudioSourceClipEnd(src, clip);
         UnityEngine.Object.Destroy(clip);
         if (_voicePlaybackGameObject == go)
             _voicePlaybackGameObject = null;
         UnityEngine.Object.Destroy(go);
+    }
+
+    private void EnqueueIncomingHotMic(string senderUserId, byte[] decryptedBlob)
+    {
+        if (string.IsNullOrEmpty(senderUserId)) return;
+
+        if (!_hotMicIncoming.TryGetValue(senderUserId, out var q))
+        {
+            q = new Queue<byte[]>();
+            _hotMicIncoming[senderUserId] = q;
+        }
+
+        q.Enqueue(decryptedBlob);
+        VoipPipelineTrace.RxEnqueue(senderUserId, q.Count, decryptedBlob.Length);
+        if (!_hotMicUserCoroutines.ContainsKey(senderUserId))
+        {
+            var c = _coroutineHost.StartCoroutine(PlayHotMicUserChunks(senderUserId));
+            _hotMicUserCoroutines[senderUserId] = c;
+        }
+    }
+
+    private IEnumerator PlayHotMicUserChunks(string userId)
+    {
+        try
+        {
+            if (!_hotMicIncoming.TryGetValue(userId, out var q))
+                yield break;
+
+            var receivePrimed = false;
+
+            while (true)
+            {
+                if (!receivePrimed)
+                {
+                    var waitStart = Time.realtimeSinceStartup;
+                    while (q.Count < HotMicJitterPrefetchPackets)
+                    {
+                        if (q.Count == 0)
+                        {
+                            if (Time.realtimeSinceStartup - waitStart >= HotMicJitterEmptyQueueGiveUpSec)
+                                yield break;
+                            yield return null;
+                            continue;
+                        }
+
+                        if (q.Count >= 1 && Time.realtimeSinceStartup - waitStart >= HotMicJitterPrefetchTimeoutSec)
+                            break;
+
+                        yield return null;
+                    }
+                }
+                else
+                {
+                    var spinStart = Time.realtimeSinceStartup;
+                    while (q.Count == 0)
+                    {
+                        if (Time.realtimeSinceStartup - spinStart >= HotMicInterChunkSpinTimeoutSec)
+                            yield break;
+                        yield return null;
+                    }
+                }
+
+                if (q.Count == 0)
+                    yield break;
+
+                receivePrimed = true;
+
+                for (var pump = 0; pump < MaxHotMicClipsScheduledPerPump && q.Count > 0; pump++)
+                {
+                    var blob = q.Dequeue();
+                    if (!VoiceHotMicCodec.TryDecodeToFloatSamples(blob, out var samples, out var rate, out var ch))
+                    {
+                        VoiceReceiveDiagnostics.LogHotMicDecodeFailed(userId, blob.Length);
+                        continue;
+                    }
+
+                    var peakDecode = ComputePeakAbs(samples);
+                    var gainHm = VoiceChatAudioLevel.GetVoiceChatPlaybackGain(userId);
+                    if (VoiceReceiveDiagnostics.ShouldLogHotMicChunkLine(userId))
+                    {
+                        var vpc = PlayerVoiceVolumeStore.GetVolumePercent(userId);
+                        VoiceReceiveDiagnostics.LogHotMicChunkLine(userId, blob.Length, vpc, gainHm, peakDecode, peakDecode, rate,
+                            ch, samples.Length);
+                    }
+
+                    VoiceChatAudioLevel.ApplyReceiveGainToSamples(samples, userId);
+
+                    var merged = new List<float>(samples.Length * MaxHotMicCoalesceChunks);
+                    merged.AddRange(samples);
+                    var coalesced = 1;
+
+                    while (coalesced < MaxHotMicCoalesceChunks && q.Count > 0)
+                    {
+                        var peekBlob = q.Peek();
+                        if (!VoiceHotMicCodec.TryDecodeToFloatSamples(peekBlob, out var nextSamples, out var nextRate, out var nextCh))
+                            break;
+                        if (nextRate != rate || nextCh != ch)
+                            break;
+                        q.Dequeue();
+                        VoiceChatAudioLevel.ApplyReceiveGainToSamples(nextSamples, userId);
+                        AppendSamplesWithCrossfade(merged, nextSamples, ch);
+                        coalesced++;
+                    }
+
+                    if (coalesced < MaxHotMicCoalesceChunks)
+                    {
+                        var tailWait = Time.realtimeSinceStartup;
+                        while (q.Count == 0 && coalesced < MaxHotMicCoalesceChunks &&
+                               Time.realtimeSinceStartup - tailWait < HotMicCoalesceMergeTailWaitSec)
+                            yield return null;
+                        while (coalesced < MaxHotMicCoalesceChunks && q.Count > 0)
+                        {
+                            var peekBlob = q.Peek();
+                            if (!VoiceHotMicCodec.TryDecodeToFloatSamples(peekBlob, out var nextSamples, out var nextRate, out var nextCh))
+                                break;
+                            if (nextRate != rate || nextCh != ch)
+                                break;
+                            q.Dequeue();
+                            VoiceChatAudioLevel.ApplyReceiveGainToSamples(nextSamples, userId);
+                            AppendSamplesWithCrossfade(merged, nextSamples, ch);
+                            coalesced++;
+                        }
+                    }
+
+                    var pcm = merged.ToArray();
+                    ApplyHotMicScheduledBoundaryCrossfadeInPlace(userId, pcm, ch);
+                    var pcmFrames = ch > 0 ? pcm.Length / ch : 0;
+                    var estSec = rate > 0 && ch > 0 ? (float)pcm.Length / (rate * ch) : 0f;
+                    VoipPipelineTrace.RxMerge(userId, coalesced, pcmFrames, ch, rate, estSec, q.Count);
+
+                    var clip = VoiceHotMicCodec.CreateAudioClipFromDecodedSamples(pcm, ch, rate);
+                    if (clip == null)
+                        continue;
+
+                    StoreHotMicLastScheduledFrame(userId, pcm, ch, pcmFrames);
+                    ScheduleHotMicClip(userId, clip, 1f);
+                }
+
+                yield return null;
+            }
+        }
+        finally
+        {
+            _hotMicUserCoroutines.Remove(userId);
+            if (_hotMicIncoming.TryGetValue(userId, out var q2) && q2.Count > 0)
+            {
+                var c = _coroutineHost.StartCoroutine(PlayHotMicUserChunks(userId));
+                _hotMicUserCoroutines[userId] = c;
+            }
+            else
+            {
+                _hotMicNextPlayDsp.Remove(userId);
+                _hotMicLastScheduledFrameByUserId.Remove(userId);
+            }
+        }
+    }
+
+    /// <summary>Blend the first few frames toward the previous segment's last frame (scheduled clips are sample-discontinuous otherwise).</summary>
+    private void ApplyHotMicScheduledBoundaryCrossfadeInPlace(string userId, float[] pcm, int channels)
+    {
+        if (pcm == null || channels < 1 || pcm.Length < channels * 2) return;
+        var frameCount = pcm.Length / channels;
+
+        if (!_hotMicLastScheduledFrameByUserId.TryGetValue(userId, out var prevFrame) || prevFrame.Length != channels)
+            return;
+
+        var cf = Mathf.Min(HotMicScheduledBoundaryCrossfadeFrames, frameCount);
+        if (cf < 2) return;
+
+        for (var f = 0; f < cf; f++)
+        {
+            var u = (f + 1f) / cf;
+            var t = 0.5f - 0.5f * Mathf.Cos(Mathf.PI * u);
+            for (var c = 0; c < channels; c++)
+            {
+                var idx = f * channels + c;
+                pcm[idx] = prevFrame[c] * (1f - t) + pcm[idx] * t;
+            }
+        }
+    }
+
+    private void StoreHotMicLastScheduledFrame(string userId, float[] pcm, int channels, int frameCount)
+    {
+        if (pcm == null || channels < 1 || frameCount < 1 || pcm.Length < frameCount * channels)
+            return;
+        var last = new float[channels];
+        var li = frameCount - 1;
+        for (var c = 0; c < channels; c++)
+            last[c] = pcm[li * channels + c];
+        _hotMicLastScheduledFrameByUserId[userId] = last;
+    }
+
+    /// <summary>One child <see cref="AudioSource"/> per segment so bulk <see cref="AudioSource.PlayScheduled"/> never overwrites a pending clip on the same source.</summary>
+    private void ScheduleHotMicClip(string userId, AudioClip clip, float volume01)
+    {
+        if (clip == null) return;
+
+        var player = GetOrCreateHotMicSequentialPlayer(userId);
+        var segGo = new GameObject("HM_seg");
+        segGo.transform.SetParent(player.Root.transform, false);
+        var src = segGo.AddComponent<AudioSource>();
+        ConfigureHotMicVoipAudioSource(src);
+        src.volume = Mathf.Clamp01(volume01);
+
+        var dspNow = AudioSettings.dspTime;
+        double startDsp;
+        if (!_hotMicNextPlayDsp.TryGetValue(userId, out var chainNext) ||
+            chainNext < dspNow - HotMicPlayScheduleStaleChainSec)
+            startDsp = dspNow + HotMicPlayScheduleLeadSec;
+        else
+            startDsp = chainNext;
+
+        if (startDsp < dspNow + HotMicPlayScheduleMinLeadSec)
+            startDsp = dspNow + HotMicPlayScheduleMinLeadSec;
+
+        var dur = HotMicClipDurationSeconds(clip);
+        var endDsp = startDsp + dur;
+        _hotMicNextPlayDsp[userId] = endDsp;
+
+        src.clip = clip;
+        src.PlayScheduled(startDsp);
+        GlobalChatAudioHost.NotifyIncomingVoiceActivity();
+        _coroutineHost.StartCoroutine(DestroyHotMicClipAfterDsp(segGo, src, clip, endDsp));
+    }
+
+    private static void ConfigureHotMicVoipAudioSource(AudioSource src)
+    {
+        src.spatialBlend = 0f;
+        src.pitch = 1f;
+        src.ignoreListenerPause = true;
+        src.bypassEffects = true;
+        src.bypassListenerEffects = true;
+        src.bypassReverbZones = true;
+    }
+
+    private static IEnumerator DestroyHotMicClipAfterDsp(GameObject segmentGo, AudioSource src, AudioClip clip, double endDsp)
+    {
+        while (AudioSettings.dspTime < endDsp - 1e-4)
+            yield return null;
+
+        if (src != null && src && ReferenceEquals(src.clip, clip))
+            src.clip = null;
+        if (clip != null)
+            UnityEngine.Object.Destroy(clip);
+        if (segmentGo != null)
+            UnityEngine.Object.Destroy(segmentGo);
+    }
+
+    /// <summary>Duration Unity uses for playback (same timeline as <see cref="AudioSource.PlayScheduled"/>).</summary>
+    private static double HotMicClipDurationSeconds(AudioClip clip)
+    {
+        if (clip == null) return 0;
+        if (clip.length > 0.0001f) return clip.length;
+        var hz = Mathf.Max(1, clip.frequency);
+        var ch = Mathf.Max(1, clip.channels);
+        return clip.samples / (double)(hz * ch);
+    }
+
+    private sealed class HotMicSequentialPlayer
+    {
+        public readonly GameObject Root;
+
+        public HotMicSequentialPlayer(Transform parent)
+        {
+            Root = new GameObject("MPChatHotMicPlayer");
+            Root.transform.SetParent(parent, false);
+        }
+    }
+
+    private static float ComputePeakAbs(float[] samples)
+    {
+        if (samples == null || samples.Length == 0) return 0f;
+        var peak = 0f;
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var a = Mathf.Abs(samples[i]);
+            if (a > peak) peak = a;
+        }
+        return peak;
     }
 
 }

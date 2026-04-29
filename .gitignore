@@ -1,7 +1,12 @@
 
+# Optional local SLZ-only sources (not in repo); add your own .cs here and a local csproj Include if needed.
+SlzPrivate/
 
+SlzMarkerTool/bin/
+SlzMarkerTool/obj/
 bin/
 obj/
+releases/
 *.user
 *.suo
 .vs/

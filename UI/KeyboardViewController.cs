@@ -1,10 +1,13 @@
 using System;
 using MultiplayerChat.Core;
+using MultiplayerChat.Network;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components.Settings;
 using BeatSaberMarkupLanguage.ViewControllers;
 using HMUI;
 using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 using Zenject;
 
 namespace MultiplayerChat.UI;
@@ -27,6 +30,10 @@ public class KeyboardViewController : BSMLAutomaticViewController
     [UIComponent("UpdateMessage")]
     private TextMeshProUGUI? _updateMessageText;
 
+    private Button? _keyboardChatStringButton;
+    private TMP_InputField? _chatTmp;
+    private bool _typingBroadcastToOthers;
+
     public void SetUpdateMessage(string? message)
     {
         if (_updateMessageText != null)
@@ -45,6 +52,85 @@ public class KeyboardViewController : BSMLAutomaticViewController
             _updateMessageText.text = _pendingUpdateMessage;
             _pendingUpdateMessage = null;
         }
+
+        TryBindTypingField();
+    }
+
+    protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
+    {
+        UnbindTypingField();
+        base.DidDeactivate(removedFromHierarchy, screenSystemDisabling);
+    }
+
+    private void TryBindTypingField()
+    {
+        UnbindTypingField();
+        if (_chatInput == null) return;
+        _keyboardChatStringButton = _chatInput.GetComponentInChildren<Button>(true);
+        if (_keyboardChatStringButton != null)
+            _keyboardChatStringButton.onClick.AddListener(OnKeyboardChatBarPressed);
+
+        _chatTmp = _chatInput.GetComponentInChildren<TMP_InputField>(true);
+        if (_chatTmp != null)
+        {
+            _chatTmp.onSubmit.AddListener(OnKeyboardChatSubmitOrEnter);
+            _chatTmp.onEndEdit.AddListener(OnKeyboardChatEndEdit);
+            _chatTmp.onDeselect.AddListener(OnKeyboardChatDeselect);
+        }
+    }
+
+    private void UnbindTypingField()
+    {
+        if (_keyboardChatStringButton != null)
+        {
+            _keyboardChatStringButton.onClick.RemoveListener(OnKeyboardChatBarPressed);
+            _keyboardChatStringButton = null;
+        }
+
+        if (_chatTmp != null)
+        {
+            _chatTmp.onSubmit.RemoveListener(OnKeyboardChatSubmitOrEnter);
+            _chatTmp.onEndEdit.RemoveListener(OnKeyboardChatEndEdit);
+            _chatTmp.onDeselect.RemoveListener(OnKeyboardChatDeselect);
+            _chatTmp = null;
+        }
+
+        ClearTypingBroadcastIfNeeded();
+    }
+
+    private void OnKeyboardChatBarPressed()
+    {
+        if (_typingBroadcastToOthers) return;
+        _chatManager?.BroadcastChatActivity(ChatActivityPacket.TypingStart);
+        _typingBroadcastToOthers = true;
+    }
+
+    private void OnKeyboardChatSubmitOrEnter(string _)
+    {
+        ClearTypingBroadcastIfNeeded();
+    }
+
+    private void OnKeyboardChatEndEdit(string _)
+    {
+        ClearTypingBroadcastIfNeeded();
+    }
+
+    private void OnKeyboardChatDeselect(string _)
+    {
+        ClearTypingBroadcastIfNeeded();
+    }
+
+    /// <summary>Call before dismissing the keyboard flow so TypingStop is sent even if TMP never fires onEndEdit.</summary>
+    public void FlushTypingPresenceToPeers()
+    {
+        ClearTypingBroadcastIfNeeded();
+    }
+
+    private void ClearTypingBroadcastIfNeeded()
+    {
+        if (!_typingBroadcastToOthers) return;
+        _chatManager?.BroadcastChatActivity(ChatActivityPacket.TypingStop);
+        _typingBroadcastToOthers = false;
     }
 
     [UIAction("SubmitClicked")]
@@ -53,6 +139,7 @@ public class KeyboardViewController : BSMLAutomaticViewController
         var text = _chatInput?.Text?.Trim() ?? "";
         if (string.IsNullOrEmpty(text))
         {
+            ClearTypingBroadcastIfNeeded();
             Cancelled?.Invoke(this, EventArgs.Empty);
             return;
         }
@@ -60,6 +147,7 @@ public class KeyboardViewController : BSMLAutomaticViewController
         if (_chatManager == null || !_chatManager.SendMessage(text))
             return;
 
+        ClearTypingBroadcastIfNeeded();
         TextSubmitted?.Invoke(this, text);
         Cancelled?.Invoke(this, EventArgs.Empty);
     }
@@ -67,6 +155,7 @@ public class KeyboardViewController : BSMLAutomaticViewController
     [UIAction("CancelClicked")]
     private void CancelClicked()
     {
+        ClearTypingBroadcastIfNeeded();
         Cancelled?.Invoke(this, EventArgs.Empty);
     }
 }

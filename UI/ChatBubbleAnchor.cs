@@ -12,7 +12,7 @@ namespace MultiplayerChat.UI;
 /// <summary>
 /// Attached to AvatarCaption (nametag) via SiraUtil LobbyAvatarPlaceRegistration.
 /// Adds a chat icon sprite after the player name to indicate they have the MPChat mod.
-/// Same pattern as MultiplayerExtensions uses for the Steam logo.
+/// Same idea as optional small icons appended to multiplayer nametags.
 /// </summary>
 public class ChatBubbleAnchor : MonoBehaviour
 {
@@ -24,6 +24,8 @@ public class ChatBubbleAnchor : MonoBehaviour
 
     private string? _userId;
     private GameObject? _iconObj;
+    /// <summary>Same object we registered <see cref="OnPresenceUpdated"/> on; must not use <see cref="ModPresenceManager.Instance"/> at destroy (lobby/GameCore swap).</summary>
+    private ModPresenceManager? _subscribedModPresence;
 
     private void Start()
     {
@@ -32,8 +34,11 @@ public class ChatBubbleAnchor : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (ModPresenceManager.Instance != null)
-            ModPresenceManager.Instance.PresenceUpdated -= OnPresenceUpdated;
+        if (_subscribedModPresence != null)
+        {
+            _subscribedModPresence.PresenceUpdated -= OnPresenceUpdated;
+            _subscribedModPresence = null;
+        }
         if (_iconObj != null)
             Destroy(_iconObj);
     }
@@ -59,7 +64,10 @@ public class ChatBubbleAnchor : MonoBehaviour
 
         var modPresence = ModPresenceManager.Instance;
         if (modPresence != null)
-            modPresence.PresenceUpdated += OnPresenceUpdated;
+        {
+            _subscribedModPresence = modPresence;
+            _subscribedModPresence.PresenceUpdated += OnPresenceUpdated;
+        }
     }
 
     private void UpdateIconVisibility()

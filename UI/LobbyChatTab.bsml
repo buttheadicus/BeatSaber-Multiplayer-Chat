@@ -2,24 +2,31 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical pad="3" spacing="2">
-    <text text="Multiplayer Chat BETA v0.2.0" font-size="4" align="Center"/>
-    <text text="Created by: Butthead" font-size="3" align="Center"/>
-    <horizontal spacing="2">
-      <button text="FORCE CLEAR CHAT" on-click="ForceClearClicked"/>
-      <button text="FORCE END VOICE MESSAGE" on-click="ForceEndVoiceClicked"/>
-    </horizontal>
+    <text text="Multiplayer Chat BETA v0.3.0" font-size="4" align="Center"/>
     <horizontal spacing="2">
       <string-setting id="ChatInput" text="Message" show-buttons="false"/>
       <button text="Send" on-click="SubmitClicked"/>
     </horizontal>
     <horizontal spacing="2">
-      <button id="RecordButton" text="Record" on-click="RecordClicked"/>
-      <button text="Play" on-click="PlayVoiceClicked"/>
-      <button text="send" on-click="SendVoiceClicked"/>
+      <button text="FORCE CLEAR CHAT" on-click="ForceClearClicked"/>
+      <button text="FORCE END VOICE MESSAGE" on-click="ForceEndVoiceClicked"/>
+      <button text="FORCE RESET VOIP" on-click="ForceResetVoipClicked"/>
     </horizontal>
     <horizontal spacing="2">
-      <button id="MuteButton" text="Mute" on-click="MuteClicked"/>
+      <button id="RecordButton" text="Record" on-click="RecordClicked"/>
+      <button id="VoicePlayButton" text="Play" on-click="PlayVoiceClicked"/>
+      <button id="VoiceSendButton" text="send" on-click="SendVoiceClicked"/>
+    </horizontal>
+    <horizontal spacing="2">
+      <button id="DeafButton" text="Deaf" on-click="DeafClicked"/>
+      <button id="VoiceHotMicMuteButton" text="Mute mic" on-click="VoiceHotMicMuteClicked"/>
+      <button id="PlayerVolumeButton" text="Player Volume" on-click="PlayerVolumeClicked"/>
+      <button id="HearButton" text="Hear" on-click="HearClicked"/>
+    </horizontal>
+    <horizontal spacing="2">
+      <button id="MuteButton" text="Mute player" on-click="MuteClicked"/>
       <button id="DMButton" text="DM" on-click="DMClicked"/>
+      <button text="Voice Settings" on-click="VoiceSettingsClicked"/>
       <button text="Settings" on-click="SettingsClicked"/>
     </horizontal>
   </vertical>

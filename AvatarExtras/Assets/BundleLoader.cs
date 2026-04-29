@@ -1,0 +1,84 @@
+using System.Reflection;
+using System.Threading.Tasks;
+using UnityEngine;
+
+namespace MultiplayerChat.AvatarExtras.Assets;
+
+public static class BundleLoader
+{
+    private static AssetBundle? _bundle;
+    private static GameObject? _rootAsset;
+
+    public static async Task<bool> EnsureLoaded()
+    {
+        if (_bundle != null)
+            return false;
+
+        _bundle = await LoadBundleFromResource();
+        _rootAsset = null;
+
+        if (_bundle != null)
+        {
+            _rootAsset = await LoadRootAssetFromBundle(_bundle);
+
+            if (_rootAsset != null)
+            {
+                Plugin.Log.Info("[AvatarExtras] Loaded asset bundle successfully!");
+                return true;
+            }
+        }
+
+        Plugin.Log.Error("[AvatarExtras] Failed to load asset bundle!");
+        return false;
+    }
+
+    public static void Unload()
+    {
+        if (_bundle == null)
+            return;
+
+        _bundle.Unload(true);
+        _bundle = null;
+    }
+
+    private const string BundlePath = "MultiplayerChat.AvatarExtras.Assets.Bundles.extras.unitypackage";
+
+    private static async Task<AssetBundle?> LoadBundleFromResource()
+    {
+        var resBytes = ResourceHelpers.GetResource(Assembly.GetExecutingAssembly(), BundlePath);
+
+        if (resBytes is null)
+            return null;
+
+        return await LoadBundleFromMemory(resBytes);
+    }
+
+    private static async Task<AssetBundle?> LoadBundleFromMemory(byte[] data)
+    {
+        var tcs = new TaskCompletionSource<AssetBundle?>();
+        var request = AssetBundle.LoadFromMemoryAsync(data);
+        request.completed += _ => { tcs.TrySetResult(request.assetBundle); };
+        return await tcs.Task;
+    }
+
+    private static async Task<GameObject?> LoadRootAssetFromBundle(AssetBundle bundle)
+    {
+        var tcs = new TaskCompletionSource<GameObject?>();
+        var request = bundle.LoadAssetWithSubAssetsAsync<GameObject>(RootAssetName);
+        request.completed += _ =>
+        {
+            if (request.asset != null)
+                tcs.TrySetResult((GameObject)request.asset);
+            else
+                tcs.TrySetResult(null);
+        };
+        return await tcs.Task;
+    }
+
+    public static GameObject? GetObject(string objName) => _rootAsset?.transform.Find(objName)?.gameObject;
+
+    public static Material? GetMaterial(string objName) =>
+        GetObject(objName)?.GetComponent<MeshRenderer>()?.material;
+
+    private const string RootAssetName = "assets/export.prefab";
+}

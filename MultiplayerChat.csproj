@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>MultiplayerChat</AssemblyName>
     <RootNamespace>MultiplayerChat</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
     <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
@@ -11,33 +11,59 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>CS0618;CS1591</NoWarn>
+    <NoWarn>CS0618;CS1591;CS0649</NoWarn>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="ChatAutoUpdater\**" />
+    <Compile Remove="SlzMarkerTool\**" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Sounds\Chat.ogg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Sounds\Muted.ogg" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Sounds\Unmuted.ogg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Sounds\Error.ogg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="0Harmony">
-      <HintPath>$(BeatSaberDir)\Libs\0Harmony.dll</HintPath>
-    </Reference>
     <Reference Include="BeatmapCore">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatmapCore.dll</HintPath>
+    </Reference>
+    <Reference Include="BeatSaber.AvatarCore">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.AvatarCore.dll</HintPath>
+    </Reference>
+    <Reference Include="BeatSaber.BeatAvatarSDK">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.BeatAvatarSDK.dll</HintPath>
+    </Reference>
+    <Reference Include="BeatSaber.BeatAvatarAdapter">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.BeatAvatarAdapter.dll</HintPath>
+    </Reference>
+    <Reference Include="Menu.CommonLib">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Menu.CommonLib.dll</HintPath>
+    </Reference>
+    <Reference Include="BGLib.Polyglot">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.Polyglot.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(BeatSaberDir)\Libs\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
     </Reference>
     <Reference Include="BeatSaber.ViewSystem">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.ViewSystem.dll</HintPath>
     </Reference>
-    <Reference Include="BGNetCore">
-      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BGNetCore.dll</HintPath>
+    <Reference Include="AdditionalContentModel.Interfaces">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\AdditionalContentModel.Interfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="BGLib.AppFlow">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.AppFlow.dll</HintPath>
+    </Reference>
+    <Reference Include="BGLib.UnityExtension">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BGLib.UnityExtension.dll</HintPath>
     </Reference>
     <Reference Include="BGNetCore">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BGNetCore.dll</HintPath>
@@ -51,6 +77,27 @@
     <Reference Include="GameplayCore">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\GameplayCore.dll</HintPath>
     </Reference>
+    <Reference Include="Colors">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Colors.dll</HintPath>
+    </Reference>
+    <Reference Include="HMRendering">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\HMRendering.dll</HintPath>
+    </Reference>
+    <Reference Include="HMLib">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\HMLib.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Timeline">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Unity.Timeline.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.DirectorModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.DirectorModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
     <Reference Include="HMUI">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\HMUI.dll</HintPath>
     </Reference>
@@ -60,17 +107,23 @@
     <Reference Include="IPA.Loader">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\IPA.Loader.dll</HintPath>
     </Reference>
+    <Reference Include="Interactable">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Interactable.dll</HintPath>
+    </Reference>
+    <Reference Include="Networking">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Networking.dll</HintPath>
+    </Reference>
+    <Reference Include="NetworkPlayerEntitlementsChecker">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Networking.NetworkPlayerEntitlementsChecker.dll</HintPath>
+    </Reference>
     <Reference Include="LiteNetLib">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\LiteNetLib.dll</HintPath>
     </Reference>
     <Reference Include="Main">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Main.dll</HintPath>
     </Reference>
-    <Reference Include="Networking">
-      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Networking.dll</HintPath>
-    </Reference>
-    <Reference Include="MultiplayerCore">
-      <HintPath>$(BeatSaberDir)\Plugins\MultiplayerCore.dll</HintPath>
+    <Reference Include="$(BeatSaberDir)\Plugins\MultiplayerCore.dll" Publicize="true">
+      <Private>False</Private>
     </Reference>
     <Reference Include="SiraUtil">
       <HintPath>$(BeatSaberDir)\Plugins\SiraUtil.dll</HintPath>
@@ -84,6 +137,9 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine.AudioModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
     </Reference>
@@ -93,6 +149,9 @@
     <Reference Include="UnityEngine.UI">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="Zenject">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Zenject.dll</HintPath>
     </Reference>
@@ -110,6 +169,9 @@
     </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.XRModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.XRModule.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -137,10 +199,44 @@
     <EmbeddedResource Include="UI\SettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.SettingsView.bsml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\VoiceSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.VoiceSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\VoiceDuckSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.VoiceDuckSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="AvatarExtras\Assets\Sprites\Glasses.png">
+      <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.Glasses.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="AvatarExtras\Assets\Sprites\Mustache.png">
+      <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.Mustache.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="AvatarExtras\Assets\Sprites\RainbowCircle.png">
+      <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.RainbowCircle.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="AvatarExtras\Assets\Bundles\extras.unitypackage">
+      <LogicalName>MultiplayerChat.AvatarExtras.Assets.Bundles.extras.unitypackage</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
+  <!-- Install into Beat Saber for testing (only if BeatSaberDir exists). -->
   <Target Name="CopyToBeatSaber" AfterTargets="Build">
-    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins\" SkipUnchangedFiles="true" />
-    <MakeDir Directories="$(BeatSaberDir)\Plugins\Sounds\" />
-    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg" DestinationFolder="$(BeatSaberDir)\Plugins\Sounds\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
+    <MakeDir Directories="$(BeatSaberDir)\Plugins\Sounds\" Condition="Exists('$(BeatSaberDir)')" />
+    <MakeDir Directories="$(BeatSaberDir)\Plugins\MultiplayerChat\Sounds\" Condition="Exists('$(BeatSaberDir)')" />
+    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(BeatSaberDir)\Plugins\Sounds\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
+    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(BeatSaberDir)\Plugins\MultiplayerChat\Sounds\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
+  </Target>
+
+  <!-- Release layout: manifest at root, Plugins/ dll, Plugins/Sounds/ (matches manifest files[] and build-zip.ps1). -->
+  <Target Name="CopyToReleasesFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <ReleasesDir>$(ProjectDir)releases</ReleasesDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(ReleasesDir)\Plugins\Sounds" />
+    <MakeDir Directories="$(ReleasesDir)\Plugins\MultiplayerChat\Sounds" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ReleasesDir)\Plugins\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ReleasesDir)\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(ReleasesDir)\Plugins\Sounds\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(ReleasesDir)\Plugins\MultiplayerChat\Sounds\" SkipUnchangedFiles="true" />
   </Target>
 </Project>
