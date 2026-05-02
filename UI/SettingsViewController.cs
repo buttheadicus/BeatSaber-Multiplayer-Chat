@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components.Settings;
 using BeatSaberMarkupLanguage.ViewControllers;
@@ -15,7 +14,13 @@ namespace MultiplayerChat.UI;
 [ViewDefinition("MultiplayerChat.UI.SettingsView.bsml")]
 public class SettingsViewController : BSMLAutomaticViewController
 {
+    private const string LabelChatBubbleSounds = "Chat bubble sounds";
+    private const string LabelEnableCau = "Enable CAU";
+
     public event EventHandler? ApplyClicked;
+
+    /// <summary>Opens the Fused Mods sub-screen (Avatar Extras, etc.).</summary>
+    public event Action? FusedModsClicked;
 
     [UIComponent("BubbleDuration")]
     private BeatSaberMarkupLanguage.Components.Settings.SliderSetting? _bubbleDurationSlider;
@@ -26,8 +31,8 @@ public class SettingsViewController : BSMLAutomaticViewController
     [UIComponent("ChatBubbleSoundsToggle")]
     private ToggleSetting? _chatBubbleSoundsToggle;
 
-    [UIComponent("AvatarExtensionsToggle")]
-    private ToggleSetting? _avatarExtensionsToggle;
+    [UIComponent("EnableCauToggle")]
+    private ToggleSetting? _enableCauToggle;
 
     [UIValue("BubbleDuration")]
     private float BubbleDuration
@@ -56,11 +61,47 @@ public class SettingsViewController : BSMLAutomaticViewController
         set => ModSettings.ChatBubbleSoundsEnabled = value;
     }
 
-    [UIValue("EnableAvatarExtensions")]
-    public bool EnableAvatarExtensions
+    [UIValue("EnableCau")]
+    public bool EnableCau
     {
-        get => ModSettings.EnableAvatarExtensions;
-        set => ModSettings.EnableAvatarExtensions = value;
+        get => ModSettings.EnableCau;
+        set => ModSettings.EnableCau = value;
+    }
+
+    [UIAction("FusedModsClicked")]
+    private void OnFusedModsClicked() => FusedModsClicked?.Invoke();
+
+    [UIAction("#post-parse")]
+    private void PostParse()
+    {
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        ApplyMainSettingsToggleLabels();
+    }
+
+    protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
+    {
+        base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
+        if (_nameColorInput != null)
+        {
+            var hex = ModSettings.NameColor ?? "";
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            _nameColorInput.Text = hex;
+        }
+
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        ApplyMainSettingsToggleLabels();
+    }
+
+    /// <summary>
+    /// BSML leaves <see cref="ToggleSetting"/> row text at &quot;Default Text&quot;; cleanup clears it before the parser
+    /// applies <c>text=</c> in this host context. Set labels explicitly so rows stay readable.
+    /// </summary>
+    private void ApplyMainSettingsToggleLabels()
+    {
+        if (_chatBubbleSoundsToggle != null)
+            _chatBubbleSoundsToggle.Text = LabelChatBubbleSounds;
+        if (_enableCauToggle != null)
+            _enableCauToggle.Text = LabelEnableCau;
     }
 
     [UIAction("ApplyClicked")]
@@ -79,9 +120,9 @@ public class SettingsViewController : BSMLAutomaticViewController
         if (tgl != null)
             ModSettings.ChatBubbleSoundsEnabled = tgl.isOn;
 
-        var extTgl = _avatarExtensionsToggle?.GetComponentInChildren<Toggle>(true);
-        if (extTgl != null)
-            ModSettings.EnableAvatarExtensions = extTgl.isOn;
+        var cauTgl = _enableCauToggle?.GetComponentInChildren<Toggle>(true);
+        if (cauTgl != null)
+            ModSettings.EnableCau = cauTgl.isOn;
 
         ApplyClicked?.Invoke(this, EventArgs.Empty);
     }

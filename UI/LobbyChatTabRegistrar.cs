@@ -135,6 +135,12 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         }
     }
 
+    [UIAction("#post-parse")]
+    private void LobbyChatTabPostParse()
+    {
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+    }
+
     [UIAction("SettingsClicked")]
     private void SettingsClicked()
     {
@@ -579,13 +585,17 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     {
         if (_capturedSamples == null || _capturedSamples.Length == 0)
         {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing to send  -  record a voice message first.");
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Nothing to send. record a voice message first.");
+            ChatSystemErrorMessages.PostNothingRecordedToSend(_chatManager);
             return;
         }
 
         var blob = VoiceMessageCodec.EncodeFromFloatSamples(_capturedSamples, _capturedChannels, _capturedHz);
         if (blob == null)
+        {
+            ChatSystemErrorMessages.PostVoiceEncodeFailed(_chatManager);
             return;
+        }
 
         if (!_chatManager.SendVoiceMessage(blob))
             return;
@@ -600,6 +610,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         if (Microphone.devices == null || Microphone.devices.Length == 0)
         {
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] No microphone found. Check Windows sound input settings.");
+            ChatSystemErrorMessages.PostNoMicrophoneFound(_chatManager);
             return;
         }
 
@@ -619,6 +630,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         if (_recordingClip == null)
         {
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] Microphone.Start failed.");
+            ChatSystemErrorMessages.PostMicrophoneFailedToStart(_chatManager);
             return;
         }
 

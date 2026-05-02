@@ -35,33 +35,16 @@ public class FloatingHotMicMuteButton : MonoBehaviour
     private void Update()
     {
         var now = Time.realtimeSinceStartup;
+        if (now >= _nextLobbyPresencePollAt)
+        {
+            _nextLobbyPresencePollAt = now + 0.25f;
+            _cachedInLobbyState = MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby();
+            if (_cachedInLobbyState && _buttonRoot == null)
+                CreateButton();
+        }
 
-        // Between polls, reuse last lobby heuristic so SetActive is cheap every frame once the button exists.
         if (_buttonRoot != null)
             _buttonRoot.SetActive(_cachedInLobbyState);
-
-        if (now < _nextLobbyPresencePollAt)
-            return;
-
-        _nextLobbyPresencePollAt = now + 0.25f;
-
-        _cachedInLobbyState = IsInMultiplayerLobby();
-        if (_cachedInLobbyState && _buttonRoot == null)
-            CreateButton();
-        if (_buttonRoot != null)
-            _buttonRoot.SetActive(_cachedInLobbyState);
-    }
-
-    private static bool IsInMultiplayerLobby()
-    {
-        var centerStage = GameObject.Find("MultiplayerLobbyCenterStage");
-        if (centerStage != null && centerStage.activeInHierarchy)
-            return true;
-        var lobbySetup = GameObject.Find("LobbySetup");
-        if (lobbySetup != null && lobbySetup.activeInHierarchy)
-            return true;
-        var centerStageAlt = GameObject.Find("CenterStage");
-        return centerStageAlt != null && centerStageAlt.activeInHierarchy;
     }
 
     private void OnVoiceStateChanged() => UpdateLabel();

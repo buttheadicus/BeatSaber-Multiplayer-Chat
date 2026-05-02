@@ -45,6 +45,10 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     private bool _lobbyVoipReloadArmed = true;
     private float _nextLobbyHierarchyPollTime;
     private float _lastIncomingVoiceRealtime = -999f;
+    /// <summary>Throttle <see cref="ChatManager.IsIncomingVoiceAudible"/> during ducking; many talkers made per-frame scans costly.</summary>
+    private float _incomingVoiceAudiblePollExpiry = -999f;
+    private bool _incomingVoiceAudibleCached;
+    private const float IncomingVoiceAudiblePollIntervalSec = 0.045f;
     private float _nextSourceRefreshTime;
     private bool _duckVolumesApplied;
     /// <summary>Captured when ducking starts; Beat Saber often routes gameplay through the listener.</summary>
@@ -277,7 +281,10 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     public static void NotifyIncomingVoiceActivity()
     {
         if (Instance != null)
+        {
             Instance._lastIncomingVoiceRealtime = Time.realtimeSinceStartup;
+            Instance._incomingVoiceAudiblePollExpiry = -999f;
+        }
     }
 
     private void LateUpdate()
@@ -435,9 +442,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
                 continue;
             }
 
-            if (IsModChatOrProtectedUiSound(e.Source))
-                continue;
-
             e.Source.volume = Mathf.Clamp(e.BaselineVolume * mul, 0f, 3f);
         }
 
@@ -477,9 +481,21 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
     private bool IsIncomingVoiceAudibleNow()
     {
-        if (ChatManager.Instance != null && ChatManager.Instance.IsIncomingVoiceAudible())
+        var now = Time.realtimeSinceStartup;
+        if (now - _lastIncomingVoiceRealtime < VoiceActivityHoldoverSec)
             return true;
-        return Time.realtimeSinceStartup - _lastIncomingVoiceRealtime < VoiceActivityHoldoverSec;
+
+        var cm = ChatManager.Instance;
+        if (cm == null)
+            return false;
+
+        if (now >= _incomingVoiceAudiblePollExpiry)
+        {
+            _incomingVoiceAudibleCached = cm.IsIncomingVoiceAudible();
+            _incomingVoiceAudiblePollExpiry = now + IncomingVoiceAudiblePollIntervalSec;
+        }
+
+        return _incomingVoiceAudibleCached;
     }
 
     /// <summary>

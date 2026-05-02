@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using MultiplayerChat.Core;
 using HMUI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -39,35 +40,24 @@ public class FloorChatButton : MonoBehaviour
     private void Update()
     {
         var now = Time.realtimeSinceStartup;
-        if (_buttonRoot != null)
-            _buttonRoot.SetActive(_cachedInLobbyState);
+        if (now >= _nextLobbyPresencePollAt)
+        {
+            _nextLobbyPresencePollAt = now + 0.25f;
+            _cachedInLobbyState = IsInMultiplayerLobby();
+            if (_cachedInLobbyState && _buttonRoot == null)
+                CreateFloorButton();
+        }
 
-        if (now < _nextLobbyPresencePollAt)
-            return;
-        _nextLobbyPresencePollAt = now + 0.25f;
-
-        _cachedInLobbyState = IsInMultiplayerLobby();
-        if (_cachedInLobbyState && _buttonRoot == null)
-            CreateFloorButton();
         if (_buttonRoot != null)
             _buttonRoot.SetActive(_cachedInLobbyState);
     }
 
     private bool IsInMultiplayerLobby()
     {
-        var centerStage = GameObject.Find("MultiplayerLobbyCenterStage");
-        if (centerStage != null && centerStage.activeInHierarchy)
-            return true;
-        var lobbySetup = GameObject.Find("LobbySetup");
-        if (lobbySetup != null && lobbySetup.activeInHierarchy)
-            return true;
-        var centerStageAlt = GameObject.Find("CenterStage");
-        if (centerStageAlt != null && centerStageAlt.activeInHierarchy)
+        if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
             return true;
         var title = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController");
-        if (title != null && title.activeInHierarchy)
-            return true;
-        return false;
+        return title != null && title.activeInHierarchy;
     }
 
     private void CreateFloorButton()

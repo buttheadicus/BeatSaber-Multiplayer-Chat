@@ -6,11 +6,14 @@ using System.Text.RegularExpressions;
 namespace MultiplayerChat.Core;
 
 /// <summary>
-/// GitHub release API helpers. Rules must match <c>ChatAutoUpdater</c> (duplicate filter logic there).
-/// Only "MultiplayerChat" mod zips  -  not CAU, not GitHub "Source code" archives.
+/// GitHub release API helpers. Prefer <see cref="ModDllAssetFileName"/> on releases; legacy mod zip naming
+/// stays supported. CAU exe assets are excluded from mod version logic.
 /// </summary>
 internal static class GitHubReleaseVersion
 {
+    /// <summary>Primary mod binary attached to Releases (flat name).</summary>
+    public const string ModDllAssetFileName = "MultiplayerChat.dll";
+
     public const string ReleasesApiBase =
         "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases";
 
@@ -50,6 +53,7 @@ internal static class GitHubReleaseVersion
 
         if (fn.Equals("CAU.zip", StringComparison.OrdinalIgnoreCase)) return false;
         if (fn.Equals("CAU.exe", StringComparison.OrdinalIgnoreCase)) return false;
+        if (fn.Equals("Chat.Auto.Updater.CAU.exe", StringComparison.OrdinalIgnoreCase)) return false;
         if (fn.Equals("Chat Auto Updater (CAU).exe", StringComparison.OrdinalIgnoreCase)) return false;
         if (fn.StartsWith("Source code", StringComparison.OrdinalIgnoreCase)) return false;
 
@@ -91,7 +95,7 @@ internal static class GitHubReleaseVersion
         return true;
     }
 
-    /// <summary>Primary: max version from mod zip URLs only (aligned with CAU).</summary>
+    /// <summary>Legacy: max version from mod zip URLs only when no DLL asset is used.</summary>
     public static bool TryGetLatestVersionFromModZips(string json, out string version)
     {
         version = "";
@@ -116,6 +120,84 @@ internal static class GitHubReleaseVersion
         if (best == null) return false;
         version = best;
         return true;
+    }
+
+    /// <summary>
+    /// When the release includes <see cref="ModDllAssetFileName"/>, use <c>tag_name</c> as semver (supports leading v).
+    /// </summary>
+    public static bool TryGetLatestVersionFromModDllRelease(string json, out string version)
+    {
+        version = "";
+        try
+        {
+            var jo = Newtonsoft.Json.Linq.JObject.Parse(json);
+            if (jo["assets"] is not Newtonsoft.Json.Linq.JArray assets)
+                return false;
+
+            var hasDll = false;
+            foreach (var a in assets)
+            {
+                if (string.Equals(a?["name"]?.ToString(), ModDllAssetFileName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    hasDll = true;
+                    break;
+                }
+            }
+
+            if (!hasDll)
+                return false;
+
+            var tag = jo["tag_name"]?.ToString()?.Trim() ?? "";
+            if (string.IsNullOrEmpty(tag))
+                return false;
+            if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase) && tag.Length > 1)
+                tag = tag.Substring(1);
+            if (!Regex.IsMatch(tag, @"^\d+\.\d+\.\d+$"))
+                return false;
+            version = tag;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Asset name published on the CAU repo's GitHub Releases.</summary>
+    public const string CauExeAssetFileName = "Chat.Auto.Updater.CAU.exe";
+
+    /// <summary>
+    /// Standalone CAU repository (<see cref="CauRepoReleasesLatestApi"/>).
+    /// Repo slug includes trailing hyphen per GitHub URL.
+    /// </summary>
+    public const string CauRepoReleasesLatestApi =
+        "https://api.github.com/repos/buttheadicus/Chat-Auto-Updater-CAU-/releases/latest";
+
+    /// <summary>Parse a GitHub release API JSON payload for the CAU executable download URL.</summary>
+    public static bool TryGetCauExeDownloadUrl(string releaseApiJson, out string url)
+    {
+        url = "";
+        try
+        {
+            var jo = Newtonsoft.Json.Linq.JObject.Parse(releaseApiJson);
+            if (jo["assets"] is not Newtonsoft.Json.Linq.JArray assets)
+                return false;
+            foreach (var a in assets)
+            {
+                var name = a?["name"]?.ToString();
+                if (!string.Equals(name, CauExeAssetFileName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                url = a?["browser_download_url"]?.ToString() ?? "";
+                return !string.IsNullOrEmpty(url);
+            }
+        }
+        catch
+        {
+            /* ignore */
+        }
+
+        return false;
     }
 
     /// <summary>Fallback only.</summary>

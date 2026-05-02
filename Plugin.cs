@@ -31,6 +31,8 @@ public class Plugin
         if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
             return;
 
+        CauBootstrap.DeleteCauExeIfEnabled();
+
         if (ModSettings.EnableAvatarExtensions)
         {
             AvatarExtrasConfig = AvatarExtrasConfigPersistence.LoadOrCreate();
@@ -110,6 +112,8 @@ public class Plugin
             container.Bind<VoiceSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<VoiceDuckSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<VoiceDuckSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<FusedModsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<FusedModsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
             container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.BindInterfacesAndSelfTo<LobbyChatTabRegistrar>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();

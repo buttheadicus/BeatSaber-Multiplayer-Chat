@@ -11,12 +11,11 @@
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>CS0618;CS1591;CS0649</NoWarn>
+    <NoWarn>CS0618;CS1591;CS0649;CS0436</NoWarn>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="ChatAutoUpdater\**" />
     <Compile Remove="SlzMarkerTool\**" />
   </ItemGroup>
   <ItemGroup>
@@ -201,6 +200,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="UI\VoiceSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.VoiceSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\FusedModsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.FusedModsSettingsView.bsml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="UI\VoiceDuckSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.VoiceDuckSettingsView.bsml</LogicalName>

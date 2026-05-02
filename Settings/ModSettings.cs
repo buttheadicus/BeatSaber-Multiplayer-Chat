@@ -175,10 +175,16 @@ public static class ModSettings
         }
     }
 
-    /// <summary>During active song / arena (GameCore or beatmap gameplay objects), force hot-mic mute; re-synced after VoIP reload and every frame. Restores when gameplay ends.</summary>
+    /// <summary>v0.3.1: UI removed; behavior forced off until restored in a later release.</summary>
+    private const bool SongPeriodMuteAndDeafTemporarilyDisabled = true;
+
+    /// <summary>
+    /// During active song / arena, force hot-mic mute (currently disabled for v0.3.1; see <see cref="SongPeriodMuteAndDeafTemporarilyDisabled"/>).
+    /// </summary>
     public static bool MuteMicDuringSongPlaying
     {
-        get => PlayerPrefs.HasKey(KeyMuteMicDuringSongPlaying) && PlayerPrefs.GetInt(KeyMuteMicDuringSongPlaying) != 0;
+        get => !SongPeriodMuteAndDeafTemporarilyDisabled &&
+               PlayerPrefs.HasKey(KeyMuteMicDuringSongPlaying) && PlayerPrefs.GetInt(KeyMuteMicDuringSongPlaying) != 0;
         set
         {
             PlayerPrefs.SetInt(KeyMuteMicDuringSongPlaying, value ? 1 : 0);
@@ -186,15 +192,27 @@ public static class ModSettings
         }
     }
 
-    /// <summary>During active song / arena, force deafen (incoming voice off; restores when leaving). Does not broadcast deafen packets.</summary>
+    /// <summary>
+    /// During active song / arena, force deafen (currently disabled for v0.3.1; see <see cref="SongPeriodMuteAndDeafTemporarilyDisabled"/>).
+    /// </summary>
     public static bool DeafDuringSongPlaying
     {
-        get => PlayerPrefs.HasKey(KeyDeafDuringSongPlaying) && PlayerPrefs.GetInt(KeyDeafDuringSongPlaying) != 0;
+        get => !SongPeriodMuteAndDeafTemporarilyDisabled &&
+               PlayerPrefs.HasKey(KeyDeafDuringSongPlaying) && PlayerPrefs.GetInt(KeyDeafDuringSongPlaying) != 0;
         set
         {
             PlayerPrefs.SetInt(KeyDeafDuringSongPlaying, value ? 1 : 0);
             PlayerPrefs.Save();
         }
+    }
+
+    /// <summary>
+    /// Opt-in Chat Auto Updater (CAU). Persisted under LocalLow with Chat ID files (<see cref="ModFlagsFile"/>). Default off.
+    /// </summary>
+    public static bool EnableCau
+    {
+        get => ModFlagsFile.EnableCau;
+        set => ModFlagsFile.EnableCau = value;
     }
 
     /// <summary>

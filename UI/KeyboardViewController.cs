@@ -54,6 +54,7 @@ public class KeyboardViewController : BSMLAutomaticViewController
         }
 
         TryBindTypingField();
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
     protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)

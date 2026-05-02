@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using MultiplayerChat.Settings;
+using MultiplayerChat.UI;
 using UnityEngine;
 using Zenject;
 
@@ -24,6 +25,8 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private int _lastReadFrame;
     private int _chunkMonoSamples = 960;
     private readonly List<float> _monoScratch = new();
+    private float[] _micPollScratch = Array.Empty<float>();
+    private float[] _chunkEncodeScratch = Array.Empty<float>();
 
     private bool _voiceGateActive;
     private int _voiceHangoverChunksRemaining;
@@ -45,11 +48,13 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     private Coroutine? _deferredMicRestartCoroutine;
 
+    private bool _postedNoMicUi;
+    private bool _postedMicStartFailedUi;
+
     /// <summary>Lobby + GameCore each get a <see cref="VoiceHotMicManager"/>; only <see cref="Instance"/> may capture (see <see cref="Update"/>).</summary>
     private bool IsActiveHotMicHost => ReferenceEquals(Instance, this);
 
     private bool _lastPttInputCombined;
-    private bool _loggedPttPrefsOnce;
     private float _nextPttPeriodicLogTime;
 
     /// <summary>Dev-only: log Primary/Secondary/Grip/Trigger raw XR state ~1 Hz while in lobby.</summary>
@@ -92,27 +97,46 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     /// <summary>
     /// After <see cref="StopMic"/>, <see cref="IMultiplayerSessionManager.localPlayer"/> can be null for many frames in host setup;
     /// retry <see cref="EnsureMic"/> once capture is allowed so open-mic / PTT works again without re-entering the game.
+    /// PTT with button released is not a failure (mic intentionally idle until press).
     /// </summary>
     private IEnumerator DeferredRestartMicrophoneRoutine()
     {
         try
         {
-            for (var i = 0; i < 120; i++)
+            var sawLocalPlayer = false;
+            const int maxFrames = 600;
+            for (var i = 0; i < maxFrames; i++)
             {
                 yield return null;
                 if (!isActiveAndEnabled)
                     yield break;
                 if (!IsActiveHotMicHost)
                     yield break;
-                if (!CanCaptureHotMic())
+
+                if (_sessionManager?.localPlayer != null)
+                    sawLocalPlayer = true;
+
+                if (!sawLocalPlayer)
                     continue;
-                EnsureMic();
-                if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
-                    MultiplayerChat.Plugin.Log?.Info("[MPChat][VoIP] VoiceHotMicManager: deferred mic EnsureMic() succeeded");
-                yield break;
+
+                if (CanCaptureHotMic())
+                {
+                    EnsureMic();
+                    if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+                        MultiplayerChat.Plugin.Log?.Info("[MPChat][VoIP] VoiceHotMicManager: deferred mic EnsureMic() succeeded");
+                    yield break;
+                }
+
+                if (DeferredMicRestartIdleAcceptable())
+                    yield break;
             }
 
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat][VoIP] VoiceHotMicManager: deferred mic restart gave up after 120 frames (CanCaptureHotMic stayed false)");
+            if (!sawLocalPlayer)
+                yield break;
+
+            MultiplayerChat.Plugin.Log?.Warn(
+                $"[MPChat][VoIP] VoiceHotMicManager: deferred mic restart gave up after {maxFrames} frames (unexpected capture state)");
+            ChatSystemErrorMessages.PostHotMicDidNotResumeAfterVoipReload(_chatManager);
         }
         finally
         {
@@ -129,6 +153,9 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         StopMic();
+
+        if (ReferenceEquals(Instance, this) && _lastPttInputCombined)
+            ChatBubbleManager.Instance?.SetLocalPushToTalkOpen(false);
 
         var lobbyPeer = _lobbyScopeInstance;
         var iAmLobby = ReferenceEquals(_lobbyScopeInstance, this);
@@ -158,7 +185,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         MaybeLogRawControllerBindings();
-        MaybeLogPttState();
+        UpdateLocalPushToTalkBubbleAndMaybeWarn();
 
         if (!CanCaptureHotMic())
         {
@@ -169,8 +196,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         EnsureMic();
         PollMicAndSend();
     }
-
-    private static readonly string[] PttBindingLegend = { "Primary", "Secondary", "Trigger", "Grip" };
 
     private void MaybeLogRawControllerBindings()
     {
@@ -187,7 +212,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         MultiplayerChat.Plugin.Log?.Info("[MPChat][PTT][Hw] " + VrPttInput.BuildRawControllerBindingsDiagnosticLine());
     }
 
-    private void MaybeLogPttState()
+    private void UpdateLocalPushToTalkBubbleAndMaybeWarn()
     {
         if (_sessionManager?.localPlayer == null)
             return;
@@ -195,8 +220,9 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         var pttOn = ModSettings.PushToTalkEnabled;
         if (!pttOn)
         {
+            if (_lastPttInputCombined)
+                ChatBubbleManager.Instance?.SetLocalPushToTalkOpen(false);
             _lastPttInputCombined = false;
-            _loggedPttPrefsOnce = false;
             return;
         }
 
@@ -205,19 +231,9 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
         var combined = vrHeld || keyboardPtt;
 
-        if (!_loggedPttPrefsOnce)
-        {
-            _loggedPttPrefsOnce = true;
-            var name = bindingIdx >= 0 && bindingIdx < PttBindingLegend.Length ? PttBindingLegend[bindingIdx] : "?";
-            MultiplayerChat.Plugin.Log?.Info(
-                $"[MPChat][PTT] Push-to-talk ON: binding={name} (idx={bindingIdx}) scene={gameObject.scene.name}. Press/hold logs on change.");
-        }
-
         if (combined != _lastPttInputCombined)
         {
-            var name = bindingIdx >= 0 && bindingIdx < PttBindingLegend.Length ? PttBindingLegend[bindingIdx] : "?";
-            MultiplayerChat.Plugin.Log?.Info(
-                $"[MPChat][PTT] {(combined ? "BUTTON HELD" : "button released")}: binding={name} vrBinding={vrHeld} SpaceFallback={keyboardPtt}{VrPttInput.FormatDiagnosticsSuffix(bindingIdx)}");
+            ChatBubbleManager.Instance?.SetLocalPushToTalkOpen(combined);
             _lastPttInputCombined = combined;
         }
 
@@ -243,6 +259,40 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     private static bool SameMicSelection(string? a, string? b) =>
         string.Equals(a ?? "", b ?? "", System.StringComparison.Ordinal);
+
+    /// <summary>
+    /// After VoIP reload, <see cref="CanCaptureHotMic"/> may stay false on purpose (PTT not held, lobby mute, deaf).
+    /// Those are not errors.
+    /// </summary>
+    private bool DeferredMicRestartIdleAcceptable()
+    {
+        if (_sessionManager?.localPlayer == null)
+            return false;
+
+        if (VoiceChatRuntimeState.IsDeaf)
+            return true;
+
+        var pushToTalk = ModSettings.PushToTalkEnabled;
+        var vrHeldRaw = VrPttInput.IsBindingHeld(ModSettings.PttBindingIndex);
+        var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
+        var pttHeld = !pushToTalk || vrHeldRaw || keyboardPtt;
+
+        if (VoiceChatRuntimeState.IsHotMicMuted)
+        {
+            if (!pushToTalk || !GlobalChatAudioHost.SongMicCoercionAllowsPttBypass() || !pttHeld)
+                return true;
+        }
+
+        if (pushToTalk && !pttHeld)
+        {
+            var hasTail = _voiceGateActive || _voiceHangoverChunksRemaining > 0;
+            var hasFullChunkPending = _monoScratch.Count >= _chunkMonoSamples;
+            if (!hasTail && !hasFullChunkPending)
+                return true;
+        }
+
+        return false;
+    }
 
     private bool CanCaptureHotMic()
     {
@@ -283,9 +333,18 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         var devices = Microphone.devices;
+        if (devices != null && devices.Length > 0)
+            _postedNoMicUi = false;
+
         if (devices == null || devices.Length == 0)
         {
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] Hot mic: no microphone devices.");
+            if (!_postedNoMicUi)
+            {
+                ChatSystemErrorMessages.PostNoMicrophoneFound(_chatManager);
+                _postedNoMicUi = true;
+            }
+
             return;
         }
 
@@ -302,10 +361,18 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         if (_micLoop == null)
         {
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] Hot mic: Microphone.Start failed.");
+            if (!_postedMicStartFailedUi)
+            {
+                ChatSystemErrorMessages.PostMicrophoneFailedToStart(_chatManager);
+                _postedMicStartFailedUi = true;
+            }
+
             _micDevice = null;
             _micDeviceAtStart = null;
             return;
         }
+
+        _postedMicStartFailedUi = false;
 
         _lastReadFrame = 0;
         // Slightly longer frames than 100ms = fewer send boundaries (was ~4×100ms → ~400ms coalesced clips with ~25ms inter-burst gaps).
@@ -345,6 +412,8 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         _voiceHangoverChunksRemaining = 0;
         _micWarmupChunksRemaining = 0;
         _hotMicSendCrossfadeTail = null;
+        _micPollScratch = Array.Empty<float>();
+        _chunkEncodeScratch = Array.Empty<float>();
     }
 
     private static string? ResolveMicDeviceName()
@@ -369,15 +438,18 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         if (nFrames <= 0) return;
 
         var floatCount = nFrames * ch;
-        var buf = new float[floatCount];
-        _micLoop.GetData(buf, _lastReadFrame);
+        if (_micPollScratch.Length < floatCount)
+            _micPollScratch = new float[floatCount];
+        _micLoop.GetData(_micPollScratch, _lastReadFrame);
         _lastReadFrame = pos;
 
-        AppendMonoFromInterleavedBuf(buf, ch, nFrames);
+        AppendMonoFromInterleavedBuf(_micPollScratch, ch, nFrames);
 
         while (_monoScratch.Count >= _chunkMonoSamples)
         {
-            var chunk = new float[_chunkMonoSamples];
+            if (_chunkEncodeScratch.Length != _chunkMonoSamples)
+                _chunkEncodeScratch = new float[_chunkMonoSamples];
+            var chunk = _chunkEncodeScratch;
             for (var i = 0; i < _chunkMonoSamples; i++)
                 chunk[i] = _monoScratch[i];
             _monoScratch.RemoveRange(0, _chunkMonoSamples);

@@ -8,6 +8,12 @@ namespace MultiplayerChat.Core;
 /// <summary>Throttled, high-signal logging for incoming hot mic / voice message debugging (filter drops, decode, scheduling).</summary>
 internal static class VoiceReceiveDiagnostics
 {
+    /// <summary>
+    /// When <see langword="false"/> (default), suppress periodic <c>[VoiceMsgRx]</c> chunk stats during playback.
+    /// Drops, decrypt failures, and decode errors still log (throttled where noted).
+    /// </summary>
+    public static bool EnableVerboseChunkLogs;
+
     private const float DropLogThrottleSec = 1.0f;
     private const float HotMicChunkLogIntervalSec = 0.35f;
     private const int MaxScheduleDetailLogs = 12;
@@ -73,7 +79,7 @@ internal static class VoiceReceiveDiagnostics
 
     public static bool ShouldLogVoiceMessageChunkLine(string userId)
     {
-        if (VoiceBareStreamMode.Enabled) return false;
+        if (!EnableVerboseChunkLogs || VoiceBareStreamMode.Enabled) return false;
         var now = Time.realtimeSinceStartup;
         if (s_nextVoiceMsgChunkLog.TryGetValue(userId, out var next) && now < next) return false;
         s_nextVoiceMsgChunkLog[userId] = now + HotMicChunkLogIntervalSec;

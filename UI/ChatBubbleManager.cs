@@ -34,6 +34,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private readonly List<ChatBubble> _stackedBubbles = new();
     private readonly Dictionary<string, ChatBubble> _ephemeralTypingByUserId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ChatBubble> _ephemeralRecordingByUserId = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ChatBubble> _ephemeralLocalByKey = new(StringComparer.Ordinal);
     private Transform? _lobbyHeaderRoot;
     private int _lobbyBannerMissStreak;
     private bool _wasInLobby;
@@ -44,6 +45,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     /// <summary>Full scene scans for avatar caption anchors  -  capped so lobby idle does not hitch every ~0.12–0.5s.</summary>
     private float _nextNametagEnsureRealtime = -999f;
     private const float NametagEnsureMinIntervalSec = 2.75f;
+
+    private static readonly string[] LobbyUiScanRoots =
+    {
+        "MultiplayerLobbyCenterStage", "CenterStage", "LobbySetup", "HostSetup"
+    };
 
     /// <summary>While a beatmap is playing, skip lobby polling (GameObject.Find / nametag scans).</summary>
     private const float SongLobbyPollSleepSec = 2f;
@@ -398,17 +404,31 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             return;
         _nextNametagEnsureRealtime = now + NametagEnsureMinIntervalSec;
 
-        foreach (var ctrl in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarController>())
+        var hitAnyRoot = false;
+        foreach (var rootName in LobbyUiScanRoots)
         {
-            if (ctrl == null) continue;
-            var cap = ctrl.transform.Find("AvatarCaption") ?? FindRecursive(ctrl.transform, "AvatarCaption")
-                ?? FindRecursive(ctrl.transform, "PlayerName") ?? FindRecursive(ctrl.transform, "Name")
-                ?? FindNametagByText(ctrl.transform);
-            if (cap != null && cap.GetComponent<ChatBubbleAnchor>() == null)
-            {
-                cap.gameObject.AddComponent<ChatBubbleAnchor>();
-            }
+            var go = GameObject.Find(rootName);
+            if (go == null) continue;
+            hitAnyRoot = true;
+            foreach (var ctrl in go.GetComponentsInChildren<MultiplayerLobbyAvatarController>(true))
+                TryAttachNametagAnchor(ctrl);
         }
+
+        if (!hitAnyRoot)
+        {
+            foreach (var ctrl in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarController>())
+                TryAttachNametagAnchor(ctrl);
+        }
+    }
+
+    private static void TryAttachNametagAnchor(MultiplayerLobbyAvatarController ctrl)
+    {
+        if (ctrl == null) return;
+        var cap = ctrl.transform.Find("AvatarCaption") ?? FindRecursive(ctrl.transform, "AvatarCaption")
+            ?? FindRecursive(ctrl.transform, "PlayerName") ?? FindRecursive(ctrl.transform, "Name")
+            ?? FindNametagByText(ctrl.transform);
+        if (cap != null && cap.GetComponent<ChatBubbleAnchor>() == null)
+            cap.gameObject.AddComponent<ChatBubbleAnchor>();
     }
 
     private static Transform? FindNametagByText(Transform root)
@@ -464,44 +484,25 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     /// <summary>
     /// Finds the HOST SETUP bar by scanning text in the scene. Prefers world-space / camera canvases;
     /// when <paramref name="allowOverlay"/> is true, Screen Space Overlay matches are allowed (move handle / chat root).
+    /// Scoped subtree scans run before expensive global TMP walks.
     /// </summary>
     private static Transform? FindHostSetupBannerInLobby(bool allowOverlay)
     {
         bool AcceptCanvas(Canvas? canvas) =>
             canvas != null && (allowOverlay || canvas.renderMode != RenderMode.ScreenSpaceOverlay);
 
-        foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
+        foreach (var rootName in LobbyUiScanRoots)
         {
-            if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
-            var text = (tmp.text ?? "").ToUpperInvariant().Trim();
-            if (BannerTextLooksLikeLobbyHeader(text))
-            {
-                var canvas = tmp.GetComponentInParent<Canvas>();
-                if (AcceptCanvas(canvas))
-                    return tmp.transform;
-            }
-        }
-        foreach (var curved in UnityEngine.Object.FindObjectsOfType<CurvedTextMeshPro>())
-        {
-            if (curved == null || !curved.gameObject.activeInHierarchy) continue;
-            var text = (curved.text ?? "").ToUpperInvariant().Trim();
-            if (BannerTextLooksLikeLobbyHeader(text))
-            {
-                var canvas = curved.GetComponentInParent<Canvas>();
-                if (AcceptCanvas(canvas))
-                    return curved.transform;
-            }
-        }
-        var roots = new[] { "MultiplayerLobbyCenterStage", "CenterStage", "LobbySetup" };
-        foreach (var rootName in roots)
-        {
-            var root = GameObject.Find(rootName);
-            if (root == null) continue;
-            var found = FindInChildren(root.transform, t =>
+            var rootGo = GameObject.Find(rootName);
+            if (rootGo == null) continue;
+            var hit = ScanLobbyBannerTextUnderHierarchy(rootGo.transform, AcceptCanvas);
+            if (hit != null) return hit;
+
+            var found = FindInChildren(rootGo.transform, t =>
             {
                 var name = t.name.ToUpperInvariant();
                 return name.Contains("HOSTSETUP") || (name.Contains("HOST") && name.Contains("SETUP")) ||
-                    name.Contains("HEADER") || name == "TITLE";
+                       name.Contains("HEADER") || name == "TITLE";
             });
             if (found != null)
             {
@@ -510,12 +511,14 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     return found;
             }
         }
+
         var titleView = GameObject.Find("TitleViewController");
         if (titleView == null)
         {
             var wrapper = GameObject.Find("Wrapper");
             titleView = wrapper != null ? wrapper.transform.Find("MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")?.gameObject : null;
         }
+
         if (titleView != null)
         {
             foreach (var tmp in titleView.GetComponentsInChildren<TMPro.TMP_Text>(true))
@@ -529,10 +532,61 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                         return tmp.transform;
                 }
             }
+
             var titleCanvas = titleView.GetComponentInParent<Canvas>();
             if (AcceptCanvas(titleCanvas))
                 return titleView.transform;
         }
+
+        foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
+        {
+            if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
+            var text = (tmp.text ?? "").ToUpperInvariant().Trim();
+            if (BannerTextLooksLikeLobbyHeader(text))
+            {
+                var canvas = tmp.GetComponentInParent<Canvas>();
+                if (AcceptCanvas(canvas))
+                    return tmp.transform;
+            }
+        }
+
+        foreach (var curved in UnityEngine.Object.FindObjectsOfType<CurvedTextMeshPro>())
+        {
+            if (curved == null || !curved.gameObject.activeInHierarchy) continue;
+            var text = (curved.text ?? "").ToUpperInvariant().Trim();
+            if (BannerTextLooksLikeLobbyHeader(text))
+            {
+                var canvas = curved.GetComponentInParent<Canvas>();
+                if (AcceptCanvas(canvas))
+                    return curved.transform;
+            }
+        }
+
+        return null;
+    }
+
+    private static Transform? ScanLobbyBannerTextUnderHierarchy(Transform root, Func<Canvas?, bool> acceptCanvas)
+    {
+        foreach (var tmp in root.GetComponentsInChildren<TMPro.TMP_Text>(true))
+        {
+            if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
+            var text = (tmp.text ?? "").ToUpperInvariant().Trim();
+            if (!BannerTextLooksLikeLobbyHeader(text)) continue;
+            var canvas = tmp.GetComponentInParent<Canvas>();
+            if (acceptCanvas(canvas))
+                return tmp.transform;
+        }
+
+        foreach (var curved in root.GetComponentsInChildren<CurvedTextMeshPro>(true))
+        {
+            if (curved == null || !curved.gameObject.activeInHierarchy) continue;
+            var text = (curved.text ?? "").ToUpperInvariant().Trim();
+            if (!BannerTextLooksLikeLobbyHeader(text)) continue;
+            var canvas = curved.GetComponentInParent<Canvas>();
+            if (acceptCanvas(canvas))
+                return curved.transform;
+        }
+
         return null;
     }
 
@@ -616,6 +670,15 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         SetEphemeralLine(_ephemeralRecordingByUserId, senderUserId, visible, richText);
     }
 
+    private const string LocalPttEphemeralKey = "__local_ptt__";
+
+    /// <summary>Local-only hot mic UI while push-to-talk key is held (not networked).</summary>
+    public void SetLocalPushToTalkOpen(bool visible)
+    {
+        SetEphemeralLine(_ephemeralLocalByKey, LocalPttEphemeralKey, visible,
+            "<color=#CCCCCC>Push To Talk is open.</color>");
+    }
+
     private void ClearEphemeralPresenceMaps()
     {
         foreach (var kv in _ephemeralTypingByUserId.ToList())
@@ -634,6 +697,14 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
 
         _ephemeralRecordingByUserId.Clear();
+        foreach (var kv in _ephemeralLocalByKey.ToList())
+        {
+            if (kv.Value == null) continue;
+            RemoveBubbleFromStack(kv.Value);
+            kv.Value.DismissEphemeral();
+        }
+
+        _ephemeralLocalByKey.Clear();
     }
 
     private void RemoveBubbleFromStack(ChatBubble bubble)
@@ -718,6 +789,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         {
             if (kv.Value == bubble)
                 _ephemeralRecordingByUserId.Remove(kv.Key);
+        }
+
+        foreach (var kv in _ephemeralLocalByKey.ToList())
+        {
+            if (kv.Value == bubble)
+                _ephemeralLocalByKey.Remove(kv.Key);
         }
     }
 

@@ -2,20 +2,20 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical pad="3" spacing="2">
-    <text text="Multiplayer Chat BETA v0.3.1" font-size="4" align="Center"/>
+    <text text="Multiplayer Chat BETA-v0.3.1" font-size="4" align="Center"/>
     <horizontal spacing="2">
       <string-setting id="ChatInput" text="Message" show-buttons="false"/>
       <button text="Send" on-click="SubmitClicked"/>
     </horizontal>
     <horizontal spacing="2">
-      <button text="FORCE CLEAR CHAT" on-click="ForceClearClicked"/>
-      <button text="FORCE END VOICE MESSAGE" on-click="ForceEndVoiceClicked"/>
-      <button text="FORCE RESET VOIP" on-click="ForceResetVoipClicked"/>
+      <button text="Clear chat" on-click="ForceClearClicked"/>
+      <button text="End voice message" on-click="ForceEndVoiceClicked"/>
+      <button text="Reset voice chat" on-click="ForceResetVoipClicked"/>
     </horizontal>
     <horizontal spacing="2">
       <button id="RecordButton" text="Record" on-click="RecordClicked"/>
       <button id="VoicePlayButton" text="Play" on-click="PlayVoiceClicked"/>
-      <button id="VoiceSendButton" text="send" on-click="SendVoiceClicked"/>
+      <button id="VoiceSendButton" text="Send" on-click="SendVoiceClicked"/>
     </horizontal>
     <horizontal spacing="2">
       <button id="DeafButton" text="Deaf" on-click="DeafClicked"/>

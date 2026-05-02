@@ -3,7 +3,8 @@
   "id": "MultiplayerChat",
   "name": "Multiplayer Chat",
   "version": "0.3.1",
-  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice chat!",
+  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice. v0.3.1: performance work and optional in-game CAU updater (off by default; settings).",
+  "author": "Butthead",
   "gameVersion": "1.40.1",
   "dependsOn": {
     "BSIPA": "^4.2.0",

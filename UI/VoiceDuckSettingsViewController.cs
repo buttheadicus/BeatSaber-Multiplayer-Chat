@@ -40,6 +40,7 @@ public class VoiceDuckSettingsViewController : BSMLAutomaticViewController
     {
         ReloadDraftsFromDisk();
         RefreshDuckVolumeLabel();
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
@@ -48,6 +49,7 @@ public class VoiceDuckSettingsViewController : BSMLAutomaticViewController
         ReloadDraftsFromDisk();
         _duckEnabledToggle?.ReceiveValue();
         RefreshDuckVolumeLabel();
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
     [UIAction("DuckVolumeDownClicked")]

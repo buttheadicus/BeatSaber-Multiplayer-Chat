@@ -101,6 +101,7 @@ public class PlayerListViewController : BSMLAutomaticViewController
         ApplyTitle();
         UpdateVoiceChrome();
         ReloadGrid();
+        BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
     [UIAction("VoiceModeSwitchClicked")]

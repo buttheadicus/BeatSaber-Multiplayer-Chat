@@ -32,6 +32,7 @@ public class ChatManager : IInitializable, IDisposable
     private readonly Queue<(string UserId, byte[] Blob)> _voicePlaybackQueue = new();
     private bool _voicePlaybackRunning;
     private GameObject? _voicePlaybackGameObject;
+    private AudioSource? _voicePlaybackAudioSource;
     private Coroutine? _voicePlaybackCoroutine;
 
     private const float MuteNotifyCooldownSeconds = 60f;
@@ -278,12 +279,8 @@ public class ChatManager : IInitializable, IDisposable
     /// <summary>True while incoming voice message or hot mic is playing, queued, or actively being drained (for ducking / activity).</summary>
     public bool IsIncomingVoiceAudible()
     {
-        if (_voicePlaybackGameObject != null)
-        {
-            var src = _voicePlaybackGameObject.GetComponent<AudioSource>();
-            if (src != null && src.isPlaying)
-                return true;
-        }
+        if (_voicePlaybackAudioSource != null && _voicePlaybackAudioSource && _voicePlaybackAudioSource.isPlaying)
+            return true;
 
         if (_voicePlaybackQueue.Count > 0)
             return true;
@@ -293,13 +290,9 @@ public class ChatManager : IInitializable, IDisposable
         foreach (var player in _hotMicSequentialPlayers.Values)
         {
             if (player?.Root == null) continue;
-            for (var i = 0; i < player.Root.transform.childCount; i++)
-            {
-                var ch = player.Root.transform.GetChild(i);
-                var s = ch.GetComponent<AudioSource>();
-                if (s != null && s.isPlaying)
-                    return true;
-            }
+            // Cheaper than scanning each HM_seg with GetComponent<AudioSource>(); segments parent here immediately.
+            if (player.Root.transform.childCount > 0)
+                return true;
         }
 
         foreach (var kv in _hotMicIncoming)
@@ -567,6 +560,7 @@ public class ChatManager : IInitializable, IDisposable
                 UnityEngine.Object.Destroy(src.clip);
             UnityEngine.Object.Destroy(_voicePlaybackGameObject);
             _voicePlaybackGameObject = null;
+            _voicePlaybackAudioSource = null;
         }
         _voicePlaybackRunning = false;
         StopAllHotMicPlayback();
@@ -1600,6 +1594,7 @@ public class ChatManager : IInitializable, IDisposable
         var go = new GameObject("MPChatVoicePlayback");
         _voicePlaybackGameObject = go;
         var src = go.AddComponent<AudioSource>();
+        _voicePlaybackAudioSource = src;
         src.clip = clip;
         src.volume = 1f;
         src.spatialBlend = 0f;
@@ -1609,7 +1604,11 @@ public class ChatManager : IInitializable, IDisposable
         yield return WaitForAudioSourceClipEnd(src, clip);
         UnityEngine.Object.Destroy(clip);
         if (_voicePlaybackGameObject == go)
+        {
             _voicePlaybackGameObject = null;
+            _voicePlaybackAudioSource = null;
+        }
+
         UnityEngine.Object.Destroy(go);
     }
 

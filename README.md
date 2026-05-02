@@ -1,20 +1,14 @@
 # Multiplayer Chat
 
-End-to-end encrypted text and voice for BeatTogether multiplayer. Chat and voice payloads are encrypted on your device; only players in your session can decrypt them. The relay server sees opaque bytes, not your messages or voice.
+Encrypted text/voice chat for BeatTogether (or other supported server (in theory, any server))
 
-## Features (implemented)
+## Already implemented features
 
-- **Encrypted text chat**: AES-256-CBC + HMAC. Session key from connected player IDs; only lobby members derive the key.
-- **Voice messages**: Record, send, and play short voice clips over the same encrypted channel.
-- **Hot mic (continuous voice)**: Low-latency streamed voice chat.
-- **DMs**: Direct messages to a chosen player in the lobby.
-- **Mute / unmute**: Per-player mute for incoming voice.
-- **Deafen**: Local deafen.
-- **Talk-to / listen filters**: Restrict who you send voice to and whose voice you hear when those modes are active.
-- **Receive gain**: Per-sender playback level applied in PCM before playback (consistent with voice message path).
-- **Chat activity**: Typing / recording presence hints for other players (where supported by UI).
-- **Mod tab**: "Multiplayer chat" in mod tabs (lobby-side).
-- **Keyboard UI**: Letters, numbers, and symbols for composing messages.
+- **Encrypted text/voice chat**: fully encrypted packets, server cant read what you say or type.
+- **Voice chat & messages**: speak to other players with hot mic, or give them a nice voice message!
+- **DMs**: self explanitory, have only one player read/hear your text/voice message.
+- **Mute / deafen**: self explanitory
+- **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)a
 
 ## Plans
 
@@ -24,7 +18,7 @@ End-to-end encrypted text and voice for BeatTogether multiplayer. Chat and voice
 - **Private calls**: Out-of-lobby or dedicated voice sessions (design is TBD).
 - **DM from menu**: Start or continue DMs without being in a multiplayer lobby first.
 
-## Multiplayer Extensions (Required)
+## Multiplayer Extensions (Required (but also auto installs, see below))
 
 Lobby features (solo-style environment, lobby visuals, gameplay tweaks) come from **[Multiplayer Extensions](https://github.com/EnderdracheLP/MultiplayerExtensions)** ([v1.1.0 for BS 1.37.5–1.40.8](https://github.com/EnderdracheLP/MultiplayerExtensions/releases/tag/v1.1.0)). It is **not** a hard BSIPA dependency of Multiplayer Chat so the mod can start without it.
 
