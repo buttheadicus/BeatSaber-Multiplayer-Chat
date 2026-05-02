@@ -4,12 +4,16 @@
   <vertical pad="10" spacing="5">
     <text text="Multiplayer Chat Settings" font-size="5" align="Center"/>
     <slider-setting id="BubbleDuration" text="Chat bubble duration (seconds)" value="BubbleDuration" min="15" max="60" increment="1" show-value="true"/>
-    <toggle-setting id="ChatBubbleSoundsToggle" text="Chat bubble sounds" value="ChatBubbleSoundsEnabled"/>
+    <horizontal child-expand-width="true">
+      <toggle-setting id="ChatBubbleSoundsToggle" text="Chat bubble sounds" value="ChatBubbleSoundsEnabled"/>
+    </horizontal>
     <horizontal>
       <text text="Name color" font-size="4"/>
       <string-setting id="NameColorInput" text="HEX (6 chars)" value="NameColor" show-buttons="false"/>
     </horizontal>
-    <toggle-setting id="EnableCauToggle" text="Enable CAU" value="EnableCau"/>
+    <horizontal child-expand-width="true">
+      <toggle-setting id="EnableCauToggle" text="Enable CAU" value="EnableCau"/>
+    </horizontal>
     <button text="Fused Mods" on-click="FusedModsClicked"/>
     <button text="APPLY" on-click="ApplyClicked"/>
   </vertical>

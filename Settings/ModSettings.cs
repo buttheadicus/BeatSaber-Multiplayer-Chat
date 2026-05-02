@@ -4,51 +4,32 @@ using UnityEngine;
 namespace MultiplayerChat.Settings;
 
 /// <summary>
-/// Persists mod settings using Unity <see cref="PlayerPrefs"/> (Windows: typically registry under
-/// <c>HKCU\Software\Hyperbolic Magnetism\Beat Saber</c>, not the LocalLow folder). Chat id files use
-/// <see cref="ChatIdFilePaths.RootDirectory"/> instead.
+/// Mod preferences stored under Beat Saber LocalLow with Chat ID files (<see cref="ChatIdFilePaths.ModSettingsFilePath"/>).
+/// Previously used Unity <see cref="PlayerPrefs"/> and a separate CAU flags file; those are migrated once when the JSON is missing or unreadable.
 /// </summary>
 public static class ModSettings
 {
-    private const string KeyBubbleDuration = "MultiplayerChat.BubbleDuration";
-    private const string KeyShowSystemMessages = "MultiplayerChat.ShowSystemMessages";
-    private const string KeyNameColor = "MultiplayerChat.NameColor";
-    private const string KeyCustomPlacement = "MultiplayerChat.CustomPlacement";
-    private const string KeyLobbyChatPosX = "MultiplayerChat.LobbyChatPosX";
-    private const string KeyLobbyChatPosY = "MultiplayerChat.LobbyChatPosY";
-    private const string KeyChatBubbleSounds = "MultiplayerChat.ChatBubbleSounds";
-    private const string KeyMicInputDevice = "MultiplayerChat.MicInputDevice";
-    private const string KeyPushToTalk = "MultiplayerChat.PushToTalk";
-    private const string KeyPttBinding = "MultiplayerChat.PttBinding";
-    private const string KeyVoiceDuckEnabled = "MultiplayerChat.VoiceDuckEnabled";
-    private const string KeyVoiceDuckTargetPercent = "MultiplayerChat.VoiceDuckTargetPercent";
-    private const string KeyMuteMicDuringSongPlaying = "MultiplayerChat.MuteMicDuringSongPlaying";
-    private const string KeyDeafDuringSongPlaying = "MultiplayerChat.DeafDuringSongPlaying";
-    private const string KeyEnableAvatarExtensions = "MultiplayerChat.EnableAvatarExtensions";
-
-    private const float DefaultBubbleDuration = 15f;
-    private const bool DefaultShowSystemMessages = true;
-    private const bool DefaultCustomPlacement = false;
     private const string DefaultNameColor = "87CEEB";
+
+    private static ModSettingsPersistence.Data D => ModSettingsPersistence.Instance;
 
     public static float BubbleDuration
     {
-        get => PlayerPrefs.HasKey(KeyBubbleDuration) ? PlayerPrefs.GetFloat(KeyBubbleDuration) : DefaultBubbleDuration;
+        get => D.BubbleDuration;
         set
         {
-            var clamped = Math.Max(15f, Math.Min(60f, value));
-            PlayerPrefs.SetFloat(KeyBubbleDuration, clamped);
-            PlayerPrefs.Save();
+            D.BubbleDuration = Math.Max(15f, Math.Min(60f, value));
+            ModSettingsPersistence.Save();
         }
     }
 
     public static bool ShowSystemMessages
     {
-        get => !PlayerPrefs.HasKey(KeyShowSystemMessages) || PlayerPrefs.GetInt(KeyShowSystemMessages) != 0;
+        get => D.ShowSystemMessages;
         set
         {
-            PlayerPrefs.SetInt(KeyShowSystemMessages, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.ShowSystemMessages = value;
+            ModSettingsPersistence.Save();
         }
     }
 
@@ -56,22 +37,25 @@ public static class ModSettings
     {
         get
         {
+            var hex = D.NameColor?.Trim() ?? "";
+            if (hex.StartsWith("#")) hex = hex.Substring(1);
+            if (hex.Length == 6 && IsValidHex(hex))
+                return hex;
+
             var fromJson = MultiplayerExtensionsJson.GetPlayerColorHex();
-            return !string.IsNullOrEmpty(fromJson)
-                ? fromJson!
-                : PlayerPrefs.GetString(KeyNameColor, DefaultNameColor);
+            return !string.IsNullOrEmpty(fromJson) ? fromJson! : DefaultNameColor;
         }
         set
         {
             var hex = (value ?? "").Trim();
             if (hex.StartsWith("#")) hex = hex.Substring(1);
             if (hex.Length > 6) hex = hex.Substring(0, 6);
-            if (hex.Length == 6 && IsValidHex(hex))
-            {
-                MultiplayerExtensionsJson.SetPlayerColorHex(hex);
-                PlayerPrefs.SetString(KeyNameColor, hex);
-                PlayerPrefs.Save();
-            }
+            if (hex.Length != 6 || !IsValidHex(hex))
+                return;
+
+            D.NameColor = hex;
+            ModSettingsPersistence.Save();
+            MultiplayerExtensionsJson.SetPlayerColorHex(hex);
         }
     }
 
@@ -87,35 +71,33 @@ public static class ModSettings
     /// <summary>Off = default position above HOST SETUP. On = custom placement with draggable handle.</summary>
     public static bool CustomPlacement
     {
-        get => PlayerPrefs.HasKey(KeyCustomPlacement) && PlayerPrefs.GetInt(KeyCustomPlacement) != 0;
+        get => D.CustomPlacement;
         set
         {
-            PlayerPrefs.SetInt(KeyCustomPlacement, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.CustomPlacement = value;
+            ModSettingsPersistence.Save();
         }
     }
 
     public static Vector2 LobbyChatPosition
     {
-        get => new Vector2(
-            PlayerPrefs.GetFloat(KeyLobbyChatPosX, 0f),
-            PlayerPrefs.GetFloat(KeyLobbyChatPosY, 0f));
+        get => new Vector2(D.LobbyChatPosX, D.LobbyChatPosY);
         set
         {
-            PlayerPrefs.SetFloat(KeyLobbyChatPosX, value.x);
-            PlayerPrefs.SetFloat(KeyLobbyChatPosY, value.y);
-            PlayerPrefs.Save();
+            D.LobbyChatPosX = value.x;
+            D.LobbyChatPosY = value.y;
+            ModSettingsPersistence.Save();
         }
     }
 
     /// <summary>UI one-shot sounds for chat bubbles (not system lines).</summary>
     public static bool ChatBubbleSoundsEnabled
     {
-        get => !PlayerPrefs.HasKey(KeyChatBubbleSounds) || PlayerPrefs.GetInt(KeyChatBubbleSounds) != 0;
+        get => D.ChatBubbleSoundsEnabled;
         set
         {
-            PlayerPrefs.SetInt(KeyChatBubbleSounds, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.ChatBubbleSoundsEnabled = value;
+            ModSettingsPersistence.Save();
         }
     }
 
@@ -124,54 +106,54 @@ public static class ModSettings
     /// </summary>
     public static string MicInputDeviceName
     {
-        get => PlayerPrefs.GetString(KeyMicInputDevice, "");
+        get => D.MicInputDeviceName ?? "";
         set
         {
-            PlayerPrefs.SetString(KeyMicInputDevice, value ?? "");
-            PlayerPrefs.Save();
+            D.MicInputDeviceName = value ?? "";
+            ModSettingsPersistence.Save();
         }
     }
 
     public static bool PushToTalkEnabled
     {
-        get => PlayerPrefs.HasKey(KeyPushToTalk) && PlayerPrefs.GetInt(KeyPushToTalk) != 0;
+        get => D.PushToTalkEnabled;
         set
         {
-            PlayerPrefs.SetInt(KeyPushToTalk, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.PushToTalkEnabled = value;
+            ModSettingsPersistence.Save();
         }
     }
 
-    /// <summary>0–3: Primary, Secondary, Trigger, Grip.</summary>
+    /// <summary>0-3: Primary, Secondary, Trigger, Grip.</summary>
     public static int PttBindingIndex
     {
-        get => Mathf.Clamp(PlayerPrefs.GetInt(KeyPttBinding, 0), 0, 3);
+        get => Mathf.Clamp(D.PttBindingIndex, 0, 3);
         set
         {
-            PlayerPrefs.SetInt(KeyPttBinding, Mathf.Clamp(value, 0, 3));
-            PlayerPrefs.Save();
+            D.PttBindingIndex = Mathf.Clamp(value, 0, 3);
+            ModSettingsPersistence.Save();
         }
     }
 
     /// <summary>Lower selected game <see cref="UnityEngine.AudioSource"/> volumes while incoming voice is active; MPChat playback sources are excluded by hierarchy name.</summary>
     public static bool VoiceDuckingEnabled
     {
-        get => PlayerPrefs.HasKey(KeyVoiceDuckEnabled) && PlayerPrefs.GetInt(KeyVoiceDuckEnabled) != 0;
+        get => D.VoiceDuckingEnabled;
         set
         {
-            PlayerPrefs.SetInt(KeyVoiceDuckEnabled, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.VoiceDuckingEnabled = value;
+            ModSettingsPersistence.Save();
         }
     }
 
-    /// <summary>Game audio multiplier while ducked (5–100), as percent of baseline per-source volume.</summary>
+    /// <summary>Game audio multiplier while ducked (5-100), as percent of baseline per-source volume.</summary>
     public static int VoiceDuckTargetPercent
     {
-        get => Mathf.Clamp(PlayerPrefs.GetInt(KeyVoiceDuckTargetPercent, 35), 5, 100);
+        get => Mathf.Clamp(D.VoiceDuckTargetPercent, 5, 100);
         set
         {
-            PlayerPrefs.SetInt(KeyVoiceDuckTargetPercent, Mathf.Clamp(value, 5, 100));
-            PlayerPrefs.Save();
+            D.VoiceDuckTargetPercent = Mathf.Clamp(value, 5, 100);
+            ModSettingsPersistence.Save();
         }
     }
 
@@ -183,12 +165,11 @@ public static class ModSettings
     /// </summary>
     public static bool MuteMicDuringSongPlaying
     {
-        get => !SongPeriodMuteAndDeafTemporarilyDisabled &&
-               PlayerPrefs.HasKey(KeyMuteMicDuringSongPlaying) && PlayerPrefs.GetInt(KeyMuteMicDuringSongPlaying) != 0;
+        get => !SongPeriodMuteAndDeafTemporarilyDisabled && D.MuteMicDuringSongPlaying;
         set
         {
-            PlayerPrefs.SetInt(KeyMuteMicDuringSongPlaying, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.MuteMicDuringSongPlaying = value;
+            ModSettingsPersistence.Save();
         }
     }
 
@@ -197,22 +178,25 @@ public static class ModSettings
     /// </summary>
     public static bool DeafDuringSongPlaying
     {
-        get => !SongPeriodMuteAndDeafTemporarilyDisabled &&
-               PlayerPrefs.HasKey(KeyDeafDuringSongPlaying) && PlayerPrefs.GetInt(KeyDeafDuringSongPlaying) != 0;
+        get => !SongPeriodMuteAndDeafTemporarilyDisabled && D.DeafDuringSongPlaying;
         set
         {
-            PlayerPrefs.SetInt(KeyDeafDuringSongPlaying, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.DeafDuringSongPlaying = value;
+            ModSettingsPersistence.Save();
         }
     }
 
     /// <summary>
-    /// Opt-in Chat Auto Updater (CAU). Persisted under LocalLow with Chat ID files (<see cref="ModFlagsFile"/>). Default off.
+    /// Opt-in Chat Auto Updater (CAU). Stored in <see cref="ChatIdFilePaths.ModSettingsFilePath"/> with other mod settings.
     /// </summary>
     public static bool EnableCau
     {
-        get => ModFlagsFile.EnableCau;
-        set => ModFlagsFile.EnableCau = value;
+        get => D.EnableCau;
+        set
+        {
+            D.EnableCau = value;
+            ModSettingsPersistence.Save();
+        }
     }
 
     /// <summary>
@@ -220,11 +204,11 @@ public static class ModSettings
     /// </summary>
     public static bool EnableAvatarExtensions
     {
-        get => PlayerPrefs.HasKey(KeyEnableAvatarExtensions) && PlayerPrefs.GetInt(KeyEnableAvatarExtensions) != 0;
+        get => D.EnableAvatarExtensions;
         set
         {
-            PlayerPrefs.SetInt(KeyEnableAvatarExtensions, value ? 1 : 0);
-            PlayerPrefs.Save();
+            D.EnableAvatarExtensions = value;
+            ModSettingsPersistence.Save();
         }
     }
 

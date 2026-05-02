@@ -26,4 +26,7 @@ public static class ChatIdFilePaths
 
     /// <summary>DPAPI-encrypted JSON: learned platform user id → others' persistent chat IDs.</summary>
     public static string LearnedIdsFilePath => Path.Combine(RootDirectory, "LearnedIDs.dat");
+
+    /// <summary>Mod UI and voice preferences (same folder as Chat ID, not Unity PlayerPrefs).</summary>
+    public static string ModSettingsFilePath => Path.Combine(RootDirectory, "MultiplayerChat.Settings.json");
 }

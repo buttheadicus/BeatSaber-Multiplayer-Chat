@@ -16,11 +16,11 @@ public static class CauBootstrap
     public const string LegacyCauExeFileName = "Chat Auto Updater (CAU).exe";
 
     /// <summary>
-    /// When <see cref="ModFlagsFile.EnableCau"/> is true, delete CAU executables from Plugins before version check.
+    /// When <see cref="ModSettings.EnableCau"/> is true, delete CAU executables from Plugins before version check.
     /// </summary>
     public static void DeleteCauExeIfEnabled()
     {
-        if (!ModFlagsFile.EnableCau)
+        if (!ModSettings.EnableCau)
             return;
 
         try
