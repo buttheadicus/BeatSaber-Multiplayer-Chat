@@ -16,7 +16,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Friend service**: ChatID based friends beyond the current lobby list.
 - **Join friends**: Connect to a friend's session from the menu or a friends list.
 - **Private calls**: Out-of-lobby or dedicated voice sessions (design is TBD).
-- **DM from menu**: Start or continue DMs without being in a multiplayer lobby first.
+- **DM from menu**: Start or continue DMs without being in a multiplayer lobby first, basically just discord but ingame.e
 
 ## Multiplayer Extensions (Required (but also auto installs, see below))
 
