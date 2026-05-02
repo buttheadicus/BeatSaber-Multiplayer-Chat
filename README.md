@@ -10,6 +10,9 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Mute / deafen**: self explanitory
 - **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)a
 
+## Fused mods
+- [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras)
+
 ## Plans
 
 - **Custom avatars**: Permit custom avatars to replace the current Beat Saber multiplayer avatarr, able to be turned off at the flick of a switch. 
