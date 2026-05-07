@@ -56,8 +56,9 @@ public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
-        if (_avatarColoringToggle != null && _avatarColoringToggle.Toggle != null)
-            _draftAvatarColoringExtensions = _avatarColoringToggle.Toggle.isOn;
+        var tgl = _avatarColoringToggle?.GetComponentInChildren<Toggle>(true);
+        if (tgl != null)
+            _draftAvatarColoringExtensions = tgl.isOn;
 
         ModSettings.EnableAvatarColoringExtensions = _draftAvatarColoringExtensions;
 

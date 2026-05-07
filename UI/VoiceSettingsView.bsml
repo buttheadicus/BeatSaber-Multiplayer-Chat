@@ -9,8 +9,6 @@
       <text text="Lower volume when player speaks" font-size="3.5" align="Left"/>
       <button text="Configure" pad="2" on-click="ConfigureLowerVolumeWhenSpeakingClicked"/>
     </horizontal>
-    <toggle-setting id="MuteMicDuringSongToggle" text="Mute mic during song" value="MuteMicDuringSong"/>
-    <toggle-setting id="DeafDuringSongToggle" text="Deafen during song" value="DeafDuringSong"/>
     <button text="APPLY" on-click="ApplyClicked"/>
   </vertical>
 </bg>

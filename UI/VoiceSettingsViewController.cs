@@ -24,10 +24,6 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
 
     [UIComponent("PushToTalkToggle")] private ToggleSetting? _pushToTalkToggle;
 
-    [UIComponent("MuteMicDuringSongToggle")] private ToggleSetting? _muteMicDuringSongToggle;
-
-    [UIComponent("DeafDuringSongToggle")] private ToggleSetting? _deafDuringSongToggle;
-
     private readonly List<object> _micOptionObjects = new() { MicDefaultLabel };
     private readonly List<object> _pttOptionObjects = new() { "Primary", "Secondary", "Trigger", "Grip" };
 
@@ -42,20 +38,6 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
     {
         get => ModSettings.PushToTalkEnabled;
         set => ModSettings.PushToTalkEnabled = value;
-    }
-
-    [UIValue("MuteMicDuringSong")]
-    public bool MuteMicDuringSong
-    {
-        get => ModSettings.MuteMicDuringSongPlaying;
-        set => ModSettings.MuteMicDuringSongPlaying = value;
-    }
-
-    [UIValue("DeafDuringSong")]
-    public bool DeafDuringSong
-    {
-        get => ModSettings.DeafDuringSongPlaying;
-        set => ModSettings.DeafDuringSongPlaying = value;
     }
 
     [UIAction("#post-parse")]
@@ -144,12 +126,6 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
         // BSML toggles do not always sync [UIValue] back to PlayerPrefs until Apply; persist explicitly from components.
         if (_pushToTalkToggle != null)
             ModSettings.PushToTalkEnabled = _pushToTalkToggle.Value;
-
-        if (_muteMicDuringSongToggle != null)
-            ModSettings.MuteMicDuringSongPlaying = _muteMicDuringSongToggle.Value;
-
-        if (_deafDuringSongToggle != null)
-            ModSettings.DeafDuringSongPlaying = _deafDuringSongToggle.Value;
 
         ApplyClicked?.Invoke(this, EventArgs.Empty);
     }

@@ -57,8 +57,9 @@ public class FusedModsSettingsViewController : BSMLAutomaticViewController
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
-        if (_avatarExtensionsToggle != null && _avatarExtensionsToggle.Toggle != null)
-            _avatarExtrasDraft = _avatarExtensionsToggle.Toggle.isOn;
+        var tgl = _avatarExtensionsToggle?.GetComponentInChildren<Toggle>(true);
+        if (tgl != null)
+            _avatarExtrasDraft = tgl.isOn;
 
         ModSettings.EnableAvatarExtensions = _avatarExtrasDraft;
 
