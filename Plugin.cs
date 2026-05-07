@@ -79,6 +79,7 @@ public class Plugin
         if (SlzMode.IsEnabled)
             Log.Info($"[MultiplayerChat] SLZ mode is ON ({SlzMode.MarkerFileName} next to mod DLL)");
 
+        // Load local Chat ID from disk early so registry and encryption paths see a stable id during Zenject setup.
         ChatPersistentId.EnsureLoaded();
         MpChatLog.Apply(ModSettings.DebugLogging);
 

@@ -12,6 +12,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
+// Registers MP packet callbacks, encrypt/decrypt, DM state, voice playback, and outbound spam timers. Inbound paths call ChatPacketIdValidation.TryAcceptSenderChatId before handling content.
 public class ChatManager : IInitializable, IDisposable
 {
     public static ChatManager? Instance { get; private set; }

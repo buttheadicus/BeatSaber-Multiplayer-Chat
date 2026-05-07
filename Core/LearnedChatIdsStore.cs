@@ -10,6 +10,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
+// Persists platformUserId -> ChatId learned from MP sessions (DPAPI-protected JSON). Overwrites when same user sends a different valid Chat ID.
 public class LearnedChatIdsStore : IInitializable
 {
     private readonly Dictionary<string, string> _platformUserIdToChatId = new(StringComparer.Ordinal);
@@ -21,6 +22,7 @@ public class LearnedChatIdsStore : IInitializable
         LoadFromDisk();
     }
 
+    // File may be raw JSON (dev) or DPAPI-wrapped bytes from this machine.
     private static Stream? OpenLearnedIdsJsonStream(byte[] raw)
     {
         if (raw.Length == 0)
@@ -101,6 +103,7 @@ public class LearnedChatIdsStore : IInitializable
         }
     }
 
+    // Same Chat ID string is a no-op; any real change is written to disk under lock.
     public void SetMapping(string platformUserId, string chatId)
     {
         if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId))

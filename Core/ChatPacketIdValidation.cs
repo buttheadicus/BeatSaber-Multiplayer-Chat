@@ -5,11 +5,10 @@ using MultiplayerCore.Models;
 
 namespace MultiplayerChat.Core;
 
+// Inbound Chat ID policy: platform user id comes from the MP session; SenderChatId is treated like persisted settings.
+// We update LearnedChatIdsStore when we see a valid SenderChatId, adopt changed IDs, and accept packets even when the field is empty until we learn one.
 internal static class ChatPacketIdValidation
 {
-    // Official-tagged SenderChatId always passes when format-valid and overwrites prior mapping.
-    // If a peer sends a different valid SenderChatId than we learned, we adopt it (Chat ID is settings-like, not an auth boundary).
-    // Invalid/missing SenderChatId with no learned mapping still accepts the packet (trust session platform user id).
     public static bool TryAcceptSenderChatId(string? senderChatId, IConnectedPlayer sender, ChatPlayerIdRegistry registry,
         bool voiceHotPath = false)
     {
@@ -43,6 +42,7 @@ internal static class ChatPacketIdValidation
             MpChatVerboseDebug.ChatIdBlock(sb.ToString());
         }
 
+        // SenderChatId missing or malformed on wire (older builds or player mid-reset).
         if (!validSender)
         {
             if (registry.TryGetChatId(sender.userId, out var learned) &&
@@ -62,6 +62,7 @@ internal static class ChatPacketIdValidation
                 return true;
             }
 
+            // No row yet: still accept so chat/voice can flow; first valid SenderChatId on a later packet will SetMapping.
             if (ModSettings.DebugLogging)
             {
                 MultiplayerChat.Plugin.Log?.Debug(
@@ -77,6 +78,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
+        // Official suffix form always replaces whatever we had for this platform user.
         if (official)
         {
             registry.SetMapping(sender.userId, senderChatId!);
@@ -88,6 +90,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
+        // Known Chat ID for this user: merge legacy 8-digit vs official-tagged for same number, else overwrite with new ID.
         if (registry.TryGetChatId(sender.userId, out var known))
         {
             if (known == senderChatId)
@@ -119,6 +122,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
+        // First time we see a valid SenderChatId for this platform user.
         registry.SetMapping(sender.userId, senderChatId!);
         if (MpChatVerboseDebug.IsOn)
             MpChatVerboseDebug.ChatIdBlock(
@@ -127,6 +131,7 @@ internal static class ChatPacketIdValidation
         return true;
     }
 
+    // DM packets carry both TargetUserId and TargetChatId; half-filled routing is invalid (ignore packet).
     public static bool TryParseDmRouting(string? targetUserId, string? targetChatId, out bool isDm)
     {
         var hasUser = !string.IsNullOrEmpty(targetUserId);
@@ -147,6 +152,7 @@ internal static class ChatPacketIdValidation
         return false;
     }
 
+    // For DM-shaped packets: local player must match TargetUserId and local ChatPersistentId must match TargetChatId (broadcast packets skip this).
     public static bool IsLocalParticipant(string? targetUserId, string? targetChatId, bool isDm, string? localUserId, string senderUserId)
     {
         if (!isDm)

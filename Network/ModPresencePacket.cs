@@ -2,6 +2,7 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
+// Lobby discovery and SenderChatId publication; targeted variants carry TargetUserId for reply routing.
 public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public string? TargetUserId;

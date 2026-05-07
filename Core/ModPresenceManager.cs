@@ -13,6 +13,8 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
+// Broadcasts ModPresencePacket so lobby peers learn who runs MP Chat and can map platformUserId <-> SenderChatId when format-valid.
+// Lobby-scoped instance sometimes hands off to GameCore; Dispose re-registers the lobby serializer when core tears down.
 public class ModPresenceManager : IInitializable, IDisposable
 {
     public static ModPresenceManager? Instance { get; private set; }
@@ -85,6 +87,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         _sessionManager.playerDisconnectedEvent -= OnPlayerDisconnected;
         lock (_lock) _playersWithMod.Clear();
 
+        // GameCore disposes its ModPresenceManager while lobby instance may still be alive; restore lobby packet handler so presence keeps working.
         if (gameCore && lobbyPeer != null && !ReferenceEquals(lobbyPeer, this))
         {
             try
@@ -135,6 +138,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
+    // Updates ChatPlayerIdRegistry when SenderChatId is valid; still drives has-mod UI when SenderChatId is temporarily invalid (reset/regenerate window).
     private void OnModPresenceReceived(ModPresencePacket packet, IConnectedPlayer sender)
     {
         if (string.IsNullOrEmpty(sender.userId)) return;

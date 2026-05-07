@@ -2,7 +2,7 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical pad="3" spacing="2">
-    <text text="Multiplayer Chat BETA-v0.3.4" font-size="4" align="Center"/>
+    <text text="Multiplayer Chat BETA-v0.3.5" font-size="4" align="Center"/>
     <horizontal spacing="2">
       <string-setting id="ChatInput" text="Message" show-buttons="false"/>
       <button text="Send" on-click="SubmitClicked"/>

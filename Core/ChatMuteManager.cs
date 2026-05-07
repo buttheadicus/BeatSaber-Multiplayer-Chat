@@ -2,6 +2,7 @@ using System;
 
 namespace MultiplayerChat.Core;
 
+// Resolves mute state by Chat ID when known, else by platform user id; forwards Chat ID updates into ChatIdConfigStore for mute-list migration.
 public class ChatMuteManager
 {
     private readonly ChatIdConfigStore _config = null!;
@@ -43,6 +44,7 @@ public class ChatMuteManager
 
     public void ClearAllMutes() => _config.ClearAllMutes();
 
+    // Called when we learn or refresh a peer Chat ID so platform-only mutes move onto Chat ID keys when possible.
     public void OnPeerChatIdLearned(string platformUserId, string chatId)
     {
         _config.OnChatIdLearnedForUser(platformUserId, chatId);

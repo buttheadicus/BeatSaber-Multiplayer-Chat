@@ -6,6 +6,7 @@ using System.Text;
 
 namespace MultiplayerChat.Core;
 
+// Session-scoped AES/HMAC for chat and voice blobs; key derived from sorted participant id material (includes Chat IDs where CollectEncryptionParticipantIds supplies them).
 public class EncryptionManager
 {
     private const int KeySize = 32;

@@ -13,6 +13,7 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
+// Lobby stacked chat bubbles plus ephemeral typing/recording lines; anchors under multiplayer lobby UI (prefers a strip above TitleViewController).
 public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 {
     private const int MaxVisibleBubbles = 8;
@@ -121,6 +122,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private bool _lastPollInLobby;
 
+    // Polls lobby vs song; finds/creates header root, clears bubbles when leaving lobby, keeps nametag icons wired while in lobby.
     private IEnumerator EnsureLobbyHeaderRoot()
     {
         _lastPollInLobby = false;
@@ -1031,6 +1033,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     }
 }
 
+// Marker on RectTransforms positioned via title-bar-relative layout so placement helpers can detect that mode.
 internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
 {
 }
