@@ -90,7 +90,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
             foreach (var o in _avatarOptionObjects)
             {
                 var s = o?.ToString() ?? "";
-                if (string.Equals(s, saved, StringComparison.OrdinalIgnoreCase))
+                if (o is not null && string.Equals(s, saved, StringComparison.OrdinalIgnoreCase))
                 {
                     pick = o;
                     break;

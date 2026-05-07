@@ -16,7 +16,7 @@ internal static class CustomAvatarHashUtil
 
     internal static bool LooksLikeMd5Hex(string? s)
     {
-        if (string.IsNullOrEmpty(s) || s.Length != 32)
+        if (s is null || s.Length != 32)
             return false;
         foreach (var c in s)
         {

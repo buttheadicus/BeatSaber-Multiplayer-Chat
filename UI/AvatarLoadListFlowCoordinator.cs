@@ -22,19 +22,13 @@ public sealed class AvatarLoadListFlowCoordinator : FlowCoordinator
         }
 
         if (addedToHierarchy)
-        {
             _viewController.PresetSelected += OnPresetSelected;
-            _viewController.Closed += OnClosed;
-        }
     }
 
     protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
     {
         if (removedFromHierarchy)
-        {
             _viewController.PresetSelected -= OnPresetSelected;
-            _viewController.Closed -= OnClosed;
-        }
     }
 
     private void OnPresetSelected(string presetFileName)
@@ -45,8 +39,6 @@ public sealed class AvatarLoadListFlowCoordinator : FlowCoordinator
         AvatarColoringEditorSession.RefreshAfterAvatarDatChangedOnDisk();
         Dismiss();
     }
-
-    private void OnClosed() => Dismiss();
 
     protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();
 

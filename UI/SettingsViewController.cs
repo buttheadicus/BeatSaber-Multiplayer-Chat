@@ -13,7 +13,7 @@ public class SettingsViewController : BSMLAutomaticViewController
 {
     private const string LabelChatBubbleSounds = "Chat bubble sounds";
     private const string LabelEnableCau = "Enable CAU";
-    private const string LabelDebugLogging = "Debug mode (verbose logs)";
+    private const string LabelDebugLogging = "Debug mode (very verbose; may lag; no restart)";
 
     public event EventHandler? ApplyClicked;
 

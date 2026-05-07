@@ -15,7 +15,7 @@
       <toggle-setting id="EnableCauToggle" text="Enable CAU" value="EnableCau"/>
     </horizontal>
     <horizontal child-expand-width="true">
-      <toggle-setting id="DebugLoggingToggle" text="Debug mode (verbose logs)" value="DebugLogging"/>
+      <toggle-setting id="DebugLoggingToggle" text="Debug mode (very verbose; WILL lag.)" value="DebugLogging"/>
     </horizontal>
     <horizontal spacing="4" pad="2" horizontal-fit="PreferredSize">
       <button text="Fused Mods" pad="2" min-width="36" on-click="FusedModsClicked"/>

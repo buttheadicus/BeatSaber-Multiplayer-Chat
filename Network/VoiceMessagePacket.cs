@@ -63,25 +63,25 @@ public class VoiceMessagePacket : MultiplayerCore.Networking.Abstractions.MpPack
             {
                 var t = reader.GetString();
                 if (!string.IsNullOrEmpty(t))
-                    TargetUserId = t;
+                    TargetUserId = t.Trim();
             }
             if (reader.AvailableBytes > 0)
             {
                 var c = reader.GetString();
                 if (!string.IsNullOrEmpty(c))
-                    NameColor = c;
+                    NameColor = c.Trim();
             }
             if (reader.AvailableBytes > 0)
             {
                 var sid = reader.GetString();
                 if (!string.IsNullOrEmpty(sid))
-                    SenderChatId = sid;
+                    SenderChatId = sid.Trim();
             }
             if (reader.AvailableBytes > 0)
             {
                 var tc = reader.GetString();
                 if (!string.IsNullOrEmpty(tc))
-                    TargetChatId = tc;
+                    TargetChatId = tc.Trim();
             }
         }
         catch (Exception ex)

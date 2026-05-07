@@ -170,6 +170,41 @@ internal static class AvatarDatOperations
         }
     }
 
+    // Removes a preset folder (nested AvatarData.dat layout) or a legacy flat file under Avatar Storage.
+    internal static bool DeletePresetFromStorage(string presetName)
+    {
+        if (string.IsNullOrWhiteSpace(presetName))
+            return false;
+        EnsureAvatarStorageExists();
+        var root = ChatIdFilePaths.AvatarStorageDirectoryPath;
+        try
+        {
+            if (!Directory.Exists(root))
+                return false;
+
+            var dirPath = Path.Combine(root, presetName);
+            if (Directory.Exists(dirPath))
+            {
+                Directory.Delete(dirPath, recursive: true);
+                return true;
+            }
+
+            var filePath = Path.Combine(root, presetName);
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                return true;
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Error($"[MPChat][AvatarColoring] Delete preset failed: {ex.Message}");
+            return false;
+        }
+    }
+
     internal static bool ApplyPresetFromStorage(string presetFileName)
     {
         try

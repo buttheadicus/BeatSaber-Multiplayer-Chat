@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using MultiplayerChat;
 using MultiplayerChat.Network;
 using MultiplayerChat.Settings;
@@ -138,12 +139,55 @@ public class ModPresenceManager : IInitializable, IDisposable
     {
         if (string.IsNullOrEmpty(sender.userId)) return;
 
-        if (!ChatPersistentId.IsValidFormat(packet.SenderChatId))
-            return;
-        if (_chatPlayerIdRegistry.TryGetChatId(sender.userId, out var known) && known != packet.SenderChatId)
-            return;
-        _chatPlayerIdRegistry.SetMapping(sender.userId, packet.SenderChatId!);
-        _chatMuteManager.OnPeerChatIdLearned(sender.userId, packet.SenderChatId!);
+        var formatOk = ChatPersistentId.IsValidFormat(packet.SenderChatId);
+        if (formatOk)
+        {
+            var packetOfficial = ChatPersistentId.IsOfficialTaggedChatId(packet.SenderChatId);
+            var hasKnown = _chatPlayerIdRegistry.TryGetChatId(sender.userId, out var known);
+
+            var canonicalChatId = packet.SenderChatId!;
+            if (hasKnown && ChatPersistentId.IsOfficialLegacyEightDigitPair(known, packet.SenderChatId))
+                canonicalChatId = ChatPersistentId.PreferOfficialTaggedForm(known, packet.SenderChatId!);
+
+            if (MpChatVerboseDebug.IsOn)
+            {
+                var sb = new StringBuilder(384);
+                sb.Append("OnModPresenceReceived APPLY mapping.\n");
+                sb.Append("sender.platformUserId=").Append(MpChatVerboseDebug.TruncPlatformUserId(sender.userId)).Append('\n');
+                sb.Append("packetOfficialTagged=").Append(packetOfficial).Append('\n');
+                sb.Append("incoming SenderChatId=").Append(packet.SenderChatId).Append('\n');
+                sb.Append("prior known=").Append(hasKnown ? known : "(none)").Append('\n');
+                sb.Append("canonical stored=").Append(canonicalChatId).Append('\n');
+                sb.Append("Stack:\n").Append(Environment.StackTrace);
+                MpChatVerboseDebug.PresenceBlock(sb.ToString());
+            }
+
+            if (hasKnown && known != canonicalChatId && ModSettings.DebugLogging)
+            {
+                MultiplayerChat.Plugin.Log?.Debug(
+                    "[MPChat][ChatId] Presence: peer Chat ID updated for " + sender.userId + " -> " + canonicalChatId + ".");
+            }
+
+            _chatPlayerIdRegistry.SetMapping(sender.userId, canonicalChatId);
+            _chatMuteManager.OnPeerChatIdLearned(sender.userId, canonicalChatId);
+        }
+        else
+        {
+            if (MpChatVerboseDebug.IsOn)
+                MpChatVerboseDebug.PresenceBlock(
+                    "OnModPresenceReceived: SenderChatId invalid; skip Chat ID mapping, continue presence.\n" +
+                    "sender.platformUserId=" + MpChatVerboseDebug.TruncPlatformUserId(sender.userId) + '\n' +
+                    "SenderChatId literal=" + (packet.SenderChatId ?? "(null)") + '\n' +
+                    "charCodes=" + MpChatVerboseDebug.CharCodes(packet.SenderChatId) + '\n' +
+                    "Stack:\n" + Environment.StackTrace);
+
+            if (ModSettings.DebugLogging)
+            {
+                MultiplayerChat.Plugin.Log?.Debug(
+                    "[MPChat][ChatId] Presence from " + sender.userId +
+                    ": SenderChatId missing or invalid; skipping registry update.");
+            }
+        }
 
         var local = _sessionManager.localPlayer;
         if (local == null || string.IsNullOrEmpty(local.userId)) return;

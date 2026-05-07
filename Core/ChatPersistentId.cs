@@ -8,6 +8,8 @@ namespace MultiplayerChat.Core;
 
 public static class ChatPersistentId
 {
+    public const string IdGeneratedOfficialSuffix = "IdGeneratedOfficial";
+
     private const int MinId = 10_000_000;
     private const int MaxId = 99_999_999;
 
@@ -38,12 +40,49 @@ public static class ChatPersistentId
         return $"{Current}{name}";
     }
 
+    public static bool IsOfficialTaggedChatId(string? value) =>
+        IsValidFormat(value) &&
+        value!.EndsWith(IdGeneratedOfficialSuffix, StringComparison.Ordinal) &&
+        value.Length == 8 + IdGeneratedOfficialSuffix.Length;
+
     public static bool IsValidFormat(string? value)
     {
-        if (string.IsNullOrEmpty(value)) return false;
-        if (value!.Length != 8) return false;
-        if (!int.TryParse(value!, out var n)) return false;
-        return n >= MinId && n <= MaxId;
+        if (value is null || value.Length == 0) return false;
+
+        if (value.Length == 8)
+        {
+            if (!int.TryParse(value, out var n)) return false;
+            return n >= MinId && n <= MaxId;
+        }
+
+        if (value.Length == 8 + IdGeneratedOfficialSuffix.Length &&
+            value.EndsWith(IdGeneratedOfficialSuffix, StringComparison.Ordinal))
+        {
+            var head = value.Substring(0, 8);
+            if (!int.TryParse(head, out var m)) return false;
+            return m >= MinId && m <= MaxId;
+        }
+
+        return false;
+    }
+
+    public static bool ChatIdsSameEightDigitHead(string? a, string? b)
+    {
+        if (!IsValidFormat(a) || !IsValidFormat(b)) return false;
+        return string.CompareOrdinal(a!, 0, b!, 0, 8) == 0;
+    }
+
+    public static bool IsOfficialLegacyEightDigitPair(string? a, string? b)
+    {
+        if (!ChatIdsSameEightDigitHead(a, b)) return false;
+        return IsOfficialTaggedChatId(a) != IsOfficialTaggedChatId(b);
+    }
+
+    public static string PreferOfficialTaggedForm(string a, string b)
+    {
+        if (IsOfficialTaggedChatId(a)) return a;
+        if (IsOfficialTaggedChatId(b)) return b;
+        return b;
     }
 
     private static string LoadOrCreateId()
@@ -60,11 +99,11 @@ public static class ChatPersistentId
                 var id = Encoding.UTF8.GetString(plain).Trim();
                 if (IsValidFormat(id))
                     return id;
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat] ChatID.dat invalid or tampered; generating a new ID.");
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat] ChatID.dat invalid or tampered; creating a new ID.");
             }
             catch (Exception ex)
             {
-                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] ChatID.dat unreadable ({ex.Message}); generating a new ID.");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] ChatID.dat unreadable ({ex.Message}); creating a new ID.");
             }
         }
 

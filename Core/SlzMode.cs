@@ -54,7 +54,7 @@ public static class SlzMode
             {
                 _warnedInvalidMarker = true;
                 Plugin.Log?.Warn(
-                    $"[MPChat] {MarkerFileName} is present but contents are not valid for this mod version. Remove it or recreate with SlzMarkerTool from Multiplayer Chat 0.3.3+.");
+                    $"[MPChat] {MarkerFileName} is present but contents are not valid for this mod version. Remove it or recreate with SlzMarkerTool from Multiplayer Chat 0.3.4+.");
             }
         }
         catch

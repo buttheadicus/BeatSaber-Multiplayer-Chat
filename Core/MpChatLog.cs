@@ -4,7 +4,8 @@ using IPALogger = IPA.Logging.Logger;
 
 namespace MultiplayerChat.Core;
 
-// Maps ModSettings DebugLogging to BSIPA FilterLevel on the Multiplayer Chat logger so Debug() lines appear in _latest.log.
+// Maps ModSettings.DebugLogging to BSIPA FilterLevel on this logger so Debug() lines appear in _latest.log.
+// Changing DebugLogging runs MpChatLog.Apply immediately from the ModSettings setter (toggle or Apply). No game restart.
 internal static class MpChatLog
 {
     private static IPALogger? _logger;

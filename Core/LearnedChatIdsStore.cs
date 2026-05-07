@@ -103,13 +103,47 @@ public class LearnedChatIdsStore : IInitializable
 
     public void SetMapping(string platformUserId, string chatId)
     {
-        if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId)) return;
+        if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId))
+        {
+            if (MpChatVerboseDebug.IsOn)
+                MpChatVerboseDebug.LearnedStoreBlock(
+                    "SetMapping REJECT invalid args.\n" +
+                    "platformUserId empty=" + string.IsNullOrEmpty(platformUserId) +
+                    " chatIdValidFormat=" + ChatPersistentId.IsValidFormat(chatId) + '\n' +
+                    "chatId literal=" + (chatId ?? "(null)") + '\n' +
+                    "chatId charCodes=" + MpChatVerboseDebug.CharCodes(chatId) + '\n' +
+                    "Stack:\n" + Environment.StackTrace);
+            return;
+        }
 
         lock (_lock)
         {
-            if (_platformUserIdToChatId.TryGetValue(platformUserId, out var existing) && existing == chatId)
+            var hadPrior = _platformUserIdToChatId.TryGetValue(platformUserId, out var prior);
+            if (hadPrior && prior == chatId)
+            {
+                if (MpChatVerboseDebug.IsOn)
+                    MpChatVerboseDebug.LearnedStoreBlock(
+                        "SetMapping no-op (already mapped).\nplatformUserId=" +
+                        MpChatVerboseDebug.TruncPlatformUserId(platformUserId) + "\nchatId=" + chatId);
                 return;
+            }
+
             _platformUserIdToChatId[platformUserId] = chatId;
+
+            if (MpChatVerboseDebug.IsOn)
+            {
+                var sb = new StringBuilder(2048);
+                sb.Append("SetMapping WRITE (memory); calling SaveToDisk after lock.\n");
+                sb.Append("platformUserId=").Append(MpChatVerboseDebug.TruncPlatformUserId(platformUserId)).Append('\n');
+                sb.Append("prior=").Append(hadPrior ? prior : "(none)").Append(" new=").Append(chatId).Append('\n');
+                sb.Append("prior official=").Append(hadPrior && ChatPersistentId.IsOfficialTaggedChatId(prior))
+                    .Append(" new official=").Append(ChatPersistentId.IsOfficialTaggedChatId(chatId)).Append('\n');
+                sb.Append("FULL TABLE snapshot count=").Append(_platformUserIdToChatId.Count).Append('\n');
+                foreach (var kv in _platformUserIdToChatId.OrderBy(k => k.Key, StringComparer.Ordinal))
+                    sb.Append("  ").Append(kv.Key).Append(" -> ").Append(kv.Value).Append('\n');
+                sb.Append("Stack:\n").Append(Environment.StackTrace);
+                MpChatVerboseDebug.LearnedStoreBlock(sb.ToString());
+            }
         }
 
         SaveToDisk();

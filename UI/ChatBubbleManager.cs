@@ -254,8 +254,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
         if (rt != null)
         {
-            rt.anchoredPosition = DefaultChatPosition;
-            ModSettings.LobbyChatPosition = DefaultChatPosition;
+            var pos = DefaultAnchoredPositionForCurrentLobbyRoot();
+            rt.anchoredPosition = pos;
+            ModSettings.LobbyChatPosition = pos;
         }
     }
 
@@ -282,7 +283,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 StopCoroutine(_moveModeHelperCoroutine);
                 _moveModeHelperCoroutine = null;
             }
-            rt.anchoredPosition = DefaultChatPosition;
+            rt.anchoredPosition = DefaultAnchoredPositionForCurrentLobbyRoot();
         }
     }
 
@@ -449,6 +450,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private Transform? FindOrCreateLobbyHeaderChatRoot()
     {
+        var titleAnchored = CreateLobbyChatRootAboveTitleBar();
+        if (titleAnchored != null)
+            return titleAnchored;
+
         var startAnchored = CreateLobbyChatRootAboveStartButtonRow();
         if (startAnchored != null)
             return startAnchored;
@@ -464,8 +469,56 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             }
         }
 
-        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not anchor lobby chat (START row or header bar not found)");
+        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not anchor lobby chat (title bar, START row, or header bar not found)");
         return null;
+    }
+
+    // Inserts a strip immediately BEFORE TitleViewController so vertical layouts stack it above the title row:
+    // bottom edge of the chat block sits just above the top edge of the title bar.
+    private static Transform? CreateLobbyChatRootAboveTitleBar()
+    {
+        var titleGo = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
+                      ?? GameObject.Find("TitleViewController");
+        if (titleGo == null)
+            return null;
+
+        var titleView = titleGo.transform;
+        var parent = titleView.parent;
+        if (parent == null)
+            return null;
+
+        if (parent.GetComponentInParent<Canvas>() == null)
+            return null;
+
+        var rootObj = new GameObject("MPChatLobbyHeaderStack");
+        rootObj.layer = titleView.gameObject.layer;
+
+        rootObj.transform.SetParent(parent, false);
+        rootObj.transform.SetSiblingIndex(titleView.GetSiblingIndex());
+
+        var rootRect = rootObj.AddComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0f, 1f);
+        rootRect.anchorMax = new Vector2(1f, 1f);
+        rootRect.pivot = new Vector2(0.5f, 1f);
+        rootRect.sizeDelta = new Vector2(0f, 320f);
+        rootRect.anchoredPosition = ModSettings.CustomPlacement
+            ? ModSettings.LobbyChatPosition
+            : DefaultChatPosition + TitleBarLobbyChatAnchoredPositionOffset;
+
+        rootObj.AddComponent<MpChatTitleBarAnchoredChatRoot>();
+
+        var le = rootObj.AddComponent<LayoutElement>();
+        le.preferredHeight = 320f;
+        le.minHeight = 96f;
+        le.flexibleHeight = 0f;
+
+        EnsureCanvasRaycaster(rootObj.transform);
+
+        ApplyLobbyBubbleStackLayout(rootObj);
+
+        MultiplayerChat.Plugin.Log?.Info(
+            $"[MPChat] Chat strip above title bar (before {titleView.name} in layout; parent={parent.name}; anchoredYOffset+= {TitleBarLobbyChatAnchoredPositionOffset.y})");
+        return rootObj.transform;
     }
 
     private static Transform? CreateLobbyChatRootAboveStartButtonRow()
@@ -669,6 +722,17 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     }
 
     private static readonly Vector2 DefaultChatPosition = Vector2.zero;
+
+    // Extra anchoredPosition applied only when the lobby chat strip is parented above TitleViewController.
+    // Increase Y to shift the strip toward the top of the screen (away from the lobby floor); decrease if it moves the wrong way.
+    private static readonly Vector2 TitleBarLobbyChatAnchoredPositionOffset = new(0f, 310f);
+
+    private Vector2 DefaultAnchoredPositionForCurrentLobbyRoot()
+    {
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() != null)
+            return DefaultChatPosition + TitleBarLobbyChatAnchoredPositionOffset;
+        return DefaultChatPosition;
+    }
 
     private static Transform? CreateChatRootAboveBanner(Transform banner)
     {
@@ -965,4 +1029,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         if (name.Length <= maxLen) return name;
         return name.Substring(0, maxLen) + "...";
     }
+}
+
+internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
+{
 }

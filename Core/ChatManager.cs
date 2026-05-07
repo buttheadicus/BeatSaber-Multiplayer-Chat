@@ -1299,7 +1299,8 @@ public class ChatManager : IInitializable, IDisposable
             return;
         }
 
-        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry,
+                voiceHotPath: true))
         {
             VoiceReceiveDiagnostics.LogVoiceReceiveDropThrottled("reject_sender_chat_id", sender.userId);
             return;

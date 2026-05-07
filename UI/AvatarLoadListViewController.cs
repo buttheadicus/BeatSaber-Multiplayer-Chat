@@ -13,17 +13,20 @@ namespace MultiplayerChat.UI;
 [ViewDefinition("MultiplayerChat.UI.AvatarLoadListView.bsml")]
 public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
 {
-    private const int SlotsPerRow = 8;
+    private const int SlotsPerRow = 7;
 
     public event Action<string>? PresetSelected;
-    public event Action? Closed;
 
     [UIComponent("PresetListRoot")] private RectTransform? _presetRoot;
+    [UIComponent("DeleteModeButton")] private Button? _deleteModeButton;
+
+    private bool _deleteMode;
 
     [UIAction("#post-parse")]
     private void PostParse()
     {
         ResolvePresetRoot();
+        RefreshDeleteModeUi();
         RebuildList();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
@@ -31,9 +34,77 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
+        if (addedToHierarchy)
+            _deleteMode = false;
         ResolvePresetRoot();
+        RefreshDeleteModeUi();
         RebuildList();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+    }
+
+    [UIAction("DeleteModeToggleClicked")]
+    private void DeleteModeToggleClicked()
+    {
+        _deleteMode = !_deleteMode;
+        RefreshDeleteModeUi();
+        RebuildList();
+    }
+
+    private void RefreshDeleteModeUi()
+    {
+        ApplyDeleteButtonColors();
+        RefreshDeleteModeButtonLabel();
+    }
+
+    private void ApplyDeleteButtonColors()
+    {
+        if (_deleteModeButton == null)
+            return;
+        var colors = _deleteModeButton.colors;
+        if (_deleteMode)
+        {
+            var b = new Color(0.2f, 0.45f, 0.95f, 1f);
+            colors.normalColor = b;
+            colors.highlightedColor = new Color(0.35f, 0.58f, 1f, 1f);
+            colors.pressedColor = new Color(0.12f, 0.32f, 0.78f, 1f);
+            colors.selectedColor = b;
+        }
+        else
+        {
+            var k = new Color(0.06f, 0.06f, 0.06f, 1f);
+            colors.normalColor = k;
+            colors.highlightedColor = new Color(0.12f, 0.12f, 0.12f, 1f);
+            colors.pressedColor = new Color(0.04f, 0.04f, 0.04f, 1f);
+            colors.selectedColor = k;
+        }
+
+        colors.disabledColor = new Color(0.2f, 0.2f, 0.2f, 0.5f);
+        colors.colorMultiplier = 1f;
+        colors.fadeDuration = 0.06f;
+        _deleteModeButton.colors = colors;
+    }
+
+    private void RefreshDeleteModeButtonLabel()
+    {
+        if (_deleteModeButton == null)
+            return;
+        var tmp = _deleteModeButton.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (tmp == null)
+            return;
+        if (_deleteMode)
+        {
+            tmp.text = "TAP ON AVATAR NAME TO DELETE IT. PRESS THIS BUTTON AGAIN TO END DELETE MODE.";
+            tmp.fontSize = 2.35f;
+            tmp.enableWordWrapping = true;
+            tmp.alignment = TextAlignmentOptions.Center;
+        }
+        else
+        {
+            tmp.text = "DELETE MODE OFF. PRESS THIS BUTTON TO ENABLE IT.";
+            tmp.fontSize = 3.2f;
+            tmp.enableWordWrapping = false;
+            tmp.alignment = TextAlignmentOptions.Center;
+        }
     }
 
     private void ResolvePresetRoot()
@@ -61,6 +132,7 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
         MultiplayerChat.Plugin.Log?.Info(
             $"[MPChat][AvatarLoad] {names.Count} presets under {ChatIdFilePaths.AvatarStorageDirectoryPath}");
 
+        var deleteMode = _deleteMode;
         for (var i = 0; i < names.Count; i += SlotsPerRow)
         {
             var row = new GameObject("PresetRow", typeof(RectTransform));
@@ -84,7 +156,10 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
 
             var end = Math.Min(i + SlotsPerRow, names.Count);
             for (var j = i; j < end; j++)
-                AddPresetSlot(row.transform, names[j], s => PresetSelected?.Invoke(s));
+            {
+                var name = names[j];
+                AddPresetSlot(row.transform, name, deleteMode, OnPresetSlotClicked);
+            }
         }
 
         Canvas.ForceUpdateCanvases();
@@ -97,7 +172,22 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
         }
     }
 
-    private static void AddPresetSlot(Transform row, string presetFileName, Action<string> onPick)
+    private void OnPresetSlotClicked(string presetFileName, bool asDelete)
+    {
+        if (asDelete)
+        {
+            if (!AvatarDatOperations.DeletePresetFromStorage(presetFileName))
+                return;
+            MultiplayerChat.Plugin.Log?.Info($"[MPChat][AvatarLoad] Deleted preset: {presetFileName}");
+            RebuildList();
+            return;
+        }
+
+        MultiplayerChat.Plugin.Log?.Debug($"[MPChat][AvatarLoad] Selected preset: {presetFileName}");
+        PresetSelected?.Invoke(presetFileName);
+    }
+
+    private static void AddPresetSlot(Transform row, string presetFileName, bool deleteMode, Action<string, bool> onClick)
     {
         var go = new GameObject($"Preset_{presetFileName}", typeof(RectTransform));
         go.transform.SetParent(row, false);
@@ -116,11 +206,7 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
         var btn = go.AddComponent<Button>();
         btn.targetGraphic = img;
         var capture = presetFileName;
-        btn.onClick.AddListener(() =>
-        {
-            MultiplayerChat.Plugin.Log?.Debug($"[MPChat][AvatarLoad] Selected preset: {capture}");
-            onPick(capture);
-        });
+        btn.onClick.AddListener(() => onClick(capture, deleteMode));
 
         var txtGo = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         txtGo.transform.SetParent(go.transform, false);
@@ -137,7 +223,4 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
         tmp.text = presetFileName;
         tmp.raycastTarget = false;
     }
-
-    [UIAction("CloseClicked")]
-    private void CloseClicked() => Closed?.Invoke();
 }
