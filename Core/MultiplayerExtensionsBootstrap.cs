@@ -10,17 +10,10 @@ using IPALogger = IPA.Logging.Logger;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Ensures standalone <see cref="TargetDll"/> lives next to <see cref="MultiplayerChat"/>. Downloads the official zip when missing,
-/// installs the DLL only, then forces an exit so BSIPA picks up the new assembly on next launch.
-/// </summary>
 public static class MultiplayerExtensionsBootstrap
 {
     public const string TargetDll = "MultiplayerExtensions.dll";
 
-    /// <summary>
-    /// <see cref="ReleaseTagUrl"/> ZIP asset (<c>{root}/Plugins/{TargetDll}</c>).
-    /// </summary>
     public const string DownloadZipAssetName = "MultiplayerExtensions-1.1.0-bs1.37.5-9b5959b.zip";
 
     public const string ReleaseTagUrl = "https://github.com/EnderdracheLP/MultiplayerExtensions/releases/tag/v1.1.0";
@@ -29,10 +22,6 @@ public static class MultiplayerExtensionsBootstrap
         "https://github.com/EnderdracheLP/MultiplayerExtensions/releases/download/v1.1.0/"
         + DownloadZipAssetName;
 
-    /// <returns>
-    /// <see langword="true"/> → continue loading Multiplayer Chat now.
-    /// <see langword="false"/> → <see cref="UnityEngine.Application.Quit"/> scheduled; callers should return immediately from plugin init without binding Zenject.
-    /// </returns>
     internal static bool TryContinueAfterEnsuringStandaloneMpex(IPALogger log)
     {
         string? pluginsDir = null;
@@ -153,10 +142,6 @@ public static class MultiplayerExtensionsBootstrap
         }
     }
 
-    /// <summary>
-    /// During BSIPA <c>[Init]</c>, <see cref="UnityEngine.Application.Quit"/> often does nothing and
-    /// <see cref="Environment.Exit"/> can be ignored by the Unity/Mono host. Terminating the current process is reliable on Windows.
-    /// </summary>
     private static void ScheduleHardExitSoon()
     {
         try

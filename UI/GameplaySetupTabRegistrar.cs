@@ -8,9 +8,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Adds a "TEXT CHAT" entry to the MODS tab when lobby loads. Defers AddTab briefly so GameplaySetup is ready.
-/// </summary>
 public class GameplaySetupTabRegistrar : MonoBehaviour, IDisposable
 {
     [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;

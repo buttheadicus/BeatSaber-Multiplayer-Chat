@@ -2,7 +2,6 @@ using System;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>User-visible error line + sound + structured logs for bug reports.</summary>
 public static class ChatErrorReporter
 {
     public static void Report(Exception ex, string context)

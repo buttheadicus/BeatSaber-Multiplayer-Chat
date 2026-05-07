@@ -13,10 +13,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Waits for GameplaySetup to be ready, then adds the Multiplayer Chat tab.
-/// Settings opens in its own FlowCoordinator (separate UI).
-/// </summary>
 public class LobbyChatTabRegistrar : MonoBehaviour
 {
     private const string TabName = "Multiplayer Chat";
@@ -288,7 +284,6 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         ClearLobbyTypingBroadcastIfNeeded();
     }
 
-    /// <summary>GameplaySetup often deselects this tab when opening Mute/DM/Settings; when user comes back, re-sync DM (and mute) from state.</summary>
     private IEnumerator RefreshLobbyUiWhenTabShown()
     {
         yield return null;
@@ -643,7 +638,6 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         UpdateRecordButtonLabel();
     }
 
-    /// <summary>Null means use the system default input device (Unity).</summary>
     private static string? ResolveMicDeviceNameForRecording()
     {
         var name = ModSettings.MicInputDeviceName;

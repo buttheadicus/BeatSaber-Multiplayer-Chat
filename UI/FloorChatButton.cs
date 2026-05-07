@@ -9,10 +9,6 @@ using Object = UnityEngine.Object;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Creates a "TEXT CHAT" button on the lobby floor, to the left of the shoes/avatar edit button.
-/// When the shoes button cannot be found, places button in the lobby UI near the floor area.
-/// </summary>
 public class FloorChatButton : MonoBehaviour
 {
     public event EventHandler? Clicked;
@@ -87,9 +83,6 @@ public class FloorChatButton : MonoBehaviour
             CreateStandaloneCanvasButton();
     }
 
-    /// <summary>
-    /// Places TEXT CHAT button in Host Setup area (right of START, near Per Player Difficulty/Modifiers).
-    /// </summary>
     private bool CreateButtonInHostSetup()
     {
         var startButton = FindStartButtonInLobby();
@@ -123,34 +116,7 @@ public class FloorChatButton : MonoBehaviour
         return true;
     }
 
-    private Transform? FindStartButtonInLobby()
-    {
-        // Try by name first (e.g. "StartButton")
-        var byName = GameObject.Find("StartButton") ?? GameObject.Find("HostSetup/StartButton");
-        if (byName != null)
-        {
-            var btn = byName.GetComponent<Button>();
-            if (btn != null)
-                return btn.transform;
-        }
-
-        // Try by button text "START"
-        var roots = new[] { "MultiplayerLobbyCenterStage", "CenterStage", "LobbySetup", "HostSetup" };
-        foreach (var rootName in roots)
-        {
-            var root = GameObject.Find(rootName);
-            if (root == null)
-                continue;
-
-            foreach (var btn in root.GetComponentsInChildren<Button>(true))
-            {
-                var tmp = btn.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
-                if (tmp != null && tmp.text.IndexOf("START", StringComparison.OrdinalIgnoreCase) >= 0)
-                    return btn.transform;
-            }
-        }
-        return null;
-    }
+    private Transform? FindStartButtonInLobby() => LobbyUiStartButtonLocator.FindStartButtonTransform();
 
     private Transform? FindShoesOrAvatarButton()
     {

@@ -2,19 +2,14 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Sent when the sender ends DM mode; only <see cref="TargetUserId"/> should show the system line.
-/// </summary>
 public class DmStoppedNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public string? TargetUserId;
 
-    /// <summary>Sender's username color as 6-char hex without # (optional).</summary>
     public string? SenderNameColor;
 
     public string? SenderChatId;
 
-    /// <summary>Recipient's Chat ID (player who receives "stopped DMing you").</summary>
     public string? TargetChatId;
 
     public override void Serialize(NetDataWriter writer)

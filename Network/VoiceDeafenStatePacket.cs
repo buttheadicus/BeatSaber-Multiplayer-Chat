@@ -2,13 +2,11 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>Broadcast when a player toggles lobby deafen so others can show a system line.</summary>
 public class VoiceDeafenStatePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public bool IsDeaf;
     public string? SenderChatId;
 
-    /// <summary>Sender display-name color as 6-char hex without # (optional).</summary>
     public string? SenderNameColor;
 
     public override void Serialize(NetDataWriter writer)

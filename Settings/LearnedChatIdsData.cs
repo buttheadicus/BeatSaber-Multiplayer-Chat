@@ -3,7 +3,6 @@ using System.Runtime.Serialization;
 
 namespace MultiplayerChat.Settings;
 
-/// <summary>JSON model for LearnedIDs.dat (platform user id → persistent chat id).</summary>
 [DataContract]
 public class LearnedChatIdsData
 {

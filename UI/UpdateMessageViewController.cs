@@ -7,9 +7,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Simple view that displays only the update message (large text).
-/// </summary>
 [ViewDefinition("MultiplayerChat.UI.UpdateMessageView.bsml")]
 public class UpdateMessageViewController : BSMLAutomaticViewController
 {

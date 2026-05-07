@@ -5,19 +5,12 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Chat Auto Updater: optional exe dropped next to Plugins, deleted every boot when opt-in is on.
-/// </summary>
 public static class CauBootstrap
 {
     public const string CauExeFileName = "Chat.Auto.Updater.CAU.exe";
 
-    /// <summary>Legacy manual install name (removed when clearing).</summary>
     public const string LegacyCauExeFileName = "Chat Auto Updater (CAU).exe";
 
-    /// <summary>
-    /// When <see cref="ModSettings.EnableCau"/> is true, delete CAU executables from Plugins before version check.
-    /// </summary>
     public static void DeleteCauExeIfEnabled()
     {
         if (!ModSettings.EnableCau)

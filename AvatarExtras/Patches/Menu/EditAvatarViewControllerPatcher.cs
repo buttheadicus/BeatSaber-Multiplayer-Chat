@@ -28,7 +28,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
     private CustomAvatarOptionField? _glassesPicker;
     private CustomAvatarOptionField? _facialHairPicker;
 
-    private static Transform? FindChildRecursive(Transform root, string exactName)
+    internal static Transform? FindChildRecursive(Transform root, string exactName)
     {
         if (root.name == exactName)
             return root;
@@ -42,7 +42,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
         return null;
     }
 
-    private static Transform? ResolveEditPanel(BeatAvatarEditorViewController vc)
+    internal static Transform? ResolveEditPanel(BeatAvatarEditorViewController vc)
     {
         var root = vc.transform;
         var direct = root.Find(EditPanelName);
@@ -166,7 +166,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
 
         BumpVerticalListSpacing(editPanel, ExtraVerticalListSpacing);
 
-        _extras = PackedExtrasString.TryFromAvatarData(_avatarDataModel.avatarData) ?? new PackedExtrasString(null, null);
+        _extras = PackedExtrasString.FromEditorState(_avatarDataModel.avatarData);
 
         var insert = templateRow.GetSiblingIndex() + 1;
         _glassesPicker = CreateCustomField(editPanel, templateRow, "Glasses", 1, ref insert);
@@ -200,6 +200,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
                 delegate(string s)
                 {
                     _extras.GlassesId = s;
+                    SyncWireColorsFromAvatar();
                     _extras.ApplyTo(_avatarDataModel.avatarData);
                 },
                 AvatarPart.Unknown);
@@ -210,6 +211,8 @@ public class EditAvatarViewControllerPatcher : IAffinity
                 delegate(Color color)
                 {
                     _avatarDataModel.avatarData.glassesColor = color;
+                    SyncWireColorsFromAvatar();
+                    _extras.ApplyTo(_avatarDataModel.avatarData);
                 },
                 () => _avatarDataModel.avatarData.glassesColor,
                 AvatarPart.GlassesColor);
@@ -221,6 +224,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
                 delegate(string s)
                 {
                     _extras.FacialHairId = s;
+                    SyncWireColorsFromAvatar();
                     _extras.ApplyTo(_avatarDataModel.avatarData);
                 },
                 AvatarPart.Unknown);
@@ -231,11 +235,14 @@ public class EditAvatarViewControllerPatcher : IAffinity
                 delegate(Color color)
                 {
                     _avatarDataModel.avatarData.facialHairColor = color;
+                    SyncWireColorsFromAvatar();
+                    _extras.ApplyTo(_avatarDataModel.avatarData);
                 },
                 () => _avatarDataModel.avatarData.facialHairColor,
                 AvatarPart.FacialHairColor);
 
         InvokeRefreshUi();
+        PackedExtrasString.SyncSeparateColorsFromPackedWire(_avatarDataModel.avatarData);
     }
 
     [AffinityPatch(typeof(AvatarRandomizer), nameof(AvatarRandomizer.RandomizeModels))]
@@ -244,7 +251,10 @@ public class EditAvatarViewControllerPatcher : IAffinity
     {
         _extras.GlassesId = CoinFlip() ? avatarPartsModel.glassesCollection.GetRandom().id : null;
         _extras.FacialHairId = CoinFlip() ? avatarPartsModel.facialHairCollection.GetRandom().id : null;
+        _extras.WireGlassesColor = avatarData.glassesColor;
+        _extras.WireFacialHairColor = avatarData.facialHairColor;
         _extras.ApplyTo(avatarData);
+        PackedExtrasString.SyncSeparateColorsFromPackedWire(avatarData);
     }
 
     private static bool CoinFlip() => Random.Range(0, 2) == 0;
@@ -253,7 +263,7 @@ public class EditAvatarViewControllerPatcher : IAffinity
     [AffinityPostfix]
     public void PostfixRefreshUi()
     {
-        _extras = PackedExtrasString.TryFromAvatarData(_avatarDataModel.avatarData) ?? new PackedExtrasString(null, null);
+        _extras = PackedExtrasString.FromEditorState(_avatarDataModel.avatarData);
 
         if (_glassesPicker?.ValueController != null)
         {
@@ -268,6 +278,14 @@ public class EditAvatarViewControllerPatcher : IAffinity
                 _avatarPartsModel.facialHairCollection.GetIndexById(_extras.FacialHairId));
             _facialHairPicker.PrimaryColorController?.SetColor(_avatarDataModel.avatarData.facialHairColor);
         }
+
+        PackedExtrasString.SyncSeparateColorsFromPackedWire(_avatarDataModel.avatarData);
+    }
+
+    private void SyncWireColorsFromAvatar()
+    {
+        _extras.WireGlassesColor = _avatarDataModel.avatarData.glassesColor;
+        _extras.WireFacialHairColor = _avatarDataModel.avatarData.facialHairColor;
     }
 
     private void InvokeRefreshUi() =>

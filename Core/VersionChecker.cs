@@ -12,10 +12,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Checks Beat Saber Multiplayer Chat on GitHub for newer releases. Optional CAU path fetches
-/// <see cref="GitHubReleaseVersion.CauExeAssetFileName"/> from the CAU repo's latest release when enabled.
-/// </summary>
 public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 {
     private const string ApiUrl = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
@@ -23,7 +19,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;
 
-    /// <summary>Update message for display in the Multiplayer Chat Update menu tab. Set after version check completes.</summary>
     public static string UpdateMessage { get; private set; } = "Checking for updates...";
 
     public void Initialize()

@@ -10,11 +10,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Persists Beat Saber platform <c>userId</c> → other players' 8-digit chat IDs in
-/// <see cref="ChatIdFilePaths.LearnedIdsFilePath"/> (DPAPI-encrypted JSON, same folder as ChatID / ChatIDConfig).
-/// Loaded at multiplayer init; updated whenever we learn or confirm an ID.
-/// </summary>
 public class LearnedChatIdsStore : IInitializable
 {
     private readonly Dictionary<string, string> _platformUserIdToChatId = new(StringComparer.Ordinal);
@@ -26,7 +21,6 @@ public class LearnedChatIdsStore : IInitializable
         LoadFromDisk();
     }
 
-    /// <summary>Plain JSON (legacy) or DPAPI blob, matching <see cref="ChatIdConfigStore"/>.</summary>
     private static Stream? OpenLearnedIdsJsonStream(byte[] raw)
     {
         if (raw.Length == 0)

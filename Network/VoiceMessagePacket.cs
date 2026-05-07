@@ -3,29 +3,20 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// End-to-end encrypted voice payload (encoded by <see cref="MultiplayerChat.Core.VoiceMessageCodec"/>).
-/// </summary>
 public class VoiceMessagePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
-    /// <summary>Max voice blob size (bytes) before encryption (~24s mono @ 44.1kHz float PCM).</summary>
     internal const int MaxPlaintextVoiceBytes = 4_194_304;
 
-    /// <summary>Max encrypted payload on the wire (generous upper bound).</summary>
     private const int MaxEncryptedPayloadSize = MaxPlaintextVoiceBytes + 4096;
 
     public byte[]? EncryptedPayload;
 
-    /// <summary>When set, only sender and this user receive/play the voice (DM).</summary>
     public string? TargetUserId;
 
-    /// <summary>Sender's username color as 6-char hex without # (optional; old clients omit).</summary>
     public string? NameColor;
 
-    /// <summary>Sender's persistent 8-digit Chat ID (0.2.0 required).</summary>
     public string? SenderChatId;
 
-    /// <summary>DM recipient's Chat ID when <see cref="TargetUserId"/> is set (0.2.0).</summary>
     public string? TargetChatId;
 
     public override void Serialize(NetDataWriter writer)

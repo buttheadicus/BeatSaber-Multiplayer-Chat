@@ -5,16 +5,12 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// FlowCoordinator that presents the Multiplayer Chat settings view.
-/// Renamed from SettingsFlowCoordinator to avoid Zenject conflict with Beat Saber's type.
-/// </summary>
 public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly SettingsViewController _settingsViewController = null!;
     [Inject] private readonly FusedModsSettingsFlowCoordinator _fusedModsSettingsFlowCoordinator = null!;
+    [Inject] private readonly AddonsSettingsFlowCoordinator _addonsSettingsFlowCoordinator = null!;
 
-    /// <summary>Parent to dismiss from; set before PresentFlowCoordinator when presenting from lobby.</summary>
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
 
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
@@ -29,6 +25,7 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
         {
             _settingsViewController.ApplyClicked += OnApply;
             _settingsViewController.FusedModsClicked += OnFusedModsClicked;
+            _settingsViewController.AddonsClicked += OnAddonsClicked;
         }
     }
 
@@ -38,6 +35,7 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
         {
             _settingsViewController.ApplyClicked -= OnApply;
             _settingsViewController.FusedModsClicked -= OnFusedModsClicked;
+            _settingsViewController.AddonsClicked -= OnAddonsClicked;
         }
         // Do not destroy - instance is reused to prevent overlap when reopening
     }
@@ -52,6 +50,16 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
 
         _fusedModsSettingsFlowCoordinator.ParentFlow = this;
         PresentFlowCoordinator(_fusedModsSettingsFlowCoordinator);
+    }
+
+    private void OnAddonsClicked()
+    {
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _addonsSettingsFlowCoordinator)
+            return;
+
+        _addonsSettingsFlowCoordinator.ParentFlow = this;
+        PresentFlowCoordinator(_addonsSettingsFlowCoordinator);
     }
 
     protected override void BackButtonWasPressed(ViewController topViewController)

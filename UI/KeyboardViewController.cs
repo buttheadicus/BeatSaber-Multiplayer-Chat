@@ -12,10 +12,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// ViewController with keyboard input for chat. Presented via FlowCoordinator.
-/// Can display an update message at the top when opened from version check.
-/// </summary>
 [ViewDefinition("MultiplayerChat.UI.KeyboardView.bsml")]
 public class KeyboardViewController : BSMLAutomaticViewController
 {
@@ -121,7 +117,6 @@ public class KeyboardViewController : BSMLAutomaticViewController
         ClearTypingBroadcastIfNeeded();
     }
 
-    /// <summary>Call before dismissing the keyboard flow so TypingStop is sent even if TMP never fires onEndEdit.</summary>
     public void FlushTypingPresenceToPeers()
     {
         ClearTypingBroadcastIfNeeded();

@@ -4,9 +4,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// FlowCoordinator that presents the player list for Mute or DM selection.
-/// </summary>
 public class PlayerListFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly PlayerListViewController _playerListViewController = null!;

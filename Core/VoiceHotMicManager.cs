@@ -8,7 +8,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>Continuous hot mic capture (PCM chunks). Playback runs on <see cref="ChatManager"/>.</summary>
 public class VoiceHotMicManager : MonoBehaviour, IInitializable
 {
     public static VoiceHotMicManager? Instance { get; private set; }
@@ -19,7 +18,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     [Inject] private readonly ChatManager _chatManager = null!;
 
     private string? _micDevice;
-    /// <summary>Device name passed to <see cref="Microphone.Start"/>; null = OS default.</summary>
     private string? _micDeviceAtStart;
     private AudioClip? _micLoop;
     private int _lastReadFrame;
@@ -31,17 +29,14 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private bool _voiceGateActive;
     private int _voiceHangoverChunksRemaining;
 
-    /// <summary>When <see cref="VoiceHotMicTransport.WarmupChunksToSkip"/> &gt; 0, drops that many post-start chunks before send (currently 0).</summary>
     private int _micWarmupChunksRemaining;
 
-    /// <summary>RMS to open gate (float -1..1). Previous 0.008 blocked many real mics; keep low so quiet speech still passes.</summary>
     private const float VadOpenRms = 0.002f;
 
     private const float VadCloseRms = 0.001f;
 
     private const int VadHangoverChunks = 6;
 
-    /// <summary>Linear crossfade at VHOT chunk joins on the send path (mono samples). Reduces boundary clicks from fixed-window cuts without DSP scheduling.</summary>
     private const int HotMicSendCrossfadeMonoSamples = 48;
 
     private float[]? _hotMicSendCrossfadeTail;
@@ -51,13 +46,11 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private bool _postedNoMicUi;
     private bool _postedMicStartFailedUi;
 
-    /// <summary>Lobby + GameCore each get a <see cref="VoiceHotMicManager"/>; only <see cref="Instance"/> may capture (see <see cref="Update"/>).</summary>
     private bool IsActiveHotMicHost => ReferenceEquals(Instance, this);
 
     private bool _lastPttInputCombined;
     private float _nextPttPeriodicLogTime;
 
-    /// <summary>Dev-only: log Primary/Secondary/Grip/Trigger raw XR state ~1 Hz while in lobby.</summary>
     private static readonly bool TemporaryLogRawControllerBindings = false;
 
     private const float RawControllerBindingsLogIntervalSec = 1f;
@@ -79,7 +72,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             Instance = this;
     }
 
-    /// <summary>Stops the mic ring buffer so the next capture cycle starts fresh (used when reloading VoIP on scene changes).</summary>
     public void ForceReloadMicrophone()
     {
         if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
@@ -94,11 +86,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         _deferredMicRestartCoroutine = StartCoroutine(DeferredRestartMicrophoneRoutine());
     }
 
-    /// <summary>
-    /// After <see cref="StopMic"/>, <see cref="IMultiplayerSessionManager.localPlayer"/> can be null for many frames in host setup;
-    /// retry <see cref="EnsureMic"/> once capture is allowed so open-mic / PTT works again without re-entering the game.
-    /// PTT with button released is not a failure (mic intentionally idle until press).
-    /// </summary>
     private IEnumerator DeferredRestartMicrophoneRoutine()
     {
         try
@@ -260,10 +247,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private static bool SameMicSelection(string? a, string? b) =>
         string.Equals(a ?? "", b ?? "", System.StringComparison.Ordinal);
 
-    /// <summary>
-    /// After VoIP reload, <see cref="CanCaptureHotMic"/> may stay false on purpose (PTT not held, lobby mute, deaf).
-    /// Those are not errors.
-    /// </summary>
     private bool DeferredMicRestartIdleAcceptable()
     {
         if (_sessionManager?.localPlayer == null)
@@ -502,7 +485,6 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         Array.Copy(chunk, chunk.Length - k, _hotMicSendCrossfadeTail, 0, k);
     }
 
-    /// <summary>RMS voice gate  -  always on; no bypass (see <see cref="VoiceHotMicTransport"/> class remarks).</summary>
     private bool ShouldTransmitVoiceChunk(float[] chunk)
     {
         var rms = ComputeRms(chunk, chunk.Length);

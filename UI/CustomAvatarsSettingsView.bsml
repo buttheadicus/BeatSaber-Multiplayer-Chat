@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="10" spacing="5">
+    <text text="Lobby Custom Avatars (nicoco007 Custom Avatars)" font-size="4.5" align="Center"/>
+    <toggle-setting id="EnableLobbyAvatarsToggle" value="EnableLobbyAvatarsDraft"/>
+    <dropdown-list-setting id="AvatarDropdown" text="Avatar (.avatar in CustomAvatars)" options="AvatarOptions"/>
+    <text text="Peers must have the same .avatar file (same MD5) locally. Requires Final IK / Custom Avatars pipeline." font-size="3" align="Center"/>
+    <text text="Changing the enable toggle requires restarting Beat Saber." font-size="3.2" align="Center"/>
+    <button text="Apply" pad="2" on-click="ApplyClicked"/>
+  </vertical>
+</bg>

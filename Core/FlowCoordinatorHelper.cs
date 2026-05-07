@@ -3,10 +3,6 @@ using HMUI;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Helper to get the topmost (youngest child) FlowCoordinator for presenting from the correct parent.
-/// Presenting from the top flow when in the lobby avoids "MainMenuViewController is inactive" errors.
-/// </summary>
 public static class FlowCoordinatorHelper
 {
     private static FieldInfo? GetChildField()
@@ -19,10 +15,6 @@ public static class FlowCoordinatorHelper
 
     private static readonly FieldInfo? ChildField = GetChildField();
 
-    /// <summary>
-    /// Gets the topmost flow coordinator in the hierarchy (the one with no active child).
-    /// Use this as the parent when presenting from the lobby.
-    /// </summary>
     public static FlowCoordinator GetTopFlowCoordinator(FlowCoordinator flow)
     {
         if (flow == null) return flow!;
@@ -32,9 +24,6 @@ public static class FlowCoordinatorHelper
         return child != null ? GetTopFlowCoordinator(child) : flow;
     }
 
-    /// <summary>
-    /// Gets the child flow coordinator of the given flow, or null if none.
-    /// </summary>
     public static FlowCoordinator? GetChildFlowCoordinator(FlowCoordinator flow)
     {
         if (flow == null || ChildField == null) return null;

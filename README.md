@@ -8,7 +8,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Voice chat & messages**: speak to other players with hot mic, or give them a nice voice message!
 - **DMs**: self explanitory, have only one player read/hear your text/voice message.
 - **Mute / deafen**: self explanitory
-- **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)a
+- **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)
 
 ## Fused mods
 - [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras)
@@ -19,7 +19,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Friend service**: ChatID based friends beyond the current lobby list.
 - **Join friends**: Connect to a friend's session from the menu or a friends list.
 - **Private calls**: Out-of-lobby or dedicated voice sessions (design is TBD).
-- **DM from menu**: Start or continue DMs without being in a multiplayer lobby first, basically just discord but ingame.e
+- **DM from menu**: Start or continue DMs without being in a multiplayer lobby first, basically just discord but ingame.
 
 ## Multiplayer Extensions (Required (but also auto installs, see below))
 

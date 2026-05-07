@@ -5,9 +5,6 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Shows the update message in the game view (Screen Space - Camera so it appears in VR and desktop).
-/// </summary>
 public class UpdateMessager : MonoBehaviour
 {
     private const float DisplayDuration = 45f;

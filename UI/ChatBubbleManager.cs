@@ -13,22 +13,16 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Manages chat bubbles stacked above the lobby header (HOST SETUP / CLIENT SETUP / QUICK PLAY LOBBY).
-/// All messages appear in one area; multiple messages stack vertically with newest at bottom.
-/// </summary>
 public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 {
     private const int MaxVisibleBubbles = 8;
     private const float BubbleHeight = 36f;
 
-    /// <summary>Active lobby instance (BSML settings VC often does not get this via Zenject injection).</summary>
     public static ChatBubbleManager? Instance { get; private set; }
 
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly ChatManager _chatManager = null!;
 
-    /// <summary>Whichever <see cref="ChatManager"/> we subscribed to for messages (lobby vs GameCore instance).</summary>
     private ChatManager? _messageSubscriptionTarget;
 
     private readonly List<ChatBubble> _stackedBubbles = new();
@@ -42,7 +36,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private GameObject? _moveHandle;
     private Coroutine? _moveModeHelperCoroutine;
 
-    /// <summary>Full scene scans for avatar caption anchors  -  capped so lobby idle does not hitch every ~0.12–0.5s.</summary>
     private float _nextNametagEnsureRealtime = -999f;
     private const float NametagEnsureMinIntervalSec = 2.75f;
 
@@ -51,7 +44,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         "MultiplayerLobbyCenterStage", "CenterStage", "LobbySetup", "HostSetup"
     };
 
-    /// <summary>While a beatmap is playing, skip lobby polling (GameObject.Find / nametag scans).</summary>
     private const float SongLobbyPollSleepSec = 2f;
 
     public bool IsMoveMode => _isMoveMode;
@@ -72,7 +64,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         StartCoroutine(EnsureLobbyHeaderRoot());
     }
 
-    /// <summary>After arena → lobby (or manual VoIP reset), <see cref="ChatManager.Instance"/> may be a new object; re-subscribe so chat lines still flow.</summary>
     public void RebindToActiveChatManager()
     {
         var live = ChatManager.Instance ?? _chatManager;
@@ -128,7 +119,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         ShowStackedBubble(name, msg, e.NameColor);
     }
 
-    /// <summary>Previous iteration&apos;s <see cref="IsInLobby"/>  -  avoids an extra <c>GameObject.Find</c> pass before each wait.</summary>
     private bool _lastPollInLobby;
 
     private IEnumerator EnsureLobbyHeaderRoot()
@@ -196,7 +186,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    /// <summary>When custom placement is on: enter move mode to show handle for dragging.</summary>
     public void EnterMoveMode()
     {
         if (!ModSettings.CustomPlacement) return;
@@ -241,7 +230,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         _moveModeHelperCoroutine = StartCoroutine(MoveModeHelperMessages());
     }
 
-    /// <summary>Exit move mode and save position.</summary>
     public void ExitMoveMode()
     {
         if (!_isMoveMode) return;
@@ -260,7 +248,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    /// <summary>Reset chat to default position (above HOST SETUP).</summary>
     public void ResetToDefaultPosition()
     {
         if (_lobbyHeaderRoot == null) return;
@@ -367,7 +354,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    /// <summary>Force clear all chat bubbles (e.g. from user button). Keeps root to avoid layout corruption.</summary>
     public void ForceClearChat()
     {
         ClearEphemeralPresenceMaps();
@@ -461,31 +447,95 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return null;
     }
 
-    /// <summary>
-    /// Creates chat area above the HOST SETUP bar in the lobby's 3D VR UI.
-    /// Parents to the game's in-world UI hierarchy. NO screen overlay - VR only.
-    /// </summary>
     private Transform? FindOrCreateLobbyHeaderChatRoot()
     {
+        var startAnchored = CreateLobbyChatRootAboveStartButtonRow();
+        if (startAnchored != null)
+            return startAnchored;
+
         var banner = FindHostSetupBannerInLobby(allowOverlay: false) ?? FindHostSetupBannerInLobby(allowOverlay: true);
         if (banner != null)
         {
             var root = CreateChatRootAboveBanner(banner);
             if (root != null)
             {
-                MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached to lobby UI above HOST SETUP: {banner.name}");
+                MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached to lobby UI via header text: {banner.name}");
                 return root;
             }
         }
-        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not find HOST SETUP bar in lobby UI - chat bubbles disabled");
+
+        MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not anchor lobby chat (START row or header bar not found)");
         return null;
     }
 
-    /// <summary>
-    /// Finds the HOST SETUP bar by scanning text in the scene. Prefers world-space / camera canvases;
-    /// when <paramref name="allowOverlay"/> is true, Screen Space Overlay matches are allowed (move handle / chat root).
-    /// Scoped subtree scans run before expensive global TMP walks.
-    /// </summary>
+    private static Transform? CreateLobbyChatRootAboveStartButtonRow()
+    {
+        var start = LobbyUiStartButtonLocator.FindStartButtonTransform();
+        if (start == null)
+            return null;
+
+        var buttonRow = start.parent;
+        if (buttonRow == null)
+            return null;
+
+        var attachParent = buttonRow.parent;
+        if (attachParent == null)
+            return null;
+
+        // START often sits inside a horizontal strip; prefer inserting above that strip inside a vertical panel.
+        if (attachParent.GetComponent<HorizontalLayoutGroup>() != null &&
+            attachParent.GetComponent<VerticalLayoutGroup>() == null &&
+            attachParent.parent != null)
+        {
+            buttonRow = attachParent;
+            attachParent = attachParent.parent;
+            if (attachParent == null)
+                return null;
+        }
+
+        if (attachParent.GetComponentInParent<Canvas>() == null)
+            return null;
+
+        var insertIndex = buttonRow.GetSiblingIndex();
+
+        var rootObj = new GameObject("MPChatLobbyHeaderStack");
+        rootObj.layer = start.gameObject.layer;
+        rootObj.transform.SetParent(attachParent, false);
+        rootObj.transform.SetSiblingIndex(insertIndex);
+
+        EnsureCanvasRaycaster(attachParent);
+
+        var rootRect = rootObj.AddComponent<RectTransform>();
+        rootRect.anchorMin = new Vector2(0f, 1f);
+        rootRect.anchorMax = new Vector2(1f, 1f);
+        rootRect.pivot = new Vector2(0.5f, 1f);
+        rootRect.sizeDelta = new Vector2(0f, 320f);
+        rootRect.anchoredPosition = ModSettings.CustomPlacement ? ModSettings.LobbyChatPosition : DefaultChatPosition;
+
+        var le = rootObj.AddComponent<LayoutElement>();
+        le.preferredHeight = 320f;
+        le.minHeight = 96f;
+        le.flexibleHeight = 0f;
+
+        ApplyLobbyBubbleStackLayout(rootObj);
+
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Chat attached above START row (parent={attachParent.name})");
+        return rootObj.transform;
+    }
+
+    private static void ApplyLobbyBubbleStackLayout(GameObject rootObj)
+    {
+        var vlg = rootObj.AddComponent<VerticalLayoutGroup>();
+        vlg.childAlignment = TextAnchor.LowerCenter;
+        vlg.childControlHeight = true;
+        vlg.childControlWidth = false;
+        vlg.childForceExpandHeight = false;
+        vlg.childForceExpandWidth = false;
+        vlg.spacing = 2f;
+        vlg.padding = new RectOffset(0, 0, 0, 0);
+        vlg.reverseArrangement = true;
+    }
+
     private static Transform? FindHostSetupBannerInLobby(bool allowOverlay)
     {
         bool AcceptCanvas(Canvas? canvas) =>
@@ -618,10 +668,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return null;
     }
 
-    /// <summary>
-    /// Parents chat stack so the bottom of the chat aligns with the top of the HOST SETUP bar.
-    /// Chat grows upward from the bar.
-    /// </summary>
     private static readonly Vector2 DefaultChatPosition = Vector2.zero;
 
     private static Transform? CreateChatRootAboveBanner(Transform banner)
@@ -646,20 +692,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootRect.anchoredPosition = ModSettings.CustomPlacement ? ModSettings.LobbyChatPosition : DefaultChatPosition;
         rootRect.sizeDelta = new Vector2(420f, 320f);
 
-        var vlg = rootObj.AddComponent<VerticalLayoutGroup>();
-        vlg.childAlignment = TextAnchor.LowerCenter;
-        vlg.childControlHeight = true;
-        vlg.childControlWidth = false;
-        vlg.childForceExpandHeight = false;
-        vlg.childForceExpandWidth = false;
-        vlg.spacing = 2f;
-        vlg.padding = new RectOffset(0, 0, 0, 0);
-        vlg.reverseArrangement = true;
+        ApplyLobbyBubbleStackLayout(rootObj);
 
         return rootObj.transform;
     }
 
-    /// <summary>Remote-only ephemeral lines (typing / recording voice message).</summary>
     public void SetEphemeralTypingLine(string senderUserId, bool visible, string richText)
     {
         SetEphemeralLine(_ephemeralTypingByUserId, senderUserId, visible, richText);
@@ -672,7 +709,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private const string LocalPttEphemeralKey = "__local_ptt__";
 
-    /// <summary>Local-only hot mic UI while push-to-talk key is held (not networked).</summary>
     public void SetLocalPushToTalkOpen(bool visible)
     {
         SetEphemeralLine(_ephemeralLocalByKey, LocalPttEphemeralKey, visible,
@@ -911,7 +947,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return false;
     }
 
-    /// <summary>True during beatmap play (GameCore and/or <see cref="MpChatLobbyDiagnostics.SongGameplayLikelyActive"/>).</summary>
     private static bool IsInSong() => MpChatLobbyDiagnostics.SongGameplayLikelyActive();
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)

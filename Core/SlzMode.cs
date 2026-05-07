@@ -4,20 +4,10 @@ using MultiplayerChat;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// When <see cref="MarkerFileName"/> exists in the same directory as this assembly (Beat Saber Plugins folder)
-/// and passes <see cref="SlzMarkerProof.TryValidateMarkerContent"/>, optional "SLZ mode" behavior is enabled.
-/// Use <c>SlzMarkerTool</c> from the same release to create a valid marker (0.3.1+).
-/// </summary>
-/// <remarks>
-/// Keep fork-specific SLZ behavior out of git: use the gitignored <c>SlzPrivate/</c> folder for extra sources or
-/// a local MSBuild props file; marker validation lives in <see cref="SlzMarkerProof"/>.
-/// </remarks>
 public static class SlzMode
 {
     public const string MarkerFileName = "SLZ.dat";
 
-    /// <summary>True after <see cref="Refresh"/> if the marker file is present and passes <see cref="SlzMarkerProof.TryValidateMarkerContent"/>.</summary>
     public static bool IsEnabled { get; private set; }
 
     private static bool _warnedInvalidMarker;

@@ -2,10 +2,6 @@ using System;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Mutes by persistent chat ID (saved in ChatIDConfig.dat). If a player's ID is not known yet,
-/// mute is stored by platform userId until presence provides their chat ID.
-/// </summary>
 public class ChatMuteManager
 {
     private readonly ChatIdConfigStore _config = null!;
@@ -47,7 +43,6 @@ public class ChatMuteManager
 
     public void ClearAllMutes() => _config.ClearAllMutes();
 
-    /// <summary>Called when we learn a remote player's chat ID (e.g. from presence).</summary>
     public void OnPeerChatIdLearned(string platformUserId, string chatId)
     {
         _config.OnChatIdLearnedForUser(platformUserId, chatId);

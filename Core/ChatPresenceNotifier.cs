@@ -8,11 +8,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Posts "USERNAME has chat! They can see your messages!" when players with the mod join.
-/// Batches names when we join a lobby; single message when someone joins us.
-/// Only announces each player once per session (avoids spam when returning from song).
-/// </summary>
 public class ChatPresenceNotifier : IInitializable, IDisposable
 {
     private static readonly HashSet<string> _alreadyAnnouncedUserIds = new();

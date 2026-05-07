@@ -112,8 +112,6 @@ public class EditAvatarColorViewControllerPatcher : IInitializable, IAffinity
 
             if (newOption.MagicColor is not null)
                 setColor = newOption.MagicColor.Value;
-            else
-                setColor.a = 1;
 
             _editColorViewController.SetColor(setColor);
             InvokeChangeColor(setColor);

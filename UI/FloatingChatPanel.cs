@@ -11,10 +11,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Creates a VR-grabbable floating chat panel (FloatingScreen) with chat UI built in code.
-/// Grab the handle at the bottom to move it in 3D space.
-/// </summary>
 public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
 {
     [Inject] private readonly ChatManager _chatManager = null!;

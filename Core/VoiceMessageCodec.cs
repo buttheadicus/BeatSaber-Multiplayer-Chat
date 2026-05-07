@@ -6,9 +6,6 @@ using MultiplayerChat.Network;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Binary format for voice messages: magic, version, sample rate, channel count, frame count, interleaved float32 samples.
-/// </summary>
 public static class VoiceMessageCodec
 {
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("VMSG");
@@ -91,7 +88,6 @@ public static class VoiceMessageCodec
         return true;
     }
 
-    /// <summary>PCM duration from the wire header only (no sample decode). Used to cap playout buffer latency.</summary>
     public static bool TryGetDurationMs(byte[] blob, out float ms)
     {
         ms = 0f;
@@ -112,7 +108,6 @@ public static class VoiceMessageCodec
         return true;
     }
 
-    /// <summary>Builds a one-shot <see cref="AudioClip"/> for playback.</summary>
     public static AudioClip? CreateAudioClip(byte[] blob)
     {
         if (!TryDecodeToFloatSamples(blob, out var samples, out var rate, out var ch))

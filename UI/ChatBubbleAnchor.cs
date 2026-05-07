@@ -9,11 +9,6 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Attached to AvatarCaption (nametag) via SiraUtil LobbyAvatarPlaceRegistration.
-/// Adds a chat icon sprite after the player name to indicate they have the MPChat mod.
-/// Same idea as optional small icons appended to multiplayer nametags.
-/// </summary>
 public class ChatBubbleAnchor : MonoBehaviour
 {
     private const float IconSize = 14f;
@@ -24,7 +19,6 @@ public class ChatBubbleAnchor : MonoBehaviour
 
     private string? _userId;
     private GameObject? _iconObj;
-    /// <summary>Same object we registered <see cref="OnPresenceUpdated"/> on; must not use <see cref="ModPresenceManager.Instance"/> at destroy (lobby/GameCore swap).</summary>
     private ModPresenceManager? _subscribedModPresence;
 
     private void Start()

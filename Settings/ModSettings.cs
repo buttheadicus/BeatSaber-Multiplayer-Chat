@@ -1,12 +1,9 @@
 using System;
 using UnityEngine;
+using MultiplayerChat.Core;
 
 namespace MultiplayerChat.Settings;
 
-/// <summary>
-/// Mod preferences stored under Beat Saber LocalLow with Chat ID files (<see cref="ChatIdFilePaths.ModSettingsFilePath"/>).
-/// Previously used Unity <see cref="PlayerPrefs"/> and a separate CAU flags file; those are migrated once when the JSON is missing or unreadable.
-/// </summary>
 public static class ModSettings
 {
     private const string DefaultNameColor = "87CEEB";
@@ -58,7 +55,6 @@ public static class ModSettings
             MultiplayerExtensionsJson.SetPlayerColorHex(hex);
         }
     }
-
     private static bool IsValidHex(string s)
     {
         if (string.IsNullOrEmpty(s) || s.Length != 6) return false;
@@ -68,7 +64,6 @@ public static class ModSettings
         return true;
     }
 
-    /// <summary>Off = default position above HOST SETUP. On = custom placement with draggable handle.</summary>
     public static bool CustomPlacement
     {
         get => D.CustomPlacement;
@@ -90,7 +85,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>UI one-shot sounds for chat bubbles (not system lines).</summary>
     public static bool ChatBubbleSoundsEnabled
     {
         get => D.ChatBubbleSoundsEnabled;
@@ -101,9 +95,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>
-    /// Windows recording device name from <see cref="UnityEngine.Microphone.devices"/>, or empty to use the system default device.
-    /// </summary>
     public static string MicInputDeviceName
     {
         get => D.MicInputDeviceName ?? "";
@@ -124,7 +115,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>0-3: Primary, Secondary, Trigger, Grip.</summary>
     public static int PttBindingIndex
     {
         get => Mathf.Clamp(D.PttBindingIndex, 0, 3);
@@ -135,7 +125,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>Lower selected game <see cref="UnityEngine.AudioSource"/> volumes while incoming voice is active; MPChat playback sources are excluded by hierarchy name.</summary>
     public static bool VoiceDuckingEnabled
     {
         get => D.VoiceDuckingEnabled;
@@ -146,7 +135,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>Game audio multiplier while ducked (5-100), as percent of baseline per-source volume.</summary>
     public static int VoiceDuckTargetPercent
     {
         get => Mathf.Clamp(D.VoiceDuckTargetPercent, 5, 100);
@@ -157,15 +145,9 @@ public static class ModSettings
         }
     }
 
-    /// <summary>v0.3.1: UI removed; behavior forced off until restored in a later release.</summary>
-    private const bool SongPeriodMuteAndDeafTemporarilyDisabled = true;
-
-    /// <summary>
-    /// During active song / arena, force hot-mic mute (currently disabled for v0.3.1; see <see cref="SongPeriodMuteAndDeafTemporarilyDisabled"/>).
-    /// </summary>
     public static bool MuteMicDuringSongPlaying
     {
-        get => !SongPeriodMuteAndDeafTemporarilyDisabled && D.MuteMicDuringSongPlaying;
+        get => D.MuteMicDuringSongPlaying;
         set
         {
             D.MuteMicDuringSongPlaying = value;
@@ -173,12 +155,9 @@ public static class ModSettings
         }
     }
 
-    /// <summary>
-    /// During active song / arena, force deafen (currently disabled for v0.3.1; see <see cref="SongPeriodMuteAndDeafTemporarilyDisabled"/>).
-    /// </summary>
     public static bool DeafDuringSongPlaying
     {
-        get => !SongPeriodMuteAndDeafTemporarilyDisabled && D.DeafDuringSongPlaying;
+        get => D.DeafDuringSongPlaying;
         set
         {
             D.DeafDuringSongPlaying = value;
@@ -186,9 +165,6 @@ public static class ModSettings
         }
     }
 
-    /// <summary>
-    /// Opt-in Chat Auto Updater (CAU). Stored in <see cref="ChatIdFilePaths.ModSettingsFilePath"/> with other mod settings.
-    /// </summary>
     public static bool EnableCau
     {
         get => D.EnableCau;
@@ -199,15 +175,78 @@ public static class ModSettings
         }
     }
 
-    /// <summary>
-    /// Off by default. When on, Avatar Extras load at startup (editor + packed networking). Changing this requires a game restart.
-    /// </summary>
+    public static bool DebugLogging
+    {
+        get => D.DebugLogging;
+        set
+        {
+            D.DebugLogging = value;
+            ModSettingsPersistence.Save();
+            MpChatLog.Apply(value);
+        }
+    }
+
     public static bool EnableAvatarExtensions
     {
         get => D.EnableAvatarExtensions;
         set
         {
             D.EnableAvatarExtensions = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static bool EnableAvatarColoringExtensions
+    {
+        get => D.Addons.EnableAvatarColoringExtensions;
+        set
+        {
+            D.Addons.EnableAvatarColoringExtensions = value;
+            ModSettingsPersistence.Save();
+            if (value)
+                AvatarColoring.AvatarDatOperations.EnsureAvatarStorageExists();
+        }
+    }
+
+    public static bool EnableLobbyCustomAvatars
+    {
+        get => D.EnableLobbyCustomAvatars;
+        set
+        {
+            D.EnableLobbyCustomAvatars = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static string LobbyCustomAvatarRelativePath
+    {
+        get => D.LobbyCustomAvatarRelativePath ?? "";
+        set
+        {
+            var s = (value ?? "").Trim().Replace('\\', '/');
+            if (s.Length > 260)
+                s = s.Substring(0, 260);
+            D.LobbyCustomAvatarRelativePath = s;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static string LobbyCustomAvatarContentHash
+    {
+        get => D.LobbyCustomAvatarContentHash ?? "";
+        set
+        {
+            var h = (value ?? "").Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(h))
+            {
+                D.LobbyCustomAvatarContentHash = "";
+                ModSettingsPersistence.Save();
+                return;
+            }
+
+            if (h.Length > 32)
+                h = h.Substring(0, 32);
+            D.LobbyCustomAvatarContentHash = CustomAvatarHashUtil.LooksLikeMd5Hex(h) ? h : "";
             ModSettingsPersistence.Save();
         }
     }

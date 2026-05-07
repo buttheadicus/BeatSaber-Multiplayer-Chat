@@ -1,6 +1,5 @@
 namespace MultiplayerChat.Core;
 
-/// <summary>Self chat lines for hardware / VoIP failures. Primary line: caps + red; hints in gray (bug reports, etc.).</summary>
 public static class ChatSystemErrorMessages
 {
     private const string ErrRed = "#FF4444";

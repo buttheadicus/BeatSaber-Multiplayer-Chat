@@ -3,9 +3,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.Settings;
 
-/// <summary>
-/// Persists floating chat panel position/rotation. Uses PlayerPrefs.
-/// </summary>
 public static class ChatPositionSettings
 {
     private const string KeyVersion = "MultiplayerChat.LayoutVersion";

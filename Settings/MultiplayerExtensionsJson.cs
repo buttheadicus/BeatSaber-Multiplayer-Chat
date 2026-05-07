@@ -4,10 +4,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.Settings;
 
-/// <summary>
-/// Reads and writes PlayerColor in (INSTALL)/UserData/MultiplayerExtensions.json.
-/// Keeps the # prefix in the JSON value.
-/// </summary>
 public static class MultiplayerExtensionsJson
 {
     private static string GetPath()
@@ -17,7 +13,6 @@ public static class MultiplayerExtensionsJson
         return Path.Combine(installRoot ?? "", "UserData", "MultiplayerExtensions.json");
     }
 
-    /// <summary>Gets PlayerColor from JSON (without #). Returns null if file missing or invalid.</summary>
     public static string? GetPlayerColorHex()
     {
         try
@@ -37,7 +32,6 @@ public static class MultiplayerExtensionsJson
         }
     }
 
-    /// <summary>Sets PlayerColor in JSON. Hex should be 6 chars without #. Preserves # in the JSON.</summary>
     public static void SetPlayerColorHex(string hex)
     {
         if (string.IsNullOrEmpty(hex) || hex.Length != 6) return;

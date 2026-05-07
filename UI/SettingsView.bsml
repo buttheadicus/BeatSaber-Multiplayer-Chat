@@ -14,7 +14,13 @@
     <horizontal child-expand-width="true">
       <toggle-setting id="EnableCauToggle" text="Enable CAU" value="EnableCau"/>
     </horizontal>
-    <button text="Fused Mods" on-click="FusedModsClicked"/>
+    <horizontal child-expand-width="true">
+      <toggle-setting id="DebugLoggingToggle" text="Debug mode (verbose logs)" value="DebugLogging"/>
+    </horizontal>
+    <horizontal spacing="4" pad="2" horizontal-fit="PreferredSize">
+      <button text="Fused Mods" pad="2" min-width="36" on-click="FusedModsClicked"/>
+      <button text="Addons" pad="2" min-width="36" on-click="AddonsClicked"/>
+    </horizontal>
     <button text="APPLY" on-click="ApplyClicked"/>
   </vertical>
 </bg>

@@ -5,22 +5,8 @@ using UnityEngine.XR;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// VR push-to-talk cross-referenced with EasyOffset (<see href="https://github.com/Reezonate/EasyOffset"/>):
-/// <list type="bullet">
-/// <item><description><b>Devices:</b> EasyOffset <c>ReeInputDevice</c> uses <see cref="InputDevices.GetDevicesAtXRNode"/> and
-/// <c>devices[0]</c> per hand  -  we do the same via <see cref="PrimaryDeviceAt"/> (not <see cref="InputDevices.GetDeviceAtXRNode"/>,
-/// which can disagree when multiple devices are registered).</description></item>
-/// <item><description><b>Buttons:</b> same Unity <see cref="CommonUsages"/> booleans EasyOffset maps from feature names
-/// (<c>PrimaryButton</c>, <c>SecondaryButton</c>, <c>GripButton</c>).</description></item>
-/// <item><description><b>Trigger:</b> EasyOffset <c>ReeInputManager</c> uses <c>IVRPlatformHelper.GetTriggerValue</c> with threshold
-/// <c>0.1f</c>. We use that threshold on <see cref="CommonUsages.trigger"/> / <see cref="CommonUsages.triggerButton"/> on the
-/// same primary devices (SteamVR/OpenXR still expose analog trigger on those).</description></item>
-/// </list>
-/// </summary>
 public static class VrPttInput
 {
-    /// <summary>Matches EasyOffset <c>ReeInputManager.TriggerThreshold</c> (0.1f).</summary>
     private const float TriggerPressThreshold = 0.1f;
 
     private static readonly List<InputDevice> DeviceBuffer = new(4);
@@ -32,7 +18,6 @@ public static class VrPttInput
         return DeviceBuffer.Count > 0 ? DeviceBuffer[0] : default;
     }
 
-    /// <summary>True if either hand controller is currently tracked (PTT can be evaluated).</summary>
     public static bool HasAnyHandDeviceValid()
     {
         try
@@ -45,7 +30,6 @@ public static class VrPttInput
         }
     }
 
-    /// <param name="bindingIndex">0 primary, 1 secondary, 2 trigger, 3 grip (same order as the voice settings PTT dropdown / PlayerPrefs).</param>
     public static bool IsBindingHeld(int bindingIndex)
     {
         var idx = Mathf.Clamp(bindingIndex, 0, 3);
@@ -83,7 +67,6 @@ public static class VrPttInput
 
     private static string FormatBoolToken(bool v) => v ? "y" : "n";
 
-    /// <summary>One-line report of Primary / Secondary / Trigger / Grip on both hands (for temporary diagnostics).</summary>
     public static string BuildRawControllerBindingsDiagnosticLine()
     {
         try
@@ -112,7 +95,6 @@ public static class VrPttInput
         return $"Pri={FormatBoolToken(pri)} Sec={FormatBoolToken(sec)} Grip={FormatBoolToken(grip)} TrigBtn={FormatBoolToken(triBtn)} TrigAx={triAx:0.###}";
     }
 
-    /// <summary>Extra detail for <see cref="VoiceHotMicManager"/> PTT logs (controllers + analog trigger).</summary>
     public static string FormatDiagnosticsSuffix(int bindingIndex)
     {
         try

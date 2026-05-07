@@ -5,13 +5,8 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>Throttled, high-signal logging for incoming hot mic / voice message debugging (filter drops, decode, scheduling).</summary>
 internal static class VoiceReceiveDiagnostics
 {
-    /// <summary>
-    /// When <see langword="false"/> (default), suppress periodic <c>[VoiceMsgRx]</c> chunk stats during playback.
-    /// Drops, decrypt failures, and decode errors still log (throttled where noted).
-    /// </summary>
     public static bool EnableVerboseChunkLogs;
 
     private const float DropLogThrottleSec = 1.0f;
@@ -43,7 +38,6 @@ internal static class VoiceReceiveDiagnostics
         MultiplayerChat.Plugin.Log?.Warn($"[MPChat][VoiceRx DROP] {reason}{(detail != null ? " " + detail : "")}");
     }
 
-    /// <summary>Decrypt failed after retry  -  log sorted session key fingerprint (throttled separately from generic decrypt_failed).</summary>
     public static void LogDecryptFailedWithFingerprintThrottled(string? senderUserId, string sessionStateFingerprint)
     {
         if (VoiceBareStreamMode.Enabled) return;
@@ -56,7 +50,6 @@ internal static class VoiceReceiveDiagnostics
             $"[MPChat][VoiceRx DROP] decrypt_failed (after retry) sender={ShortId(senderUserId)} keyState=[{fp}]");
     }
 
-    /// <summary>Log first VHOT chunk per sender per session (not throttled).</summary>
     public static void LogHotMicFirstChunkFromUser(string userId, int decryptedBytes)
     {
         if (VoiceBareStreamMode.Enabled) return;
@@ -65,7 +58,6 @@ internal static class VoiceReceiveDiagnostics
         MultiplayerChat.Plugin.Log?.Info($"[MPChat][HotMic] First VHOT chunk from {ShortId(userId)} ({decryptedBytes} bytes decrypted)");
     }
 
-    /// <summary>Per-chunk <c>[HotMicRx]</c> lines disabled (too noisy); decode failures still log.</summary>
     public static bool ShouldLogHotMicChunkLine(string userId) => false;
 
     public static void LogHotMicChunkLine(string userId, int blobBytes, int volPct, float gain01, float peakDecode, float peakPostFade, int rate, int ch, int sampleCount)

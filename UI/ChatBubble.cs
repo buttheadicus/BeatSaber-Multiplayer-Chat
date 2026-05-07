@@ -6,9 +6,6 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Chat bubble displayed above player name tag or avatar.
-/// </summary>
 public class ChatBubble : MonoBehaviour
 {
     private const float DefaultYOffset = 0.35f;
@@ -61,7 +58,6 @@ public class ChatBubble : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    /// <summary>Stacked bubble that stays until <see cref="DismissEphemeral"/> (no timed fade-out).</summary>
     public void ShowStackedPersistent()
     {
         if (_rectTransform == null || _canvasGroup == null || _textMesh == null)
@@ -108,8 +104,6 @@ public class ChatBubble : MonoBehaviour
             _textMesh.text = text;
     }
 
-    /// <param name="yOffset">Y offset (ignored when isStacked=true).</param>
-    /// <param name="isStacked">When true, position/size are managed by parent layout; only alpha is animated.</param>
     public void Show(float duration, float yOffset = DefaultYOffset, bool isStacked = false)
     {
         if (_rectTransform == null || _canvasGroup == null || _textMesh == null)

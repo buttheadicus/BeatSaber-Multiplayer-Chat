@@ -2,10 +2,6 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Notifies a player that the sender added or removed them in talk-to voice routing.
-/// Only <see cref="TargetUserId"/> (recipient) should handle it.
-/// </summary>
 public class TalkToNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public string? TargetUserId;
@@ -18,7 +14,6 @@ public class TalkToNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPack
 
     public string? TargetChatId;
 
-    /// <summary>Comma-separated platform user ids (other talk-to targets besides <see cref="TargetUserId"/>); optional trailing field for 0.3.0+.</summary>
     public string? AlsoTalkingToOthersCsv;
 
     public override void Serialize(NetDataWriter writer)

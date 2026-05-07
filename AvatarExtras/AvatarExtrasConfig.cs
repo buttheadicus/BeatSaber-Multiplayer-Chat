@@ -4,9 +4,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.AvatarExtras;
 
-/// <summary>
-/// Backup colors for the avatar editor rainbow toggle (persisted in <see cref="AvatarExtrasConfigPersistence"/>, not IPA <c>Config</c>).
-/// </summary>
 public class AvatarExtrasConfig
 {
     public Dictionary<string, Color> BackupColors { get; } = new();

@@ -14,9 +14,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Player grid for Mute, DM, per-player voice receive volume, listen-only filter, and talk-to selection.
-/// </summary>
 [ViewDefinition("MultiplayerChat.UI.PlayerList.bsml")]
 public class PlayerListViewController : BSMLAutomaticViewController
 {
@@ -24,7 +21,6 @@ public class PlayerListViewController : BSMLAutomaticViewController
 
     private const int SlotCount = 12;
     private const int MaxNameLen = 30;
-    /// <summary>Each +/- adjusts stored percent by this amount (0…500 ↔ gain 0.0…5.0 in steps of 0.1).</summary>
     private const int VolumeStepPercent = 10;
 
     [Inject] private readonly ChatMuteManager _muteManager = null!;
@@ -162,7 +158,7 @@ public class PlayerListViewController : BSMLAutomaticViewController
                     "Tap names to add or remove (listening). If nobody is selected, you hear everyone.",
                 Mode.TalkTo =>
                     "Listen and talk to a player (you can select as many people as you'd like, doesn't have to be one person; good for groups!).",
-                Mode.Volume => "Tap a player, then use - / + from 0.0 to 5.0 . This applies to received hot mic and voice messages.",
+                Mode.Volume => "Tap a player, then use - / + to adjust their volume. There is no cap, so you can adjust it as high as you want.",
                 _ => "Tap a name"
             };
         }
@@ -286,7 +282,14 @@ public class PlayerListViewController : BSMLAutomaticViewController
         if (_mode != Mode.Volume || string.IsNullOrEmpty(_selectedVolumeUserId))
             return;
         var cur = PlayerVoiceVolumeStore.GetVolumePercent(_selectedVolumeUserId!);
-        var next = Mathf.Clamp(cur + deltaPercent, 0, 500);
+        var sum = (long)cur + deltaPercent;
+        int next;
+        if (sum < 0L)
+            next = 0;
+        else if (sum > PlayerVoiceVolumeStore.MaxVolumePercent)
+            next = PlayerVoiceVolumeStore.MaxVolumePercent;
+        else
+            next = (int)sum;
         PlayerVoiceVolumeStore.SetVolumePercent(_selectedVolumeUserId!, next, persist: false);
         RefreshVolumeStepLabel();
         ReloadGrid();
@@ -311,7 +314,8 @@ public class PlayerListViewController : BSMLAutomaticViewController
     {
         if (_playerVolumeStepLabel == null || userId.Length == 0) return;
         var p = PlayerVoiceVolumeStore.GetVolumePercent(userId);
-        _playerVolumeStepLabel.text = (p / 100f).ToString("F1");
+        var g = p / 100f;
+        _playerVolumeStepLabel.text = Mathf.Abs(p) >= 100000 ? g.ToString("G4") : g.ToString("F1");
     }
 
     private void OnPlayerSelected(IConnectedPlayer player)

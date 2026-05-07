@@ -12,10 +12,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Tracks which players have the MPChat mod. Broadcasts our presence when connecting;
-/// shows the chat icon on nametags for players in this set.
-/// </summary>
 public class ModPresenceManager : IInitializable, IDisposable
 {
     public static ModPresenceManager? Instance { get; private set; }
@@ -55,7 +51,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         _coroutineHost.StartCoroutine(RepeatBroadcast());
     }
 
-    /// <summary>Keep trying to send presence (even during song - others will reply "ignored").</summary>
     private IEnumerator RepeatBroadcast()
     {
         for (var i = 0; i < 20; i++) // Try for ~40 seconds
@@ -120,7 +115,6 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     public event EventHandler? PresenceUpdated;
 
-    /// <summary>Fired when we learn a remote player has the mod (userId, userName).</summary>
     public event EventHandler<PlayerWithModEventArgs>? PlayerWithModAdded;
 
     private void OnPlayerConnected(IConnectedPlayer player)
@@ -223,7 +217,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         MultiplayerChat.Plugin.Log?.Info("[MPChat] Presence retry (was ignored from song)");
     }
 
-    /// <summary>Lyra waits 6 seconds before showing "X has chat" when she receives a reply.</summary>
     private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName, string? senderNameColor, bool isSlzCompanionClient)
     {
         yield return new WaitForSeconds(6f);
@@ -263,7 +256,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         return h.Length == 6 ? h : null;
     }
 
-    /// <summary>Sends "ignored from song" - recipient should retry in 3 seconds.</summary>
     private void SendPresenceIgnoredTo(string targetUserId)
     {
         if (string.IsNullOrEmpty(targetUserId)) return;
@@ -271,7 +263,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         _sessionManager.Send(BuildPresencePacket(targetUserId, ignoredFromSong: true));
     }
 
-    /// <summary>True when we're in the lobby (not during gameplay or results).</summary>
     private static bool IsInLobby()
     {
         var center = GameObject.Find("MultiplayerLobbyCenterStage");
@@ -284,7 +275,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         return host != null && host.activeInHierarchy;
     }
 
-    /// <summary>Sends presence only to the specified user (targeted reply).</summary>
     private void SendPresenceTo(string targetUserId)
     {
         if (string.IsNullOrEmpty(targetUserId)) return;
@@ -304,10 +294,8 @@ public class PlayerWithModEventArgs : EventArgs
 {
     public string UserId { get; }
     public string UserName { get; }
-    /// <summary>6-char hex without # from presence packet; null if unknown or old client.</summary>
     public string? NameColorHex { get; }
 
-    /// <summary>True when the sender runs SLZ companion mode (separate system line for non-SLZ clients).</summary>
     public bool IsSlzCompanionClient { get; }
 
     public PlayerWithModEventArgs(string userId, string userName, string? nameColorHex = null, bool isSlzCompanionClient = false)

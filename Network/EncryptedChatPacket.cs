@@ -3,33 +3,18 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Packet containing end-to-end encrypted chat message.
-/// Only players in the lobby can decrypt - the server relays encrypted bytes.
-/// </summary>
 public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     private const int MaxPayloadSize = 4096;
 
-    /// <summary>
-    /// Encrypted message bytes (AES-256-CBC + HMAC). Format: IV + Ciphertext + HMAC.
-    /// </summary>
     public byte[]? EncryptedPayload;
 
-    /// <summary>
-    /// When set, this is a DM - only sender and this user should display the message.
-    /// </summary>
     public string? TargetUserId;
 
-    /// <summary>
-    /// Sender's name color as 6-char hex (e.g. "87CEEB"). Used by other clients to display username in correct color.
-    /// </summary>
     public string? NameColor;
 
-    /// <summary>Sender's persistent 8-digit Chat ID (0.2.0 required).</summary>
     public string? SenderChatId;
 
-    /// <summary>When set with <see cref="TargetUserId"/>, DM recipient's Chat ID (0.2.0).</summary>
     public string? TargetChatId;
 
     public override void Serialize(NetDataWriter writer)

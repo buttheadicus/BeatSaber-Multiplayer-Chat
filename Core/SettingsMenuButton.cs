@@ -7,9 +7,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Registers "Multiplayer Chat Update" menu button in the main menu. Settings are in the lobby chat tab.
-/// </summary>
 public class SettingsMenuButton : MonoBehaviour, IInitializable, IDisposable
 {
     [Inject] private readonly DiContainer _container = null!;

@@ -7,10 +7,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Creates and manages the moveable floating chat panel (like BeatmapScanner).
-/// Only active in multiplayer lobby (MultiplayerLobbyInstaller). Saves position when handle is released.
-/// </summary>
 public class FloatingChatScreenCreator : IInitializable, IDisposable
 {
     private readonly FloatingChatViewController _viewController;

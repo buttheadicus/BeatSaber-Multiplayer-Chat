@@ -13,7 +13,6 @@ public class VoiceDuckSettingsViewController : BSMLAutomaticViewController
 {
     private const int DuckVolumeStepPercent = 5;
 
-    /// <summary>Fired after duck settings are written to <see cref="ModSettings"/> (parent coordinator may dismiss).</summary>
     public event Action? DuckSettingsApplied;
 
     [UIComponent("DuckEnabledToggle")] private ToggleSetting? _duckEnabledToggle;

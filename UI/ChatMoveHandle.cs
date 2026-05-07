@@ -4,10 +4,6 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Draggable handle for repositioning the lobby chat. Attach to a child of the chat root.
-/// Uses pointer delta; converts via parent's coordinate space for VR/World Space canvas.
-/// </summary>
 public class ChatMoveHandle : MonoBehaviour, IBeginDragHandler, IDragHandler
 {
     private RectTransform? _parentRect;

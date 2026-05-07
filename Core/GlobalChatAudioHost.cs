@@ -9,19 +9,10 @@ using UnityEngine.SceneManagement;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// DontDestroyOnLoad: reloads VoIP when GameCore loads/unloads (BeatTogether keeps packets during songs;
-/// lobby-scene coordinators may be gone), and optional game-audio ducking when incoming voice is active.
-/// Ducking scales non–MPChat <see cref="AudioSource"/> volumes only; <see cref="AudioListener.volume"/> is left at baseline so VoIP / voice messages are not pulled down with the listener.
-/// </summary>
 public sealed class GlobalChatAudioHost : MonoBehaviour
 {
     public static GlobalChatAudioHost? Instance { get; private set; }
 
-    /// <summary>
-    /// Song auto–mic-mute only turns off the mic if you were unmuted when the song started; in that case
-    /// <see cref="VoiceHotMicManager"/> may still transmit while PTT is held. If you were already muted, this is false.
-    /// </summary>
     public static bool SongMicCoercionAllowsPttBypass()
     {
         var inst = Instance;
@@ -41,35 +32,28 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     private bool _duckLatched;
     private float _lastVoipReloadRealtime = -999f;
     private const float VoipReloadDebounceSec = 0.45f;
-    /// <summary>When true, the next time multiplayer lobby hierarchy is active (and not GameCore), run a VoIP reload.</summary>
     private bool _lobbyVoipReloadArmed = true;
     private float _nextLobbyHierarchyPollTime;
     private float _lastIncomingVoiceRealtime = -999f;
-    /// <summary>Throttle <see cref="ChatManager.IsIncomingVoiceAudible"/> during ducking; many talkers made per-frame scans costly.</summary>
     private float _incomingVoiceAudiblePollExpiry = -999f;
     private bool _incomingVoiceAudibleCached;
     private const float IncomingVoiceAudiblePollIntervalSec = 0.045f;
     private float _nextSourceRefreshTime;
     private bool _duckVolumesApplied;
-    /// <summary>Captured when ducking starts; Beat Saber often routes gameplay through the listener.</summary>
     private float _baselineListenerVolume = 1f;
 
-    /// <summary>Tracked game <see cref="AudioSource"/> + baseline volume while ducking is active (avoid per-frame global enumeration).</summary>
     private struct DuckSourceEntry
     {
         public AudioSource Source;
         public float BaselineVolume;
     }
 
-    /// <summary>Non–MPChat sources being ducked (instance id → snapshot taken when duck engaged / periodic merge).</summary>
     private readonly Dictionary<int, DuckSourceEntry> _duckGameSourceBaselines = new(256);
 
-    /// <summary>IDs still present after one enumerator pass  -  used when pruning dead duck baselines.</summary>
     private readonly HashSet<int> _duckSeenSourceIdsScratch = new(256);
 
     private readonly List<int> _baselineDeadSweep = new(32);
 
-    /// <summary>Cheap gate for LateUpdate duck path (<see cref="FindObjectOfType{T}"/> is not free).</summary>
     private bool _duckHasCachedAudioListener = true;
 
     private float _nextCachedAudioListenerCheckTime;
@@ -171,7 +155,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         ApplySongVoicePolicy();
     }
 
-    /// <summary>One frame after GameCore transitions; full policy also runs when <see cref="TryRunVoipReload"/> finishes (GameCore + reload is the arena entry signature).</summary>
     private IEnumerator DeferredSongVoicePolicySync(string reason)
     {
         yield return null;
@@ -180,7 +163,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
             $"[MPChat][SongVoice] deferred sync ({reason}): songGameplay={MpChatLobbyDiagnostics.SongGameplayLikelyActive()} anyGameCore={MpChatLobbyDiagnostics.AnyGameCoreLoaded()} micLatch={_songMicLatch} deafLatch={_songDeafLatch}");
     }
 
-    /// <summary>Lobby tab / user: full VoIP stack reset (ignores debounce).</summary>
     public static void ForceResetVoipFromUi(string logLine)
     {
         if (Instance != null)
@@ -277,7 +259,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         }
     }
 
-    /// <summary>Call when a new incoming voice clip / hot-mic chunk starts playing (extends activity holdover).</summary>
     public static void NotifyIncomingVoiceActivity()
     {
         if (Instance != null)
@@ -371,7 +352,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         _nextSourceRefreshTime = 0f;
     }
 
-    /// <summary>Voice / UI sounds we must not duck (includes hot-mic playback under <c>MPChatHotMicPlayer</c>).</summary>
     private static bool IsModChatOrProtectedUiSound(AudioSource s)
     {
         if (s == null || s.gameObject == null)
@@ -422,7 +402,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         _nextSourceRefreshTime = Time.realtimeSinceStartup + SourceRefreshIntervalSec;
     }
 
-    /// <summary>Applies duck multiplier to tracked sources each frame; full scene scan only on periodic merge (~<see cref="SourceRefreshIntervalSec"/>).</summary>
     private void MaintainAndApplyDuckedGameAudio()
     {
         if (!_duckVolumesApplied)
@@ -498,10 +477,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         return _incomingVoiceAudibleCached;
     }
 
-    /// <summary>
-    /// Lobby often becomes visible without a reliable scene name change; poll cheaply and reload once when
-    /// returning from GameCore (or first showing lobby) while armed.
-    /// </summary>
     private void PollLobbyHierarchyForVoipReload()
     {
         if (Time.realtimeSinceStartup < _nextLobbyHierarchyPollTime)

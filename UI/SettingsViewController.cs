@@ -8,19 +8,18 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Settings view for Multiplayer Chat. Name color and bubble duration (move chat UI hidden for now).
-/// </summary>
 [ViewDefinition("MultiplayerChat.UI.SettingsView.bsml")]
 public class SettingsViewController : BSMLAutomaticViewController
 {
     private const string LabelChatBubbleSounds = "Chat bubble sounds";
     private const string LabelEnableCau = "Enable CAU";
+    private const string LabelDebugLogging = "Debug mode (verbose logs)";
 
     public event EventHandler? ApplyClicked;
 
-    /// <summary>Opens the Fused Mods sub-screen (Avatar Extras, etc.).</summary>
     public event Action? FusedModsClicked;
+
+    public event Action? AddonsClicked;
 
     [UIComponent("BubbleDuration")]
     private BeatSaberMarkupLanguage.Components.Settings.SliderSetting? _bubbleDurationSlider;
@@ -33,6 +32,9 @@ public class SettingsViewController : BSMLAutomaticViewController
 
     [UIComponent("EnableCauToggle")]
     private ToggleSetting? _enableCauToggle;
+
+    [UIComponent("DebugLoggingToggle")]
+    private ToggleSetting? _debugLoggingToggle;
 
     [UIValue("BubbleDuration")]
     private float BubbleDuration
@@ -68,8 +70,18 @@ public class SettingsViewController : BSMLAutomaticViewController
         set => ModSettings.EnableCau = value;
     }
 
+    [UIValue("DebugLogging")]
+    public bool DebugLogging
+    {
+        get => ModSettings.DebugLogging;
+        set => ModSettings.DebugLogging = value;
+    }
+
     [UIAction("FusedModsClicked")]
     private void OnFusedModsClicked() => FusedModsClicked?.Invoke();
+
+    [UIAction("AddonsClicked")]
+    private void OnAddonsClicked() => AddonsClicked?.Invoke();
 
     [UIAction("#post-parse")]
     private void PostParse()
@@ -92,16 +104,14 @@ public class SettingsViewController : BSMLAutomaticViewController
         ApplyMainSettingsToggleLabels();
     }
 
-    /// <summary>
-    /// BSML leaves <see cref="ToggleSetting"/> row text at &quot;Default Text&quot;; cleanup clears it before the parser
-    /// applies <c>text=</c> in this host context. Set labels explicitly so rows stay readable.
-    /// </summary>
     private void ApplyMainSettingsToggleLabels()
     {
         if (_chatBubbleSoundsToggle != null)
             _chatBubbleSoundsToggle.Text = LabelChatBubbleSounds;
         if (_enableCauToggle != null)
             _enableCauToggle.Text = LabelEnableCau;
+        if (_debugLoggingToggle != null)
+            _debugLoggingToggle.Text = LabelDebugLogging;
     }
 
     [UIAction("ApplyClicked")]
@@ -123,6 +133,10 @@ public class SettingsViewController : BSMLAutomaticViewController
         var cauTgl = _enableCauToggle?.GetComponentInChildren<Toggle>(true);
         if (cauTgl != null)
             ModSettings.EnableCau = cauTgl.isOn;
+
+        var debugTgl = _debugLoggingToggle?.GetComponentInChildren<Toggle>(true);
+        if (debugTgl != null)
+            ModSettings.DebugLogging = debugTgl.isOn;
 
         ApplyClicked?.Invoke(this, EventArgs.Empty);
     }

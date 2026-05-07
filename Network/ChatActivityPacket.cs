@@ -2,7 +2,6 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>Ephemeral lobby presence: typing or recording a voice message (no persistence).</summary>
 public class ChatActivityPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public const byte TypingStart = 1;
@@ -10,7 +9,6 @@ public class ChatActivityPacket : MultiplayerCore.Networking.Abstractions.MpPack
     public const byte RecordingVoiceStart = 3;
     public const byte RecordingVoiceStop = 4;
 
-    /// <summary>One of <see cref="TypingStart"/> … <see cref="RecordingVoiceStop"/>.</summary>
     public byte Activity;
 
     public string? SenderChatId;

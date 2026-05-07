@@ -6,10 +6,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Waits for GameplaySetup to be ready, then adds the TEXT CHAT entry to the MODS list.
-/// Uses BeatSaberUI so it works from both menu and lobby (no injected refs that get destroyed).
-/// </summary>
 public class GameplaySetupDeferredRegistrar : MonoBehaviour
 {
     private const string TabName = "Multiplayer Chat";

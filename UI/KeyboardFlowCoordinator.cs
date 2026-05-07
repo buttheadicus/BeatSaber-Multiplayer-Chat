@@ -4,10 +4,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// FlowCoordinator that presents the keyboard chat view.
-/// Per BSMG wiki: present via MainFlowCoordinator when MenuButton is clicked.
-/// </summary>
 public class KeyboardFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly KeyboardViewController _keyboardViewController = null!;

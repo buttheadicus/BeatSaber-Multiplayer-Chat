@@ -10,9 +10,6 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Loads and saves ChatIDConfig.dat (JSON). Thread-safe for in-memory sets.
-/// </summary>
 public class ChatIdConfigStore : IInitializable
 {
     private readonly object _lock = new();
@@ -20,7 +17,6 @@ public class ChatIdConfigStore : IInitializable
     private readonly HashSet<string> _mutedPlatformUserIds = new(StringComparer.Ordinal);
     private bool _loaded;
 
-    /// <summary>Fired after mute lists change on disk (toggle, clear, or ID reconciliation).</summary>
     public event Action? MutedStateChanged;
 
     public void Initialize()
@@ -28,7 +24,6 @@ public class ChatIdConfigStore : IInitializable
         LoadFromDisk();
     }
 
-    /// <summary>Plain JSON (legacy) or DPAPI blob like <see cref="ChatPersistentId"/>.</summary>
     private static Stream? OpenChatIdConfigJsonStream(string path)
     {
         var raw = File.ReadAllBytes(path);
@@ -154,7 +149,6 @@ public class ChatIdConfigStore : IInitializable
         MutedStateChanged?.Invoke();
     }
 
-    /// <summary>When we learn a platform user's chat ID, move a provisional mute to the stable ID list.</summary>
     public void OnChatIdLearnedForUser(string platformUserId, string chatId)
     {
         if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId)) return;

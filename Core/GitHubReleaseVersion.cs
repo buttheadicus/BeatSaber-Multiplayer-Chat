@@ -5,13 +5,8 @@ using System.Text.RegularExpressions;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// GitHub release API helpers. Prefer <see cref="ModDllAssetFileName"/> on releases; legacy mod zip naming
-/// stays supported. CAU exe assets are excluded from mod version logic.
-/// </summary>
 internal static class GitHubReleaseVersion
 {
-    /// <summary>Primary mod binary attached to Releases (flat name).</summary>
     public const string ModDllAssetFileName = "MultiplayerChat.dll";
 
     public const string ReleasesApiBase =
@@ -24,10 +19,8 @@ internal static class GitHubReleaseVersion
         @"MultiplayerChat-(\d+)\.(\d+)\.(\d+)\.zip",
         RegexOptions.IgnoreCase);
 
-    /// <summary>Fallback when no versioned zip names exist (tag_name, body, etc.).</summary>
     public static readonly Regex LooseSemverRegex = new(@"v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
 
-    /// <summary>All .zip browser_download_url values from API JSON.</summary>
     public static IEnumerable<string> ExtractReleaseZipUrls(string json)
     {
         foreach (Match m in Regex.Matches(json, @"""browser_download_url""\s*:\s*""(https://[^""]+\.zip)""",
@@ -35,9 +28,6 @@ internal static class GitHubReleaseVersion
             yield return m.Groups[1].Value;
     }
 
-    /// <summary>
-    /// Release **upload** zips only: excludes GitHub source archives and the CAU asset.
-    /// </summary>
     public static bool IsModMultiplayerChatZipUrl(string url)
     {
         if (string.IsNullOrEmpty(url)) return false;
@@ -77,7 +67,6 @@ internal static class GitHubReleaseVersion
         }
     }
 
-    /// <summary>Tag folder in /releases/download/TAG/file.zip (e.g. v0.2.1).</summary>
     public static bool TryParseVersionFromMultiplayerChatZipUrl(string url, out string version)
     {
         version = "";
@@ -95,7 +84,6 @@ internal static class GitHubReleaseVersion
         return true;
     }
 
-    /// <summary>Legacy: max version from mod zip URLs only when no DLL asset is used.</summary>
     public static bool TryGetLatestVersionFromModZips(string json, out string version)
     {
         version = "";
@@ -122,9 +110,6 @@ internal static class GitHubReleaseVersion
         return true;
     }
 
-    /// <summary>
-    /// When the release includes <see cref="ModDllAssetFileName"/>, use <c>tag_name</c> as semver (supports leading v).
-    /// </summary>
     public static bool TryGetLatestVersionFromModDllRelease(string json, out string version)
     {
         version = "";
@@ -164,17 +149,11 @@ internal static class GitHubReleaseVersion
         }
     }
 
-    /// <summary>Asset name published on the CAU repo's GitHub Releases.</summary>
     public const string CauExeAssetFileName = "Chat.Auto.Updater.CAU.exe";
 
-    /// <summary>
-    /// Standalone CAU repository (<see cref="CauRepoReleasesLatestApi"/>).
-    /// Repo slug includes trailing hyphen per GitHub URL.
-    /// </summary>
     public const string CauRepoReleasesLatestApi =
         "https://api.github.com/repos/buttheadicus/Chat-Auto-Updater-CAU-/releases/latest";
 
-    /// <summary>Parse a GitHub release API JSON payload for the CAU executable download URL.</summary>
     public static bool TryGetCauExeDownloadUrl(string releaseApiJson, out string url)
     {
         url = "";
@@ -200,7 +179,6 @@ internal static class GitHubReleaseVersion
         return false;
     }
 
-    /// <summary>Fallback only.</summary>
     public static bool TryGetLatestVersionLoose(string json, out string version)
     {
         version = "";

@@ -6,9 +6,6 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Floating "Mute" / "Unmute" for hot mic, placed above the host START / lobby setup bar when possible.
-/// </summary>
 public class FloatingHotMicMuteButton : MonoBehaviour
 {
     private static readonly Color AccentBlue = new(0.32f, 0.58f, 1f, 1f);

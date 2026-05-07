@@ -2,9 +2,6 @@ using MultiplayerCore.Models;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// 0.2.0 wire rules: every MPChat packet must carry a valid sender Chat ID; DM packets also carry the recipient's Chat ID.
-/// </summary>
 internal static class ChatPacketIdValidation
 {
     public static bool TryAcceptSenderChatId(string? senderChatId, IConnectedPlayer sender, ChatPlayerIdRegistry registry)
@@ -19,8 +16,6 @@ internal static class ChatPacketIdValidation
         return true;
     }
 
-    /// <summary>
-    /// Global: both targets empty. DM: both non-empty. Any other combination is invalid for 0.2.0.</summary>
     public static bool TryParseDmRouting(string? targetUserId, string? targetChatId, out bool isDm)
     {
         var hasUser = !string.IsNullOrEmpty(targetUserId);
@@ -41,8 +36,6 @@ internal static class ChatPacketIdValidation
         return false;
     }
 
-    /// <summary>
-    /// After sender Chat ID validation: global everyone processes; DM only sender and recipient (matching platform id and Chat ID).</summary>
     public static bool IsLocalParticipant(string? targetUserId, string? targetChatId, bool isDm, string? localUserId, string senderUserId)
     {
         if (!isDm)

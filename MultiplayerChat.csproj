@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>MultiplayerChat</AssemblyName>
     <RootNamespace>MultiplayerChat</RootNamespace>
-    <Version>0.3.1</Version>
+    <Version>0.3.2</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
     <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
@@ -14,9 +14,14 @@
     <NoWarn>CS0618;CS1591;CS0649;CS0436</NoWarn>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- nicoco007 plugin is usually CustomAvatar.dll; some installs use CustomAvatars.dll -->
+    <CustomAvatarHintPath Condition="Exists('$(BeatSaberDir)\Plugins\CustomAvatar.dll')">$(BeatSaberDir)\Plugins\CustomAvatar.dll</CustomAvatarHintPath>
+    <CustomAvatarHintPath Condition="'$(CustomAvatarHintPath)' == '' and Exists('$(BeatSaberDir)\Plugins\CustomAvatars.dll')">$(BeatSaberDir)\Plugins\CustomAvatars.dll</CustomAvatarHintPath>
+    <CustomAvatarHintPath Condition="'$(CustomAvatarHintPath)' == ''">$(BeatSaberDir)\Plugins\CustomAvatar.dll</CustomAvatarHintPath>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="SlzMarkerTool\**" />
+    <Compile Remove="_reflect\**" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Sounds\Chat.ogg" CopyToOutputDirectory="PreserveNewest" />
@@ -109,6 +114,14 @@
     <Reference Include="Interactable">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Interactable.dll</HintPath>
     </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(BeatSaberDir)\Libs\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="CustomAvatar">
+      <HintPath>$(CustomAvatarHintPath)</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Networking">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Networking.dll</HintPath>
     </Reference>
@@ -120,6 +133,10 @@
     </Reference>
     <Reference Include="Main">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Main.dll</HintPath>
+    </Reference>
+    <Reference Include="Tweening">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Tweening.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="$(BeatSaberDir)\Plugins\MultiplayerCore.dll" Publicize="true">
       <Private>False</Private>
@@ -204,8 +221,20 @@
     <EmbeddedResource Include="UI\FusedModsSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.FusedModsSettingsView.bsml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\CustomAvatarsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.CustomAvatarsSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="UI\VoiceDuckSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.VoiceDuckSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\AvatarNameEntryView.bsml">
+      <LogicalName>MultiplayerChat.UI.AvatarNameEntryView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\AvatarLoadListView.bsml">
+      <LogicalName>MultiplayerChat.UI.AvatarLoadListView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\AddonsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.AddonsSettingsView.bsml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="AvatarExtras\Assets\Sprites\Glasses.png">
       <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.Glasses.png</LogicalName>

@@ -6,9 +6,6 @@ using BeatSaber.BeatAvatarAdapter.AvatarEditor;
 
 namespace MultiplayerChat.AvatarExtras.UI;
 
-/// <summary>
-/// Clone the vanilla hands row under <c>EditPanel</c>.
-/// </summary>
 public class CustomAvatarOptionField : MonoBehaviour
 {
     private const float HorizontalOffset = -.02f;

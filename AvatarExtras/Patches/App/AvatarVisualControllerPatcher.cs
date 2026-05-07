@@ -12,12 +12,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.AvatarExtras.Patches.App;
 
-/// <summary>
-/// Packed glasses/beard in <see cref="AvatarData.facialHairId"/>: vanilla <see cref="BeatAvatarVisualController.UpdateAvatarVisual"/>
-/// assigns meshes before our postfix  -  facial <see cref="AvatarData.facialHairId"/> breaks <c>GetById</c>, so the stock
-/// <c>UpdateAvatarColors</c> inside visual runs on the wrong mesh. Prefix syncs <c>glassesId</c>; postfix corrects meshes then
-/// re-runs stock <c>UpdateAvatarColors</c> when meshes change (<see cref="AvatarPropertyBlockColorSetter"/> + MPB).
-/// </summary>
 public class AvatarVisualControllerPatcher : IAffinity
 {
     private static readonly Dictionary<string, Material> OriginalMaterialsCache = new();
@@ -38,9 +32,6 @@ public class AvatarVisualControllerPatcher : IAffinity
         "UpdateAvatarColors",
         BindingFlags.Instance | BindingFlags.NonPublic);
 
-    /// <summary>
-    /// Before vanilla assigns meshes: mirror packed ids so <c>GetById(avatarData.glassesId)</c> sees a real glasses id.
-    /// </summary>
     [AffinityPatch(typeof(BeatAvatarVisualController), nameof(BeatAvatarVisualController.UpdateAvatarVisual))]
     [AffinityPrefix]
     public void PrefixUpdateAvatarVisual(AvatarData avatarData, BeatAvatarVisualController __instance)
@@ -219,7 +210,6 @@ public class AvatarVisualControllerPatcher : IAffinity
             NativePartSharedBaselineByRenderer.Remove(r.GetInstanceID());
     }
 
-    /// <returns><see langword="true"/> if MPB was cleared (real mesh swap).</returns>
     private static bool MaybeResetRendererStateAfterMeshSwap(MeshFilter filter, Mesh newMesh)
     {
         var id = filter.GetInstanceID();
@@ -262,11 +252,6 @@ public class AvatarVisualControllerPatcher : IAffinity
         RestoreNativeMaterial(mesh);
     }
 
-    /// <summary>
-    /// Rainbow / flat fallback. With packed optional parts, third-party avatar shader replacers (e.g. Naluluna) can
-    /// leave stock <see cref="AvatarPropertyBlockColorSetter"/> tints black  -  <paramref name="forceFlatOverride"/>
-    /// swaps to a dedicated unlit (or safe fallback) material so wheel colors always show.
-    /// </summary>
     private static void ApplyCustomPartColor(MeshRenderer mesh, AvatarPropertyBlockColorSetter? setter,
         Color targetColor, bool forceFlatOverride = false)
     {
@@ -340,10 +325,6 @@ public class AvatarVisualControllerPatcher : IAffinity
         LastAccessoryFlatColorByRenderer[rid] = color;
     }
 
-    /// <summary>
-    /// <see cref="AvatarPropertyBlockColorSetter.UpdateRenderer"/> reapplies Beat Avatar MPB after our tint; for packed
-    /// flat materials that leaves the wrong block on the renderer. Reassert material colors after MPB runs.
-    /// </summary>
     [AffinityPatch(typeof(AvatarPropertyBlockColorSetter), "UpdateRenderer")]
     [AffinityPostfix]
     public void PostfixAvatarPropertyBlockColorSetterUpdateRenderer(AvatarPropertyBlockColorSetter __instance)

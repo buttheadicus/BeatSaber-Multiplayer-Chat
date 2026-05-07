@@ -1,14 +1,12 @@
 using System;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
+using MultiplayerChat.Core;
 
 namespace MultiplayerChat.Settings;
 
-/// <summary>
-/// Stores <see cref="ModSettings"/> under Beat Saber LocalLow next to Chat ID files (<see cref="ChatIdFilePaths"/>).
-/// Migrates once from Unity PlayerPrefs and legacy <c>MultiplayerChat.ModFlags.json</c> when the settings file is absent or invalid.
-/// </summary>
 internal static class ModSettingsPersistence
 {
     private static readonly object Gate = new();
@@ -17,9 +15,19 @@ internal static class ModSettingsPersistence
 
     private static string FilePath => ChatIdFilePaths.ModSettingsFilePath;
 
+    internal sealed class AddonsSettingsSection
+    {
+        [JsonProperty("enableAvatarColoringExtensions")]
+        public bool EnableAvatarColoringExtensions { get; set; }
+    }
+
+    internal sealed class PerformanceSettingsSection
+    {
+    }
+
     internal sealed class Data
     {
-        [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 1;
+        [JsonProperty("schemaVersion")] public int SchemaVersion { get; set; } = 2;
 
         [JsonProperty("bubbleDuration")] public float BubbleDuration { get; set; } = 15f;
 
@@ -51,7 +59,19 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("enableAvatarExtensions")] public bool EnableAvatarExtensions { get; set; }
 
+        [JsonProperty("enableLobbyCustomAvatars")] public bool EnableLobbyCustomAvatars { get; set; }
+
+        [JsonProperty("lobbyCustomAvatarRelativePath")] public string LobbyCustomAvatarRelativePath { get; set; } = "";
+
+        [JsonProperty("lobbyCustomAvatarContentHash")] public string LobbyCustomAvatarContentHash { get; set; } = "";
+
         [JsonProperty("enableCau")] public bool EnableCau { get; set; }
+
+        [JsonProperty("debugLogging")] public bool DebugLogging { get; set; }
+
+        [JsonProperty("addons")] public AddonsSettingsSection Addons { get; set; } = null!;
+
+        [JsonProperty("performance")] public PerformanceSettingsSection Performance { get; set; } = null!;
     }
 
     private sealed class LegacyModFlagsDto
@@ -95,11 +115,14 @@ internal static class ModSettingsPersistence
                     if (File.Exists(path))
                     {
                         var json = File.ReadAllText(path);
-                        var dto = JsonConvert.DeserializeObject<Data>(json);
+                        var jo = JObject.Parse(json);
+                        var dto = jo.ToObject<Data>();
                         if (dto != null && dto.SchemaVersion >= 1)
                         {
+                            CoalesceAddonsPerformanceSections(dto, jo);
                             Normalize(dto);
                             _cache = dto;
+                            PushNameColorToInstallExtensions(_cache.NameColor);
                             return _cache;
                         }
                     }
@@ -112,6 +135,7 @@ internal static class ModSettingsPersistence
                 _cache = MigrateFromLegacy();
                 Normalize(_cache);
                 SaveLocked();
+                PushNameColorToInstallExtensions(_cache.NameColor);
                 return _cache;
             }
         }
@@ -136,6 +160,7 @@ internal static class ModSettingsPersistence
         {
             Directory.CreateDirectory(ChatIdFilePaths.RootDirectory);
             File.WriteAllText(FilePath, JsonConvert.SerializeObject(_cache, Formatting.Indented));
+            PushNameColorToInstallExtensions(_cache.NameColor);
         }
         catch (Exception ex)
         {
@@ -143,8 +168,50 @@ internal static class ModSettingsPersistence
         }
     }
 
+    private static void CoalesceAddonsPerformanceSections(Data d, JObject? sourceJo)
+    {
+        d.Addons ??= new AddonsSettingsSection();
+        d.Performance ??= new PerformanceSettingsSection();
+
+        if (sourceJo == null)
+        {
+            if (d.SchemaVersion < 2)
+                d.SchemaVersion = 2;
+            return;
+        }
+
+        var addonsObj = sourceJo["addons"] as JObject;
+        var nestedDefined = addonsObj != null &&
+                            addonsObj.TryGetValue("enableAvatarColoringExtensions", out var nestedTok) &&
+                            nestedTok != null &&
+                            nestedTok.Type != JTokenType.Null &&
+                            nestedTok.Type != JTokenType.Undefined;
+
+        if (!nestedDefined &&
+            sourceJo.TryGetValue("enableAvatarColoringExtensions", out var legacyTok) &&
+            legacyTok != null &&
+            legacyTok.Type != JTokenType.Null &&
+            legacyTok.Type != JTokenType.Undefined)
+        {
+            try
+            {
+                d.Addons.EnableAvatarColoringExtensions = legacyTok.Value<bool>();
+            }
+            catch
+            {
+                // ignore bad legacy token
+            }
+        }
+
+        if (d.SchemaVersion < 2)
+            d.SchemaVersion = 2;
+    }
+
     private static void Normalize(Data d)
     {
+        d.Addons ??= new AddonsSettingsSection();
+        d.Performance ??= new PerformanceSettingsSection();
+
         d.BubbleDuration = Mathf.Clamp(d.BubbleDuration, 15f, 60f);
         d.PttBindingIndex = Mathf.Clamp(d.PttBindingIndex, 0, 3);
         d.VoiceDuckTargetPercent = Mathf.Clamp(d.VoiceDuckTargetPercent, 5, 100);
@@ -154,6 +221,30 @@ internal static class ModSettingsPersistence
         if (hex.Length != 6 || !IsValidHex(hex))
             hex = "87CEEB";
         d.NameColor = hex;
+
+        var desc = (d.LobbyCustomAvatarRelativePath ?? "").Trim();
+        if (desc.Length > 260)
+            desc = desc.Substring(0, 260);
+        d.LobbyCustomAvatarRelativePath = desc.Replace('\\', '/');
+
+        var hash = (d.LobbyCustomAvatarContentHash ?? "").Trim().ToUpperInvariant();
+        if (hash.Length > 32)
+            hash = hash.Substring(0, 32);
+        d.LobbyCustomAvatarContentHash = CustomAvatarHashUtil.LooksLikeMd5Hex(hash) ? hash : "";
+    }
+
+    private static void PushNameColorToInstallExtensions(string normalizedHex6)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(normalizedHex6) || normalizedHex6.Length != 6 || !IsValidHex(normalizedHex6))
+                return;
+            MultiplayerExtensionsJson.SetPlayerColorHex(normalizedHex6);
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     private static bool IsValidHex(string s)
@@ -167,7 +258,12 @@ internal static class ModSettingsPersistence
 
     private static Data MigrateFromLegacy()
     {
-        var d = new Data();
+        var d = new Data
+        {
+            SchemaVersion = 2,
+            Addons = new AddonsSettingsSection(),
+            Performance = new PerformanceSettingsSection()
+        };
 
         if (PlayerPrefs.HasKey(LegacyKeys.BubbleDuration))
             d.BubbleDuration = PlayerPrefs.GetFloat(LegacyKeys.BubbleDuration);

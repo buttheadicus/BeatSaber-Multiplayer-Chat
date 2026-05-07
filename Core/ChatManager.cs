@@ -16,7 +16,6 @@ public class ChatManager : IInitializable, IDisposable
 {
     public static ChatManager? Instance { get; private set; }
 
-    /// <summary>Lobby/menu-scoped instance (GameCore gets a separate <see cref="ChatManager"/>; see <see cref="Dispose"/>).</summary>
     private static ChatManager? _lobbyScopeChatManager;
 
     public event EventHandler<ChatMessageEventArgs>? MessageReceived;
@@ -43,7 +42,6 @@ public class ChatManager : IInitializable, IDisposable
     private float? _lastTalkToIntroDisplayAt;
     private float? _lastTalkToStopDisplayAt;
 
-    /// <summary>Senders who notified us they talk-to'd us before we added them; used for mutual line when we add them back.</summary>
     private readonly HashSet<string> _talkToMutualPendingFrom = new(StringComparer.Ordinal);
 
     private const float OutgoingTalkToNotifyCooldownSeconds = 60f;
@@ -53,7 +51,6 @@ public class ChatManager : IInitializable, IDisposable
     private float? _lastListenToIntroDisplayAt;
     private float? _lastListenToStopDisplayAt;
 
-    /// <summary>Senders who notified us they listen-filtered us before we added them; used for mutual line when we add them back.</summary>
     private readonly HashSet<string> _listenToMutualPendingFrom = new(StringComparer.Ordinal);
 
     private const float OutgoingListenToNotifyCooldownSeconds = 60f;
@@ -73,35 +70,25 @@ public class ChatManager : IInitializable, IDisposable
 
     private readonly Dictionary<string, Queue<byte[]>> _hotMicIncoming = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Coroutine> _hotMicUserCoroutines = new(StringComparer.Ordinal);
-    /// <summary>Per remote sender: parent for one-shot <see cref="AudioSource"/> children (Unity cannot safely stack <see cref="AudioSource.PlayScheduled"/> on one source by reassigning <see cref="AudioSource.clip"/>).</summary>
     private readonly Dictionary<string, HotMicSequentialPlayer> _hotMicSequentialPlayers = new(StringComparer.Ordinal);
-    /// <summary>Next <see cref="AudioSettings.dspTime"/> at which this sender's following hot-mic clip should start (end of previous clip).</summary>
     private readonly Dictionary<string, double> _hotMicNextPlayDsp = new(StringComparer.Ordinal);
-    /// <summary>Last PCM frame of the previous <see cref="AudioSource.PlayScheduled"/> segment (per sender) for boundary crossfades.</summary>
     private readonly Dictionary<string, float[]> _hotMicLastScheduledFrameByUserId = new(StringComparer.Ordinal);
 
-    /// <summary>Pre-encrypt VHOT blobs waiting until <see cref="IsHotMicEncryptionSessionReady"/> (same key as receivers).</summary>
     private readonly Queue<byte[]> _hotMicOutboundPending = new();
 
     private const int MaxHotMicOutboundPendingChunks = 48;
 
     private const int MaxHotMicCoalesceChunks = 24;
     private const int HotMicCoalesceCrossfadeFrames = 96;
-    /// <summary>Minimal prefetch; <see cref="AudioSource.PlayScheduled"/> covers inter-chunk alignment.</summary>
     private const int HotMicJitterPrefetchPackets = 1;
     private const float HotMicJitterPrefetchTimeoutSec = 0.09f;
     private const float HotMicInterChunkSpinTimeoutSec = 0.65f;
     private const float HotMicJitterEmptyQueueGiveUpSec = 0.4f;
-    /// <summary>Short coalesce tail  -  scheduling removes the need for long merge waits.</summary>
     private const float HotMicCoalesceMergeTailWaitSec = 0.028f;
-    /// <summary>Cap coalesced clips scheduled in one pump so a deep queue cannot stall the main thread.</summary>
     private const int MaxHotMicClipsScheduledPerPump = 32;
-    /// <summary>First-clip delay (seconds) so enough packets arrive and following chunks can be scheduled before playout. 0.5 = 500 ms if you want even more cushion.</summary>
     private const double HotMicPlayScheduleLeadSec = 0.25;
     private const double HotMicPlayScheduleMinLeadSec = 0.002;
-    /// <summary>If the chain head is this far behind <see cref="AudioSettings.dspTime"/>, treat as a new burst.</summary>
     private const double HotMicPlayScheduleStaleChainSec = 0.08;
-    /// <summary>Cosine blend at the start of each scheduled clip vs the end of the previous (reduces boundary clicks).</summary>
     private const int HotMicScheduledBoundaryCrossfadeFrames = 44;
 
     public void Initialize()
@@ -118,6 +105,7 @@ public class ChatManager : IInitializable, IDisposable
         _sessionManager.playerConnectedEvent += OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent += OnPlayerDisconnected;
         UpdateEncryptionKey();
+        MpChatRuntimeAudit.LogAfterLobbyChatInit(_sessionManager, _encryption, !IsGameCoreSceneContext());
     }
 
     public void Dispose()
@@ -168,12 +156,6 @@ public class ChatManager : IInitializable, IDisposable
     private bool IsGameCoreSceneContext() =>
         _coroutineHost != null && MpChatSceneScope.IsGameCoreHost(_coroutineHost);
 
-    /// <summary>
-    /// Clears voice playback state and refreshes the session key (scene transitions).
-    /// Hot mic uses the same AudioClip path as voice messages so it works in GameCore.
-    /// Re-binds <strong>all</strong> chat packet callbacks: a stale GameCore <see cref="ChatManager"/> dispose can unregister
-    /// shared serializer handlers and leave the lobby instance without <see cref="EncryptedChatPacket"/> routing.
-    /// </summary>
     public void ReloadVoiceHotMicPipeline()
     {
         LogVoipReloadContext("ReloadVoiceHotMicPipeline enter");
@@ -186,7 +168,6 @@ public class ChatManager : IInitializable, IDisposable
         LogVoipReloadContext("ReloadVoiceHotMicPipeline exit");
     }
 
-    /// <summary>Hard reset: stops all hot mic and voice-message playback, clears queues, rebinds packet handlers, refreshes crypto.</summary>
     public void ForceFullVoipReset()
     {
         MpChatLobbyDiagnostics.LogVoipTransition("ChatManager:ForceFullVoipReset:enter", null);
@@ -196,7 +177,6 @@ public class ChatManager : IInitializable, IDisposable
         MpChatLobbyDiagnostics.LogVoipTransition("ChatManager:ForceFullVoipReset:exit", null);
     }
 
-    /// <summary>Verbose diagnostics when VoIP pipeline is rebound (arena → lobby regressions).</summary>
     public void LogVoipReloadContext(string tag)
     {
         if (!MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
@@ -219,6 +199,7 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.RegisterCallback<ChatActivityPacket>(OnChatActivityReceived);
         // New packet types must be registered last so existing packet IDs stay stable across mod updates.
         _packetSerializer.RegisterCallback<ListenToNotifyPacket>(OnListenToNotifyReceived);
+        _packetSerializer.RegisterCallback<MpCustomAvatarPosePacket>(OnMpCustomAvatarPoseReceived);
     }
 
     private void UnregisterPacketCallbacks()
@@ -232,6 +213,7 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.UnregisterCallback<VoiceDeafenStatePacket>();
         _packetSerializer.UnregisterCallback<ChatActivityPacket>();
         _packetSerializer.UnregisterCallback<ListenToNotifyPacket>();
+        _packetSerializer.UnregisterCallback<MpCustomAvatarPosePacket>();
     }
 
     private void OnPlayerConnected(IConnectedPlayer player)
@@ -247,6 +229,8 @@ public class ChatManager : IInitializable, IDisposable
         {
             ClearHotMicForUser(player.userId);
             VoiceChatRuntimeState.RemoveListenUserId(player.userId);
+            if (MpChatFeatures.LobbyCustomAvatars)
+                MpCustomAvatarSyncManager.ClearRemote(player.userId);
         }
 
         UpdateEncryptionKey();
@@ -268,7 +252,6 @@ public class ChatManager : IInitializable, IDisposable
         DestroyHotMicSequentialSource(userId);
     }
 
-    /// <summary>Estimated ms of hot-mic audio still queued for this sender (excludes the clip currently playing).</summary>
     public float GetHotMicQueuedDurationMs(string userId)
     {
         if (string.IsNullOrEmpty(userId) || !_hotMicIncoming.TryGetValue(userId, out var q))
@@ -276,7 +259,6 @@ public class ChatManager : IInitializable, IDisposable
         return EstimateHotMicQueueDurationMs(q);
     }
 
-    /// <summary>True while incoming voice message or hot mic is playing, queued, or actively being drained (for ducking / activity).</summary>
     public bool IsIncomingVoiceAudible()
     {
         if (_voicePlaybackAudioSource != null && _voicePlaybackAudioSource && _voicePlaybackAudioSource.isPlaying)
@@ -310,9 +292,6 @@ public class ChatManager : IInitializable, IDisposable
         return false;
     }
 
-    /// <summary>
-    /// Returns all players in the lobby (connected + local). Use this for player list UIs.
-    /// </summary>
     public IConnectedPlayer[] GetLobbyPlayers()
     {
         var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
@@ -323,11 +302,6 @@ public class ChatManager : IInitializable, IDisposable
         return list.ToArray();
     }
 
-    /// <summary>
-    /// True if a multiplayer peer is present for broadcast VHOT (not solo). Uses both
-    /// <see cref="GetLobbyPlayers"/> and <see cref="IMultiplayerSessionManager.connectedPlayers"/> because either can
-    /// briefly lead the other around <see cref="IMultiplayerSessionManager.playerConnectedEvent"/>.
-    /// </summary>
     private bool HasRemotePeerInSession()
     {
         if (GetLobbyPlayers().Length >= 2)
@@ -344,10 +318,6 @@ public class ChatManager : IInitializable, IDisposable
         return false;
     }
 
-    /// <summary>
-    /// Builds the participant id set for session key derivation: <see cref="GetLobbyPlayers"/>,
-    /// <see cref="IMultiplayerSessionManager.connectedPlayers"/>, local player, and any extra ids (sender, DM target, etc.).
-    /// </summary>
     private List<string> CollectEncryptionParticipantIds(params string?[] extraUserIds)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
@@ -379,19 +349,11 @@ public class ChatManager : IInitializable, IDisposable
         return ids.ToList();
     }
 
-    /// <summary>Derives the AES session key from lobby membership + extras (sender, DM target, …).</summary>
     private void UpdateEncryptionKey(params string?[] extraUserIds)
     {
         _encryption.UpdateSessionKey(CollectEncryptionParticipantIds(extraUserIds));
     }
 
-    /// <summary>Sends an encrypted chat message. In DM mode, <see cref="EncryptedChatPacket.TargetUserId"/> is the intended recipient.</summary>
-    /// <returns>True if the message was sent; false if rate-limited or validation/encrypt failed.</returns>
-    /// <remarks>
-    /// Multiplayer delivers custom packets to every client in the lobby. DM is enforced in software: only the sender
-    /// and the client whose <c>userId</c> matches <c>TargetUserId</c> decrypt and display (see <see cref="OnPacketReceived"/>).
-    /// 0.2.0 requires a valid local Chat ID and DM packets include the recipient's Chat ID.
-    /// </remarks>
     public bool SendMessage(string text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -485,7 +447,6 @@ public class ChatManager : IInitializable, IDisposable
         MessageReceived?.Invoke(this, e);
     }
 
-    /// <summary>Notifies the target that they have been muted or unmuted by the local player.</summary>
     public void SendMuteNotifyTo(string targetPlatformUserId, bool nowMuted)
     {
         if (string.IsNullOrEmpty(targetPlatformUserId)) return;
@@ -527,7 +488,6 @@ public class ChatManager : IInitializable, IDisposable
             _lastOutgoingUnmutePlayerNotifyAt = Time.realtimeSinceStartup;
     }
 
-    /// <summary>Notifies the DM partner that the local player ended DM mode.</summary>
     public void SendDmStoppedNotify(string targetPlatformUserId, string? targetChatId)
     {
         if (string.IsNullOrEmpty(targetPlatformUserId)) return;
@@ -544,7 +504,6 @@ public class ChatManager : IInitializable, IDisposable
         });
     }
 
-    /// <summary>Stops the currently playing voice clip and clears the playback queue.</summary>
     public void ForceStopVoicePlayback()
     {
         _voicePlaybackQueue.Clear();
@@ -581,7 +540,6 @@ public class ChatManager : IInitializable, IDisposable
         DestroyAllHotMicSequentialSources();
     }
 
-    /// <summary>Notify lobby that the local player toggled deafen (others show a system line, with cooldown).</summary>
     public void SendVoiceDeafenStateNotify(bool isDeaf)
     {
         if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
@@ -594,7 +552,6 @@ public class ChatManager : IInitializable, IDisposable
         });
     }
 
-    /// <summary>Broadcast ephemeral lobby presence (typing / recording voice). See <see cref="ChatActivityPacket"/> kinds.</summary>
     public void BroadcastChatActivity(byte activityKind)
     {
         if (activityKind == 0) return;
@@ -833,6 +790,18 @@ public class ChatManager : IInitializable, IDisposable
         PostSystemMessageRich(SystemLineWithColoredPlayerName(name, introTail + alsoOthers, packet.SenderNameColor));
     }
 
+    private void OnMpCustomAvatarPoseReceived(MpCustomAvatarPosePacket packet, IConnectedPlayer sender)
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars)
+            return;
+        if (sender == null || string.IsNullOrEmpty(sender.userId))
+            return;
+        var localPlayer = _sessionManager.localPlayer;
+        if (localPlayer != null && sender.userId == localPlayer.userId)
+            return;
+        MpCustomAvatarSyncManager.ApplyReceived(sender.userId, packet);
+    }
+
     private static string BuildOxfordAmpersandList(IReadOnlyList<string> escapedDisplayNames)
     {
         if (escapedDisplayNames.Count == 0) return "";
@@ -920,7 +889,6 @@ public class ChatManager : IInitializable, IDisposable
         NotifyMessageReceived(new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
     }
 
-    /// <summary>Post a system message to the chat (e.g. "USERNAME has chat! They can see your messages!").</summary>
     public void PostSystemMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
@@ -928,14 +896,12 @@ public class ChatManager : IInitializable, IDisposable
         MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true, nameColor: null));
     }
 
-    /// <summary>System line with TMP rich text (caller must escape user-controlled segments; use <see cref="SystemLineWithColoredPlayerName"/>).</summary>
     public void PostSystemMessageRich(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
         MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true, nameColor: null, systemMessageRichText: true));
     }
 
-    /// <summary>Builds a system line with the player's display name in their chosen color; escapes name and suffix for TMP.</summary>
     public static string SystemLineWithColoredPlayerName(string playerDisplayName, string tailAfterName, string? nameColorHex)
     {
         var hex = NormalizeHexForPacket(nameColorHex) ?? "87CEEB";
@@ -944,7 +910,6 @@ public class ChatManager : IInitializable, IDisposable
         return $"<color=#{hex}>{safeName}</color>{safeTail}";
     }
 
-    /// <summary>Rich system line: "You and NAME are now DMing eachother."</summary>
     public static string BuildMutualDmLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
@@ -952,7 +917,6 @@ public class ChatManager : IInitializable, IDisposable
         return "You and " + $"<color=#{hex}>{safeName}</color> are now DMing eachother.";
     }
 
-    /// <summary>Rich system line when both players have each other in talk-to.</summary>
     public static string BuildMutualTalkToLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
@@ -960,7 +924,6 @@ public class ChatManager : IInitializable, IDisposable
         return "You and " + $"<color=#{hex}>{safeName}</color> are now talking to each other.";
     }
 
-    /// <summary>Rich system line when both players have each other in listen-only filter.</summary>
     public static string BuildMutualListenLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
@@ -968,7 +931,6 @@ public class ChatManager : IInitializable, IDisposable
         return "You and " + $"<color=#{hex}>{safeName}</color> are now listening to each other.";
     }
 
-    /// <summary>Call after <see cref="VoiceChatRuntimeState.ToggleTalkTo"/> to notify peers (add/remove).</summary>
     public void AfterTalkToSelectionChanged(HashSet<string> previousTalkToIds)
     {
         var current = VoiceChatRuntimeState.CopyTalkToUserIds();
@@ -1064,7 +1026,6 @@ public class ChatManager : IInitializable, IDisposable
             _lastOutgoingTalkToNotifyAtByTarget.Remove(targetPlatformUserId);
     }
 
-    /// <summary>Call after <see cref="VoiceChatRuntimeState.ToggleListen"/> to notify peers (add/remove).</summary>
     public void AfterListenSelectionChanged(HashSet<string> previousListenUserIds)
     {
         var current = VoiceChatRuntimeState.CopyListenUserIds();
@@ -1147,9 +1108,6 @@ public class ChatManager : IInitializable, IDisposable
             _lastOutgoingListenToNotifyAtByTarget.Remove(targetPlatformUserId);
     }
 
-    /// <summary>Sends encrypted voice. In DM mode, <see cref="VoiceMessagePacket.TargetUserId"/> is the intended recipient.</summary>
-    /// <returns>True if the voice packet was sent.</returns>
-    /// <remarks>Same broadcast + client filter model as text chat; see <see cref="SendMessage"/>.</remarks>
     public bool SendVoiceMessage(byte[] voicePlainBlob)
     {
         if (voicePlainBlob == null || voicePlainBlob.Length == 0)
@@ -1215,9 +1173,6 @@ public class ChatManager : IInitializable, IDisposable
         _hotMicOutboundPending.Enqueue((byte[])voicePlainBlob.Clone());
     }
 
-    /// <summary>
-    /// Broadcast hot mic: with normal encryption, session key must match receivers (queued until ready).
-    /// </summary>
     private bool IsHotMicEncryptionSessionReady()
     {
         if (VoiceChatRuntimeState.TalkToUserIds.Count > 0)
@@ -1254,7 +1209,6 @@ public class ChatManager : IInitializable, IDisposable
         return ok;
     }
 
-    /// <summary>Hot mic chunks: no chat/voice cooldown; same encryption and DM/talk-to routing as voice messages.</summary>
     public bool SendVoiceHotMicChunk(byte[] voicePlainBlob)
     {
         if (voicePlainBlob == null || voicePlainBlob.Length == 0)
@@ -1285,7 +1239,6 @@ public class ChatManager : IInitializable, IDisposable
         return SendVoiceHotMicChunkInternal(voicePlainBlob);
     }
 
-    /// <summary>One encrypted voice blob, one or more packets (multi talk-to or broadcast / single DM).</summary>
     private bool TrySendEncryptedVoiceToTargets(byte[] encrypted)
     {
         var nameColor = NormalizeHexForPacket(ModSettings.NameColor);
@@ -1334,10 +1287,6 @@ public class ChatManager : IInitializable, IDisposable
         return true;
     }
 
-    /// <summary>
-    /// Outgoing voice uses <see cref="IMultiplayerSessionManager.Send"/> (same custom-packet channel as MultiplayerCore).
-    /// A full bypass of that stack for VoIP would need a parallel transport (e.g. Steam P2P or negotiated UDP) and matching receive.
-    /// </summary>
     private void SendVoiceMessagePacket(VoiceMessagePacket voicePacket) => _sessionManager.Send(voicePacket);
 
     private static bool IsEffectivelyDeafForIncomingVoice() => VoiceChatRuntimeState.IsDeaf;
@@ -1439,7 +1388,6 @@ public class ChatManager : IInitializable, IDisposable
             _voicePlaybackCoroutine = _coroutineHost.StartCoroutine(VoicePlaybackQueueRunner());
     }
 
-    /// <summary>Disabled: dropping queued voice messages caused audible truncation/clicks; backlog plays in full.</summary>
     private void TrimVoiceMessageQueueToTargetLatency()
     {
     }
@@ -1479,8 +1427,6 @@ public class ChatManager : IInitializable, IDisposable
         }
     }
 
-    /// <summary>Waits until the clip has finished on the audio device. Using <see cref="WaitForSeconds"/> with
-    /// <see cref="AudioClip.length"/> drifts from real playback over time (Time vs DSP clock).</summary>
     private static IEnumerator WaitForAudioSourceClipEnd(AudioSource src, AudioClip clip)
     {
         if (src == null || clip == null)
@@ -1528,7 +1474,6 @@ public class ChatManager : IInitializable, IDisposable
         _hotMicSequentialPlayers.Clear();
     }
 
-    /// <summary>Append interleaved <paramref name="next"/> to <paramref name="merged"/>, crossfading over the overlap (cosine curve).</summary>
     private static void AppendSamplesWithCrossfade(List<float> merged, float[] next, int channels)
     {
         if (next == null || next.Length == 0 || channels < 1)
@@ -1767,7 +1712,6 @@ public class ChatManager : IInitializable, IDisposable
         }
     }
 
-    /// <summary>Blend the first few frames toward the previous segment's last frame (scheduled clips are sample-discontinuous otherwise).</summary>
     private void ApplyHotMicScheduledBoundaryCrossfadeInPlace(string userId, float[] pcm, int channels)
     {
         if (pcm == null || channels < 1 || pcm.Length < channels * 2) return;
@@ -1802,7 +1746,6 @@ public class ChatManager : IInitializable, IDisposable
         _hotMicLastScheduledFrameByUserId[userId] = last;
     }
 
-    /// <summary>One child <see cref="AudioSource"/> per segment so bulk <see cref="AudioSource.PlayScheduled"/> never overwrites a pending clip on the same source.</summary>
     private void ScheduleHotMicClip(string userId, AudioClip clip, float volume01)
     {
         if (clip == null) return;
@@ -1858,7 +1801,6 @@ public class ChatManager : IInitializable, IDisposable
             UnityEngine.Object.Destroy(segmentGo);
     }
 
-    /// <summary>Duration Unity uses for playback (same timeline as <see cref="AudioSource.PlayScheduled"/>).</summary>
     private static double HotMicClipDurationSeconds(AudioClip clip)
     {
         if (clip == null) return 0;
@@ -1900,10 +1842,8 @@ public class ChatMessageEventArgs : EventArgs
     public string UserId { get; }
     public bool IsDM { get; }
     public bool IsSystem { get; }
-    /// <summary>Sender's name color as 6-char hex (e.g. "87CEEB"). Null = use default.</summary>
     public string? NameColor { get; }
 
-    /// <summary>When true with <see cref="IsSystem"/>, <see cref="Message"/> is preformatted TMP rich text (tags already balanced; user text escaped by sender).</summary>
     public bool SystemMessageRichText { get; }
 
     public ChatMessageEventArgs(string userName, string message, string userId, bool isDm = false, bool isSystem = false, string? nameColor = null, bool systemMessageRichText = false)

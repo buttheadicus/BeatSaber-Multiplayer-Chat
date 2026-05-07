@@ -7,9 +7,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.AvatarExtras;
 
-/// <summary>
-/// Sidecar JSON for <see cref="AvatarExtrasConfig"/>  -  avoids a second IPA <c>Generated&lt;T&gt;</c> on the same <c>Config</c> instance.
-/// </summary>
 internal static class AvatarExtrasConfigPersistence
 {
     private static readonly string FilePath = Path.Combine(ChatIdFilePaths.RootDirectory, "MultiplayerChatAvatarExtras.json");

@@ -6,11 +6,6 @@ using MultiplayerChat.Settings;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Stable 8-digit chat identity for this Windows user + Beat Saber data folder.
-/// Stored in ChatID.dat under DPAPI so casual edits invalidate the file (new ID is generated).
-/// Username is not part of the stored ID so renames do not change it; use <see cref="FormatDisplayId"/> for UI.
-/// </summary>
 public static class ChatPersistentId
 {
     private const int MinId = 10_000_000;
@@ -19,7 +14,6 @@ public static class ChatPersistentId
     private static readonly object LockObj = new();
     private static string? _cachedId;
 
-    /// <summary>8-digit numeric string, e.g. "99416729".</summary>
     public static string Current
     {
         get
@@ -38,7 +32,6 @@ public static class ChatPersistentId
         _ = Current;
     }
 
-    /// <summary>Example display form: "99416729butthead" (not persisted).</summary>
     public static string FormatDisplayId(string userName)
     {
         var name = userName ?? "";

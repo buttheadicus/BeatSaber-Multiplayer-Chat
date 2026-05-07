@@ -4,16 +4,12 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Low-latency hot mic chunks: same float32 PCM layout as <see cref="VoiceMessageCodec"/> but magic VHOT and smaller max size.
-/// </summary>
 public static class VoiceHotMicCodec
 {
     private static readonly byte[] Magic = Encoding.ASCII.GetBytes("VHOT");
     private const byte Version = 1;
     private const int HeaderSize = 4 + 1 + 4 + 2 + 4;
 
-    /// <summary>Wire limit for one hot mic frame (before encryption).</summary>
     public const int MaxChunkPlainBytes = 131_072;
 
     public static bool IsHotMicBlob(byte[]? blob)
@@ -51,7 +47,6 @@ public static class VoiceHotMicCodec
         return buffer;
     }
 
-    /// <summary>PCM duration from the wire header only (no sample decode). Used to cap playout buffer latency.</summary>
     public static bool TryGetDurationMs(byte[] blob, out float ms)
     {
         ms = 0f;
@@ -113,7 +108,6 @@ public static class VoiceHotMicCodec
         return CreateAudioClipFromDecodedSamples(samples, ch, rate);
     }
 
-    /// <summary>Build a clip from decoded PCM (e.g. after merging multiple small chunks for smoother playback).</summary>
     public static AudioClip? CreateAudioClipFromDecodedSamples(float[] interleavedSamples, int channels, int sampleRate)
     {
         if (interleavedSamples == null || interleavedSamples.Length == 0 || channels < 1 || sampleRate < 8000)

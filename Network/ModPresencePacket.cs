@@ -2,26 +2,16 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Packet sent when joining a lobby to indicate this player has the MPChat mod.
-/// TargetUserId: when set, only that user should process it (targeted reply or ignored).
-/// IsIgnoredFromSong: when true, recipient is in a song and should retry later.
-/// </summary>
 public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
-    /// <summary>When set, only this user should process the packet.</summary>
     public string? TargetUserId;
 
-    /// <summary>When true, sender received presence but was in a song - retry in 3 seconds.</summary>
     public bool IsIgnoredFromSong;
 
-    /// <summary>Sender's persistent 8-digit Multiplayer Chat ID (optional for backward compatibility).</summary>
     public string? SenderChatId;
 
-    /// <summary>Sender's username color as 6-char hex without # (optional; old clients omit).</summary>
     public string? SenderNameColor;
 
-    /// <summary>When true, sender is an SLZ companion build; non-SLZ peers show an extra system line (0.3.0+ wire).</summary>
     public bool IsSlzCompanionClient;
 
     public override void Serialize(NetDataWriter writer)

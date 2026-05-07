@@ -4,9 +4,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// FlowCoordinator that presents only the update message (no chat input).
-/// </summary>
 public class UpdateFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly UpdateMessageViewController _updateViewController = null!;

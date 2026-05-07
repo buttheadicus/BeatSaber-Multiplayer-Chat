@@ -2,10 +2,6 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Notifies a player that the sender added or removed them in listen-only voice routing.
-/// Only <see cref="TargetUserId"/> (recipient) should handle it.
-/// </summary>
 public class ListenToNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public string? TargetUserId;
@@ -18,7 +14,6 @@ public class ListenToNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPa
 
     public string? TargetChatId;
 
-    /// <summary>Comma-separated platform user ids (other listen targets besides <see cref="TargetUserId"/>).</summary>
     public string? AlsoListeningToOthersCsv;
 
     public override void Serialize(NetDataWriter writer)

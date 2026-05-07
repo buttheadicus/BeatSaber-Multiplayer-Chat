@@ -8,9 +8,6 @@ public static class MaterialFactory
 {
     public const string MaterialNamePrefix = "MpChatAvatarExtras_";
 
-    /// <summary>
-    /// Slightly above default geometry (~2000) so glasses/facial hair draw after face/eye meshes and reduce z-order bleed-through.
-    /// </summary>
     public const int AccessoryFlatRenderQueue = 2460;
 
     private static readonly int IdBaseColor = Shader.PropertyToID("_BaseColor");
@@ -89,7 +86,6 @@ public static class MaterialFactory
         }
     }
 
-    /// <summary>URP/Built-in need a white albedo or some accessory meshes read as black.</summary>
     public static void PrimeWhiteAlbedo(Material mat)
     {
         if (mat.HasProperty(IdBaseMap))

@@ -2,21 +2,15 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-/// <summary>
-/// Notifies the target user that the sender has muted or unmuted them (client-side mute).
-/// Only <see cref="TargetUserId"/> should handle it (the player who was muted/unmuted).
-/// </summary>
 public class MuteNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     public string? TargetUserId;
     public bool IsMuted;
 
-    /// <summary>Sender's username color as 6-char hex without # (optional).</summary>
     public string? SenderNameColor;
 
     public string? SenderChatId;
 
-    /// <summary>Recipient's Chat ID (the player who was muted/unmuted).</summary>
     public string? TargetChatId;
 
     public override void Serialize(NetDataWriter writer)

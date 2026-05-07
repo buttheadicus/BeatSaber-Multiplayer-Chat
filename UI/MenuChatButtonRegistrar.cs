@@ -5,10 +5,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// Registers a "TEXT CHAT" MenuButton in the main menu left panel.
-/// Per BSMG wiki: presents FlowCoordinator when clicked via MainFlowCoordinator.
-/// </summary>
 public class MenuChatButtonRegistrar : IInitializable, IDisposable
 {
     [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;

@@ -5,12 +5,12 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>Persist per-player receive gain (0–500, i.e. 0.0–5.0×) for hot mic and voice-message playback.</summary>
-/// <remarks>Playback uses <see cref="VoiceChatAudioLevel.GetVoiceChatPlaybackVolume01"/> when <see cref="VoiceChatAudioLevel.ApplyStoredReceiveVolume"/> is true.</remarks>
 public static class PlayerVoiceVolumeStore
 {
     private const string KeyV1 = "MultiplayerChat.PlayerVoiceVolumesV1";
     private const string KeyV2 = "MultiplayerChat.PlayerVoiceVolumesV2";
+
+    public const int MaxVolumePercent = int.MaxValue;
 
     private static Dictionary<string, int>? _cache;
 
@@ -56,7 +56,7 @@ public static class PlayerVoiceVolumeStore
                 if (i <= 0) continue;
                 var id = Uri.UnescapeDataString(part.Substring(0, i));
                 if (!int.TryParse(part.Substring(i + 1), out var v)) continue;
-                into[id] = Mathf.Clamp(v, 0, 500);
+                into[id] = ClampStoredPercent(v);
             }
         }
         catch { /* ignore corrupt */ }
@@ -82,16 +82,20 @@ public static class PlayerVoiceVolumeStore
         return d.TryGetValue(userId, out var v) ? v : 100;
     }
 
-    /// <summary>Linear gain 0–5 (percent / 100).</summary>
-    public static float GetVolume01(string userId) => Mathf.Clamp(GetVolumePercent(userId) / 100f, 0f, 5f);
+    public static float GetVolume01(string userId) => Mathf.Max(0f, GetVolumePercent(userId) / 100f);
 
-    /// <param name="persist">When false, updates in-memory levels only (caller should <see cref="FlushToDisk"/> to save).</param>
-    public static void SetVolumePercent(string userId, int zeroTo500, bool persist = true)
+    public static void SetVolumePercent(string userId, int storedPercent, bool persist = true)
     {
         if (string.IsNullOrEmpty(userId)) return;
-        zeroTo500 = Mathf.Clamp(zeroTo500, 0, 500);
-        Load()[userId] = zeroTo500;
+        Load()[userId] = ClampStoredPercent(storedPercent);
         if (persist) Save();
+    }
+
+    private static int ClampStoredPercent(int value)
+    {
+        if (value < 0)
+            return 0;
+        return value > MaxVolumePercent ? MaxVolumePercent : value;
     }
 
     public static void FlushToDisk() => Save();

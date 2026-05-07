@@ -7,9 +7,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Loads UI sounds from <c>Plugins/Sounds</c>, <c>Plugins/MultiplayerChat/Sounds</c>, or next to the DLL (see load routine).
-/// </summary>
 public static class ChatSoundEffects
 {
     public static AudioClip? ChatClip { get; private set; }
@@ -101,7 +98,6 @@ public static class ChatSoundEffects
         PlayOneShot(UnmutedClip, 1f);
     }
 
-    /// <summary>Error feedback (not gated by chat bubble sounds toggle).</summary>
     public static void PlayError()
     {
         if (ErrorClip == null) return;

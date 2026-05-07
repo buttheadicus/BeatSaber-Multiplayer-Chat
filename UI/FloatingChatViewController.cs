@@ -11,10 +11,6 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// ViewController for the moveable floating chat panel. Chat log only (no input).
-/// Input/Send stay on LobbyChatTab.
-/// </summary>
 [ViewDefinition("MultiplayerChat.UI.FloatingChatView.bsml")]
 public class FloatingChatViewController : BSMLAutomaticViewController
 {
@@ -119,10 +115,6 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         ScrollToBottom();
     }
 
-    /// <summary>
-    /// Creates a chatroom-style row (emulating BeatSaberPlus ChatMessageWidget).
-    /// Explicit width, top-left anchored text, word wrap.
-    /// </summary>
     private GameObject CreateMessageRow(string userName, string message, string? nameColorHex = null, bool systemMessageRichText = false)
     {
         const float leftRightMargins = 4f;
@@ -221,9 +213,6 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         }
     }
 
-    /// <summary>
-    /// Clears the chat log (e.g. when leaving lobby).
-    /// </summary>
     public void ClearLog()
     {
         if (_chatLogContent == null) return;

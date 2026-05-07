@@ -4,10 +4,6 @@ using UnityEngine;
 
 namespace MultiplayerChat.UI;
 
-/// <summary>
-/// BSML sometimes leaves Unity TMP defaults (&quot;Default String&quot;) on secondary labels next to settings rows.
-/// Clears any matching text under a parsed view root.
-/// </summary>
 internal static class BsmlDefaultStringCleanup
 {
     internal static void StripPlaceholderLabels(GameObject root)

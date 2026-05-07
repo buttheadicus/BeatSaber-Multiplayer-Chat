@@ -2,8 +2,8 @@
   "$schema": "https://raw.githubusercontent.com/beat-saber-modding-group/BSIPA-MetadataFileSchema/master/Schema.json",
   "id": "MultiplayerChat",
   "name": "Multiplayer Chat",
-  "version": "0.3.1",
-  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice. v0.3.1: performance work and optional in-game CAU updater (off by default; settings).",
+  "version": "0.3.2",
+  "description": "Chat with other players in multiplayer with end-to-end encrypted chats and voice.",
   "author": "Butthead",
   "gameVersion": "1.40.1",
   "dependsOn": {

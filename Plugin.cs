@@ -1,9 +1,13 @@
+using System;
+using MultiplayerChat.AvatarColoring;
 using MultiplayerChat.Core;
 using MultiplayerChat.AvatarExtras;
 using MultiplayerChat.AvatarExtras.Assets;
 using MultiplayerChat.AvatarExtras.Patches.App;
 using MultiplayerChat.AvatarExtras.Patches.Menu;
+using MultiplayerChat.HarmonyPatches;
 using MultiplayerChat.Settings;
+using HarmonyLib;
 using UnityEngine;
 using MultiplayerChat.UI;
 using IPA;
@@ -21,12 +25,40 @@ public class Plugin
     internal static IPALogger Log { get; private set; } = null!;
     internal static AvatarExtrasConfig? AvatarExtrasConfig { get; private set; }
 
+    private static Harmony? _lobbyScaleHarmony;
+
+    private static Harmony? _avatarSerializationHarmony;
+
     [Init]
     public void Init(
         IPALogger logger,
         Zenjector zenjector)
     {
         Log = logger;
+        MpChatLog.Init(logger);
+
+        try
+        {
+            _avatarSerializationHarmony ??= new Harmony("com.multiplayerchat.avatarserialize");
+            AvatarDataMultiplayerSerializationPatches.Apply(_avatarSerializationHarmony);
+        }
+        catch (Exception ex)
+        {
+            logger.Warn($"[MPChat] AvatarData multiplayer serialization Harmony init failed: {ex.Message}");
+        }
+
+        if (MpChatFeatures.LobbyCustomAvatars)
+        {
+            try
+            {
+                _lobbyScaleHarmony ??= new Harmony("com.multiplayerchat.lobbyscale");
+                MpChatMultiplayerLobbyScaleAnimatorPatches.Apply(_lobbyScaleHarmony);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"[MPChat] Lobby ScaleAnimator Harmony patches failed (custom lobby avatars may look wrong): {ex.Message}");
+            }
+        }
 
         if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
             return;
@@ -48,6 +80,8 @@ public class Plugin
             Log.Info($"[MultiplayerChat] SLZ mode is ON ({SlzMode.MarkerFileName} next to mod DLL)");
 
         ChatPersistentId.EnsureLoaded();
+        MpChatLog.Apply(ModSettings.DebugLogging);
+
         var globalAudioHost = new GameObject("MPChatGlobalAudioHost");
         UnityEngine.Object.DontDestroyOnLoad(globalAudioHost);
         globalAudioHost.AddComponent<Core.GlobalChatAudioHost>();
@@ -63,6 +97,19 @@ public class Plugin
                 container.BindInterfacesAndSelfTo<ColorPickerButtonControllerPatcher>().AsSingle().NonLazy();
                 container.BindInterfacesAndSelfTo<EditAvatarViewControllerPatcher>().AsSingle().NonLazy();
                 container.BindInterfacesAndSelfTo<EditAvatarColorViewControllerPatcher>().AsSingle().NonLazy();
+            });
+        }
+
+        if (ModSettings.EnableAvatarColoringExtensions)
+        {
+            zenjector.Install(Location.Menu, container =>
+            {
+                container.BindInterfacesAndSelfTo<AvatarColoringEditorPatcher>().AsSingle().NonLazy();
+                container.BindInterfacesAndSelfTo<AvatarColoringAlphaSliderPatcher>().AsSingle().NonLazy();
+                container.Bind<AvatarNameEntryViewController>().FromNewComponentAsViewController().AsSingle();
+                container.Bind<AvatarNameEntryFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+                container.Bind<AvatarLoadListViewController>().FromNewComponentAsViewController().AsSingle();
+                container.Bind<AvatarLoadListFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             });
         }
 
@@ -114,6 +161,15 @@ public class Plugin
             container.Bind<VoiceDuckSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<FusedModsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<FusedModsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<AddonsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<AddonsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            if (MpChatFeatures.LobbyCustomAvatars)
+            {
+                container.Bind<CustomAvatarsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+                container.Bind<CustomAvatarsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+                container.BindInterfacesAndSelfTo<MpCustomAvatarSyncManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+            }
+
             container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
             container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.BindInterfacesAndSelfTo<LobbyChatTabRegistrar>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
@@ -125,6 +181,8 @@ public class Plugin
     private static MultiplayerLobbyAvatarController DecorateAvatar(MultiplayerLobbyAvatarController original)
     {
         AddChatBubbleAnchorToCaption(original.transform);
+        if (MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
+            original.gameObject.AddComponent<MpChatLobbyCustomAvatarDriver>();
         return original;
     }
 
@@ -169,5 +227,26 @@ public class Plugin
     public void OnDisable()
     {
         BundleLoader.Unload();
+        try
+        {
+            _lobbyScaleHarmony?.UnpatchSelf();
+        }
+        catch
+        {
+            // ignored
+        }
+
+        _lobbyScaleHarmony = null;
+
+        try
+        {
+            _avatarSerializationHarmony?.UnpatchSelf();
+        }
+        catch
+        {
+            // ignored
+        }
+
+        _avatarSerializationHarmony = null;
     }
 }
