@@ -176,6 +176,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     else
                         _lobbyBannerMissStreak++;
                 }
+                else
+                    TryUpgradeLobbyHeaderRootToTitleBarPreferred();
 
                 if (_lobbyHeaderRoot != null)
                 {
@@ -450,6 +452,29 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return null;
     }
 
+    private void TryUpgradeLobbyHeaderRootToTitleBarPreferred()
+    {
+        if (_lobbyHeaderRoot == null || _lobbyHeaderRoot.gameObject == null)
+            return;
+
+        if (_lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() != null)
+            return;
+
+        var titleAnchored = CreateLobbyChatRootAboveTitleBar();
+        if (titleAnchored == null)
+            return;
+
+        var bubblesToMove = _lobbyHeaderRoot.GetComponentsInChildren<ChatBubble>(true);
+        foreach (var bubble in bubblesToMove)
+        {
+            if (bubble != null && bubble.gameObject != null)
+                bubble.transform.SetParent(titleAnchored, false);
+        }
+
+        UnityEngine.Object.Destroy(_lobbyHeaderRoot.gameObject);
+        _lobbyHeaderRoot = titleAnchored;
+    }
+
     private Transform? FindOrCreateLobbyHeaderChatRoot()
     {
         var titleAnchored = CreateLobbyChatRootAboveTitleBar();
@@ -477,14 +502,36 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     // Inserts a strip immediately BEFORE TitleViewController so vertical layouts stack it above the title row:
     // bottom edge of the chat block sits just above the top edge of the title bar.
+    private static Transform? FindTitleViewControllerTransformForChatAnchor()
+    {
+        var direct = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
+                     ?? GameObject.Find("TitleViewController");
+        if (direct != null)
+            return direct.transform;
+
+        foreach (var rootName in new[] { "Wrapper", "MenuCore" })
+        {
+            var rootGo = GameObject.Find(rootName);
+            if (rootGo == null)
+                continue;
+            foreach (var tr in rootGo.GetComponentsInChildren<Transform>(true))
+            {
+                if (tr.name != "TitleViewController")
+                    continue;
+                if (tr.GetComponentInParent<Canvas>() == null)
+                    continue;
+                return tr;
+            }
+        }
+
+        return null;
+    }
+
     private static Transform? CreateLobbyChatRootAboveTitleBar()
     {
-        var titleGo = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
-                      ?? GameObject.Find("TitleViewController");
-        if (titleGo == null)
+        var titleView = FindTitleViewControllerTransformForChatAnchor();
+        if (titleView == null)
             return null;
-
-        var titleView = titleGo.transform;
         var parent = titleView.parent;
         if (parent == null)
             return null;
@@ -617,12 +664,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             }
         }
 
-        var titleView = GameObject.Find("TitleViewController");
-        if (titleView == null)
-        {
-            var wrapper = GameObject.Find("Wrapper");
-            titleView = wrapper != null ? wrapper.transform.Find("MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")?.gameObject : null;
-        }
+        var titleTf = FindTitleViewControllerTransformForChatAnchor();
+        var titleView = titleTf != null ? titleTf.gameObject : null;
 
         if (titleView != null)
         {
@@ -1002,14 +1045,63 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return _container.InstantiateComponent<ChatBubble>(panelObj);
     }
 
+    private static float _deepLobbyLayoutScanTime = -999f;
+
+    private static bool _deepLobbyLayoutScanHit;
+
     private bool IsInLobby()
     {
-        var center = GameObject.Find("MultiplayerLobbyCenterStage");
-        if (center != null && center.activeInHierarchy) return true;
-        var lobby = GameObject.Find("LobbySetup");
-        if (lobby != null && lobby.activeInHierarchy) return true;
-        var alt = GameObject.Find("CenterStage");
-        if (alt != null && alt.activeInHierarchy) return true;
+        if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+            return true;
+
+        // Arena to lobby: MP chrome can stay inactive under results while GameObject.Find misses title rows.
+        if (MpChatLobbyDiagnostics.SongGameplayLikelyActive())
+            return false;
+        if (!MpChatLobbyDiagnostics.ResultsLikeUiVisible())
+            return false;
+
+        return MultiplayerLobbyLayoutExistsIncludingInactiveCached();
+    }
+
+    private static bool MultiplayerLobbyLayoutExistsIncludingInactiveCached()
+    {
+        var now = Time.realtimeSinceStartup;
+        if (now - _deepLobbyLayoutScanTime < 1f)
+            return _deepLobbyLayoutScanHit;
+        _deepLobbyLayoutScanTime = now;
+        _deepLobbyLayoutScanHit = false;
+
+        for (var i = 0; i < SceneManager.sceneCount; i++)
+        {
+            var scene = SceneManager.GetSceneAt(i);
+            if (!scene.isLoaded)
+                continue;
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (!DescendantHasInactiveMpLobbyChromeName(root.transform))
+                    continue;
+                _deepLobbyLayoutScanHit = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool DescendantHasInactiveMpLobbyChromeName(Transform root)
+    {
+        var stack = new Stack<Transform>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var t = stack.Pop();
+            var n = t.gameObject.name;
+            if (n == "MultiplayerLobbyCenterStage" || n == "LobbySetup" || n == "HostSetup")
+                return true;
+            for (var c = 0; c < t.childCount; c++)
+                stack.Push(t.GetChild(c));
+        }
+
         return false;
     }
 

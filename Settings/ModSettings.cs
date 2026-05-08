@@ -208,6 +208,26 @@ public static class ModSettings
         }
     }
 
+    public static bool AvatarColorRgbWideRangeEnabled
+    {
+        get => D.Addons.AvatarColorRgbWideRange;
+        set
+        {
+            D.Addons.AvatarColorRgbWideRange = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static bool AvatarColorDirectNumberEntryEnabled
+    {
+        get => D.Addons.AvatarColorDirectNumberEntry;
+        set
+        {
+            D.Addons.AvatarColorDirectNumberEntry = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
     public static bool EnableLobbyCustomAvatars
     {
         get => D.EnableLobbyCustomAvatars;

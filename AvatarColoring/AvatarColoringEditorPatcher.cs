@@ -16,13 +16,13 @@ namespace MultiplayerChat.AvatarColoring;
 
 public sealed class AvatarColoringEditorPatcher : IAffinity
 {
-    public static Vector2 AvatarToolsRowAnchoredPixelOffset = new Vector2(-60f, 4f);
+    public static Vector2 AvatarToolsRowAnchoredPixelOffset = new Vector2(-64f, 7f);
 
     public static float AvatarToolsRowSpacing = 6f;
 
     public static float AvatarToolsButtonPreferredWidth = 26f;
 
-    public static float AvatarToolsButtonPreferredHeight = 14f;
+    public static float AvatarToolsButtonPreferredHeight = 8f;
 
     public static float AvatarToolsButtonMinWidth = AvatarToolsButtonPreferredWidth;
 

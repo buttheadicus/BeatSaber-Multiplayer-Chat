@@ -19,6 +19,12 @@ internal static class ModSettingsPersistence
     {
         [JsonProperty("enableAvatarColoringExtensions")]
         public bool EnableAvatarColoringExtensions { get; set; }
+
+        [JsonProperty("avatarColorRgbWideRange")]
+        public bool AvatarColorRgbWideRange { get; set; }
+
+        [JsonProperty("avatarColorDirectNumberEntry")]
+        public bool AvatarColorDirectNumberEntry { get; set; }
     }
 
     internal sealed class PerformanceSettingsSection

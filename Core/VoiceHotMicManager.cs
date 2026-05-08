@@ -56,6 +56,11 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private const float RawControllerBindingsLogIntervalSec = 1f;
     private float _nextRawControllerBindingsLogTime;
 
+    private const int PttInputPollIntervalFrames = 24;
+
+    // Decremented each Update while Push-to-talk is on; when not positive, poll XR bindings and refresh VoiceDynamicTransmitGate.
+    private int _framesUntilPttInputPoll;
+
     public void Initialize()
     {
         // GameCore host always owns Instance during gameplay. Lobby host must not overwrite Instance while a
@@ -172,6 +177,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         MaybeLogRawControllerBindings();
+        TryRefreshThrottledPushToTalkInput();
         UpdateLocalPushToTalkBubbleAndMaybeWarn();
 
         if (!CanCaptureHotMic())
@@ -182,6 +188,27 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
         EnsureMic();
         PollMicAndSend();
+    }
+
+    // XR binding poll runs about once every PttInputPollIntervalFrames while Push-to-talk is enabled so gate, capture, bubble, and deferred reload share one reading.
+    private void TryRefreshThrottledPushToTalkInput()
+    {
+        if (!ModSettings.PushToTalkEnabled)
+        {
+            _framesUntilPttInputPoll = 0;
+            VoiceDynamicTransmitGate.NotifyPushToTalkHeld(false);
+            return;
+        }
+
+        _framesUntilPttInputPoll--;
+        if (_framesUntilPttInputPoll > 0)
+            return;
+
+        var bindingIdx = ModSettings.PttBindingIndex;
+        var vrHeld = VrPttInput.IsBindingHeld(bindingIdx);
+        var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
+        VoiceDynamicTransmitGate.NotifyPushToTalkHeld(vrHeld || keyboardPtt);
+        _framesUntilPttInputPoll = PttInputPollIntervalFrames;
     }
 
     private void MaybeLogRawControllerBindings()
@@ -213,10 +240,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             return;
         }
 
-        var bindingIdx = ModSettings.PttBindingIndex;
-        var vrHeld = VrPttInput.IsBindingHeld(bindingIdx);
-        var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
-        var combined = vrHeld || keyboardPtt;
+        var combined = VoiceDynamicTransmitGate.LastPolledPushToTalkHeld;
 
         if (combined != _lastPttInputCombined)
         {
@@ -256,9 +280,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             return true;
 
         var pushToTalk = ModSettings.PushToTalkEnabled;
-        var vrHeldRaw = VrPttInput.IsBindingHeld(ModSettings.PttBindingIndex);
-        var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
-        var pttHeld = !pushToTalk || vrHeldRaw || keyboardPtt;
+        var pttHeld = !pushToTalk || VoiceDynamicTransmitGate.LastPolledPushToTalkHeld;
 
         if (VoiceChatRuntimeState.IsHotMicMuted)
         {
@@ -267,12 +289,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         if (pushToTalk && !pttHeld)
-        {
-            var hasTail = _voiceGateActive || _voiceHangoverChunksRemaining > 0;
-            var hasFullChunkPending = _monoScratch.Count >= _chunkMonoSamples;
-            if (!hasTail && !hasFullChunkPending)
-                return true;
-        }
+            return true;
 
         return false;
     }
@@ -283,10 +300,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         if (VoiceChatRuntimeState.IsDeaf) return false;
 
         var pushToTalk = ModSettings.PushToTalkEnabled;
-        // VR: rely on controller bindings only (Space would stick open mic from legacy input). No / broken XR hands: allow Space for desktop FPFC.
-        var vrHeldRaw = VrPttInput.IsBindingHeld(ModSettings.PttBindingIndex);
-        var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
-        var pttHeld = !pushToTalk || vrHeldRaw || keyboardPtt;
+        var pttHeld = !pushToTalk || VoiceDynamicTransmitGate.LastPolledPushToTalkHeld;
 
         if (VoiceChatRuntimeState.IsHotMicMuted)
         {
@@ -296,13 +310,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         }
 
         if (pushToTalk && !pttHeld)
-        {
-            // Same hangover whether XR hands report valid or not (avoids open-mic when controllers are briefly invalid).
-            var hasTail = _voiceGateActive || _voiceHangoverChunksRemaining > 0;
-            var hasFullChunkPending = _monoScratch.Count >= _chunkMonoSamples;
-            if (!hasTail && !hasFullChunkPending)
-                return false;
-        }
+            return false;
 
         return true;
     }
@@ -438,7 +446,8 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             _monoScratch.RemoveRange(0, _chunkMonoSamples);
 
             var warmupActive = _micWarmupChunksRemaining > 0;
-            var willTransmit = !warmupActive && ShouldTransmitVoiceChunk(chunk);
+            var willTransmit = !warmupActive && ShouldTransmitVoiceChunk(chunk)
+                               && !VoiceDynamicTransmitGate.ShouldSuppressOutboundVoice();
             if (willTransmit)
                 ApplySendSideChunkCrossfade(chunk);
 
