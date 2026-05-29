@@ -12,5 +12,5 @@ releases/
 *.dll
 *.zip
 !manifest.json
-BeatSaber-Multiplayer-Chat-Quest.MD
-BeatSaber-Multiplayer-Chat.code-workspace
+*BeatSaber-Multiplayer-Chat-Quest.MD
+*BeatSaber-Multiplayer-Chat.code-workspace
