@@ -17,6 +17,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 ## Addons [GO TO SETTINGS TO ENABLE THESE FEATURES]
 - **Custom Multiplayer Avatars**
 - **Avatar Coloring Extentions**
+- **Quick Binds**
 
 ## Plans
 
@@ -25,12 +26,9 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Private calls**: Out-of-lobby or dedicated voice sessions (design is TBD).
 - **DM from menu**: Start or continue DMs without being in a multiplayer lobby first, basically just discord but ingame.
 
-## Multiplayer Extensions (Required (but also auto installs, see below))
+## Dependency auto installs
 
-Lobby features (solo-style environment, lobby visuals, gameplay tweaks) come from **[Multiplayer Extensions](https://github.com/EnderdracheLP/MultiplayerExtensions)** ([v1.1.0 for BS 1.37.5–1.40.8](https://github.com/EnderdracheLP/MultiplayerExtensions/releases/tag/v1.1.0)). It is **not** a hard BSIPA dependency of Multiplayer Chat so the mod can start without it.
-
-- **Auto-install:** If `MultiplayerExtensions.dll` is not next to `MultiplayerChat.dll` in `Plugins`, Multiplayer Chat downloads the official release zip, extracts `MultiplayerExtensions.dll` into that folder, then closes Beat Saber. Launch the game again so BSIPA loads Multiplayer Extensions.
-- **Manual:** Download the same release and place `MultiplayerExtensions.dll` beside `MultiplayerChat.dll`.
+-
 
 ## Requirements
 
