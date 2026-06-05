@@ -28,11 +28,13 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
     {
         CreateFloatingScreen();
         _chatManager.MessageReceived += OnMessageReceived;
+        _chatManager.SystemMessageRemovalRequested += OnSystemMessageRemovalRequested;
     }
 
     public void Dispose()
     {
         _chatManager.MessageReceived -= OnMessageReceived;
+        _chatManager.SystemMessageRemovalRequested -= OnSystemMessageRemovalRequested;
         if (_screen != null)
         {
             _screen.HandleReleased -= OnHandleReleased;
@@ -152,6 +154,33 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         ChatPositionSettings.SaveRotation(_screen.transform.rotation);
     }
 
+    private void OnSystemMessageRemovalRequested(string exactMessageText)
+    {
+        if (string.IsNullOrEmpty(exactMessageText) || _messageRows.Count == 0)
+            return;
+
+        for (var i = _messageRows.Count - 1; i >= 0; i--)
+        {
+            var row = _messageRows[i];
+            if (row == null)
+            {
+                _messageRows.RemoveAt(i);
+                continue;
+            }
+
+            var tmp = row.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp == null || tmp.text != exactMessageText)
+                continue;
+
+            _messageRows.RemoveAt(i);
+            row.SetActive(false);
+            Destroy(row);
+        }
+
+        if (_contentRoot is RectTransform contentRect)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+    }
+
     private void OnMessageReceived(object? sender, ChatMessageEventArgs e)
     {
         if (_contentRoot == null && _screen != null)
@@ -226,7 +255,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
-            ? (systemMessageRichText ? message : Escape(message))
+            ? (systemMessageRichText ? message : message)
             : $"<color=#{hex}>{Escape(userName)}:</color> {Escape(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;

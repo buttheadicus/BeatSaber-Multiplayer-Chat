@@ -79,7 +79,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     public void ForceReloadMicrophone()
     {
-        if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+        if (MpChatVerboseDebug.IsOn)
             MultiplayerChat.Plugin.Log?.Info("[MPChat][VoIP] VoiceHotMicManager.ForceReloadMicrophone()");
         if (_deferredMicRestartCoroutine != null)
         {
@@ -89,6 +89,26 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
         StopMic();
         _deferredMicRestartCoroutine = StartCoroutine(DeferredRestartMicrophoneRoutine());
+    }
+
+    // After arena/lobby VoIP reload: re-hand Instance to lobby host, reset PTT gate, force an immediate binding poll.
+    internal static void OnVoipPipelineReloaded()
+    {
+        VoiceDynamicTransmitGate.NotifyPushToTalkHeld(false);
+
+        if (Instance != null && MpChatSceneScope.IsGameCoreHost(Instance)
+            && !MpChatLobbyDiagnostics.AnyGameCoreLoaded() && _lobbyScopeInstance != null)
+            Instance = _lobbyScopeInstance;
+
+        Instance?.PreparePushToTalkAfterVoipReload();
+    }
+
+    internal void PreparePushToTalkAfterVoipReload()
+    {
+        _framesUntilPttInputPoll = 0;
+        _lastPttInputCombined = false;
+        ChatBubbleManager.Instance?.SetLocalPushToTalkOpen(false);
+        TryRefreshThrottledPushToTalkInput();
     }
 
     private IEnumerator DeferredRestartMicrophoneRoutine()
@@ -114,7 +134,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
                 if (CanCaptureHotMic())
                 {
                     EnsureMic();
-                    if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+                    if (MpChatVerboseDebug.IsOn)
                         MultiplayerChat.Plugin.Log?.Info("[MPChat][VoIP] VoiceHotMicManager: deferred mic EnsureMic() succeeded");
                     yield break;
                 }
@@ -253,7 +273,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         {
             _nextPttPeriodicLogTime = now + 4f;
             var capturing = _micLoop != null;
-            if (pttOn && !combined && capturing)
+            if (pttOn && !combined && capturing && MpChatVerboseDebug.IsOn)
             {
                 MultiplayerChat.Plugin.Log?.Warn(
                     $"[MPChat][PTT] Mic still recording while PTT on and button not held (unexpected). deaf={VoiceChatRuntimeState.IsDeaf} hotMicMuted={VoiceChatRuntimeState.IsHotMicMuted}");

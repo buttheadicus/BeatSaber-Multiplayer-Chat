@@ -2,16 +2,28 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical id="player_grid_root" pad="8" spacing="4" horizontal-fit="PreferredSize">
-    <text id="GridTitle" text="" font-size="4" align="Center"/>
-    <button id="VoiceModeSwitchButton" text="Talk to" on-click="VoiceModeSwitchClicked"/>
-    <text id="GridHint" text="Tap a name" font-size="3" align="Center"/>
-    <vertical id="VolumeAdjustPanel" pad="2" spacing="2">
-      <text id="VolumePlayerLabel" text="" font-size="3.5" align="Center"/>
-      <horizontal id="VolumeStepRow" spacing="3" horizontal-fit="PreferredSize">
-        <button id="PlayerVolumeDownButton" text="-" pad="2" on-click="PlayerVolumeDownClicked"/>
-        <text id="PlayerVolumeStepLabel" text="1.0" font-size="4" align="Center"/>
-        <button id="PlayerVolumeUpButton" text="+" pad="2" on-click="PlayerVolumeUpClicked"/>
+    <vertical id="MuteDmPanel" spacing="3">
+      <text id="GridTitle" text="" font-size="4" align="Center"/>
+      <text id="GridHint" text="Tap a name" font-size="3" align="Center"/>
+    </vertical>
+    <vertical id="HearPanel" spacing="3">
+      <horizontal id="HearModeRow" spacing="3" horizontal-fit="PreferredSize">
+        <button id="TalkToModeButton" text="Talk to" on-click="TalkToModeClicked"/>
+        <button id="ListenModeButton" text="Listen" on-click="ListenModeClicked"/>
       </horizontal>
+      <text id="HearGridHint" text="" font-size="3" align="Center"/>
+      <vertical id="VolumeAdjustPanel" pad="2" spacing="2">
+        <text id="VolumePlayerLabel" text="" font-size="3.5" align="Center"/>
+        <horizontal id="VolumeStepRow" spacing="3" horizontal-fit="PreferredSize">
+          <button id="PlayerVolumeDownButton" text="-" pad="2" on-click="PlayerVolumeDownClicked"/>
+          <text id="PlayerVolumeStepLabel" text="1.0" font-size="4" align="Center"/>
+          <button id="PlayerVolumeUpButton" text="+" pad="2" on-click="PlayerVolumeUpClicked"/>
+        </horizontal>
+      </vertical>
+      <vertical id="HearFooterRow" spacing="3">
+        <button id="PlayerVolumeButton" text="Player Volume" on-click="PlayerVolumeClicked"/>
+        <button id="ConfigureDuckButton" text="Configure ducking" pad="2" on-click="ConfigureDuckClicked"/>
+      </vertical>
     </vertical>
     <horizontal spacing="2">
       <button id="Slot0" on-click="OnSlot0"/>

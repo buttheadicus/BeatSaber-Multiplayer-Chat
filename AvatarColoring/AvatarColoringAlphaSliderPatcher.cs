@@ -53,6 +53,18 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
 
     internal static AvatarColoringAlphaSliderPatcher? Instance { get; private set; }
 
+    internal static bool TryGetCommittedEditColor(out Color color)
+    {
+        if (Instance == null)
+        {
+            color = default;
+            return false;
+        }
+
+        color = Instance.ReadMergedLiveChannelColor();
+        return true;
+    }
+
     [Inject] private readonly BeatAvatarEditorViewController _beatAvatarEditorViewController = null!;
 
     [Inject] private readonly AvatarDataModel _avatarDataModel = null!;
@@ -509,7 +521,7 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
     }
 
     // VC.color can lag thumbs/strings while ChangeColor is deferred (alpha especially). Merge live widgets before rebuilds.
-    private Color ReadMergedLiveChannelColor()
+    internal Color ReadMergedLiveChannelColor()
     {
         var c = _editColorViewController.color;
         if (_channelsStackRoot == null)
@@ -657,6 +669,10 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
     {
         _editColorViewController.SetColor(c);
         _editColorViewController.InvokeMethod<object, EditAvatarColorViewController>("ChangeColor", c);
+
+        if (_avatarDataModel.avatarData != null
+            && AvatarDataColorResolver.TrySetColor(_avatarDataModel.avatarData, AvatarColorEditContext.LastPart, c))
+            _avatarDataModel.ReportAvatarChanged();
     }
 
     private RangeValuesTextSlider AddChannelSlider(string channelLabel, float initial, float min, float max,

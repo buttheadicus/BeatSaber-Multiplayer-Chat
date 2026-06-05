@@ -15,7 +15,7 @@ public class CustomAvatarsSettingsFlowCoordinator : FlowCoordinator
         if (firstActivation)
         {
             showBackButton = true;
-            SetTitle("Custom Avatars");
+            SetTitle("Custom Multiplayer Avatars");
             ProvideInitialViewControllers(_customAvatarsView);
         }
 

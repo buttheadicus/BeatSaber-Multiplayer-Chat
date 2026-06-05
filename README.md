@@ -9,13 +9,17 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **DMs**: self explanitory, have only one player read/hear your text/voice message.
 - **Mute / deafen**: self explanitory
 - **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)
+- **Custom avatars**: (THIS IS AN OPTIONAL ADDON, GO TO THE SETTINGS TO ENABLE THIS FEATURE) use custom unity avatars in multiplayer rather then the default Beat Saber avatars!
 
 ## Fused mods
 - [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras)
 
+## Addons [GO TO SETTINGS TO ENABLE THESE FEATURES]
+- **Custom Multiplayer Avatars**
+- **Avatar Coloring Extentions**
+
 ## Plans
 
-- **Custom avatars**: Permit custom avatars to replace the current Beat Saber multiplayer avatarr, able to be turned off at the flick of a switch. 
 - **Friend service**: ChatID based friends beyond the current lobby list.
 - **Join friends**: Connect to a friend's session from the menu or a friends list.
 - **Private calls**: Out-of-lobby or dedicated voice sessions (design is TBD).

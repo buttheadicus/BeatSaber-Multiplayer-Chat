@@ -98,7 +98,7 @@ public class ChatManager : IInitializable, IDisposable
         if (!IsGameCoreSceneContext())
             _lobbyScopeChatManager = this;
         VoiceReceiveDiagnostics.ResetSession();
-        if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+        if (MpChatVerboseDebug.IsOn)
             MultiplayerChat.Plugin.Log?.Info("[MPChat] Voice receive diagnostics (throttled)  -  look for [VoiceRx DROP], [HotMicRx]");
         if (VoiceBareStreamMode.Enabled)
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] VoiceBareStreamMode.Enabled: throttled recv diagnostic lines suppressed until disabled.");
@@ -144,7 +144,7 @@ public class ChatManager : IInitializable, IDisposable
             try
             {
                 lobbyPeer.ReloadVoiceHotMicPipeline();
-                if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+                if (MpChatVerboseDebug.IsOn)
                     MultiplayerChat.Plugin.Log?.Info("[MPChat] Lobby ChatManager: ReloadVoiceHotMicPipeline after GameCore dispose (restore packet handlers)");
             }
             catch (Exception ex)
@@ -180,7 +180,7 @@ public class ChatManager : IInitializable, IDisposable
 
     public void LogVoipReloadContext(string tag)
     {
-        if (!MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+        if (!MpChatVerboseDebug.IsOn)
             return;
         var scene = _coroutineHost != null ? _coroutineHost.gameObject.scene.name : "?";
         var localId = _sessionManager.localPlayer?.userId ?? "(null)";
@@ -201,6 +201,8 @@ public class ChatManager : IInitializable, IDisposable
         // New packet types must be registered last so existing packet IDs stay stable across mod updates.
         _packetSerializer.RegisterCallback<ListenToNotifyPacket>(OnListenToNotifyReceived);
         _packetSerializer.RegisterCallback<MpCustomAvatarPosePacket>(OnMpCustomAvatarPoseReceived);
+        _packetSerializer.RegisterCallback<MpCustomAvatarFileRequestPacket>(OnMpCustomAvatarFileRequestReceived);
+        _packetSerializer.RegisterCallback<MpCustomAvatarFileChunkPacket>(OnMpCustomAvatarFileChunkReceived);
     }
 
     private void UnregisterPacketCallbacks()
@@ -215,6 +217,8 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.UnregisterCallback<ChatActivityPacket>();
         _packetSerializer.UnregisterCallback<ListenToNotifyPacket>();
         _packetSerializer.UnregisterCallback<MpCustomAvatarPosePacket>();
+        _packetSerializer.UnregisterCallback<MpCustomAvatarFileRequestPacket>();
+        _packetSerializer.UnregisterCallback<MpCustomAvatarFileChunkPacket>();
     }
 
     private void OnPlayerConnected(IConnectedPlayer player)
@@ -222,6 +226,14 @@ public class ChatManager : IInitializable, IDisposable
         // Include connecting user in key material immediately; connectedPlayers / GetLobbyPlayers can lag the event by a frame.
         UpdateEncryptionKey(player?.userId);
         TryFlushHotMicOutboundQueue();
+
+        if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId) &&
+            !MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+        {
+            MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(
+                player.userId,
+                broadcastMetadata: ModSettings.EnableLobbyCustomAvatars);
+        }
     }
 
     private void OnPlayerDisconnected(IConnectedPlayer player)
@@ -230,7 +242,7 @@ public class ChatManager : IInitializable, IDisposable
         {
             ClearHotMicForUser(player.userId);
             VoiceChatRuntimeState.RemoveListenUserId(player.userId);
-            if (MpChatFeatures.LobbyCustomAvatars)
+            if (MpChatFeatures.LobbyCustomAvatars && !MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
                 MpCustomAvatarSyncManager.ClearRemote(player.userId);
         }
 
@@ -803,6 +815,24 @@ public class ChatManager : IInitializable, IDisposable
         MpCustomAvatarSyncManager.ApplyReceived(sender.userId, packet);
     }
 
+    private void OnMpCustomAvatarFileRequestReceived(MpCustomAvatarFileRequestPacket packet, IConnectedPlayer sender)
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars)
+            return;
+        if (sender == null)
+            return;
+        MpCustomAvatarLobbyTransferManager.Instance?.HandleFileRequest(packet, sender);
+    }
+
+    private void OnMpCustomAvatarFileChunkReceived(MpCustomAvatarFileChunkPacket packet, IConnectedPlayer sender)
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars)
+            return;
+        if (sender == null)
+            return;
+        MpCustomAvatarLobbyTransferManager.Instance?.HandleFileChunk(packet, sender);
+    }
+
     private static string BuildOxfordAmpersandList(IReadOnlyList<string> escapedDisplayNames)
     {
         if (escapedDisplayNames.Count == 0) return "";
@@ -890,11 +920,22 @@ public class ChatManager : IInitializable, IDisposable
         NotifyMessageReceived(new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
     }
 
+    public event Action<string>? SystemMessageRemovalRequested;
+
     public void PostSystemMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
         message = message.Replace("<", "&lt;").Replace(">", "&gt;");
         MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true, nameColor: null));
+    }
+
+    public void RequestRemoveSystemMessage(string message)
+    {
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        var escaped = message.Replace("<", "&lt;").Replace(">", "&gt;");
+        SystemMessageRemovalRequested?.Invoke(escaped);
     }
 
     public void PostSystemMessageRich(string message)

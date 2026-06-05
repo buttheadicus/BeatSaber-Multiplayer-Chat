@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
+using MultiplayerChat.Core;
 using Tweening;
 using UnityEngine;
 
@@ -81,7 +82,16 @@ internal static class MpChatMultiplayerLobbyScaleAnimatorPatches
                 .InstructionEnumeration();
         }
 
-        private static void SetLocalScaleAttacherStub(Transform transform, Vector3 scale) =>
+        private static void SetLocalScaleAttacherStub(Transform transform, Vector3 scale)
+        {
+            var driver = transform.GetComponent<MpChatLobbyCustomAvatarDriver>();
+            if (driver != null && driver.HasActiveCustomAvatar)
+            {
+                transform.localScale = Vector3.one;
+                return;
+            }
+
             transform.localScale = Vector3.one * 0.05f;
+        }
     }
 }

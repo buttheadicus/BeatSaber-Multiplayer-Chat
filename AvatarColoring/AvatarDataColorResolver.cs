@@ -38,4 +38,37 @@ internal static class AvatarDataColorResolver
                 return false;
         }
     }
+
+    internal static bool TrySetColor(AvatarData data, AvatarPart part, Color color)
+    {
+        switch (part)
+        {
+            case AvatarPart.HeadTopPrimaryColor:
+                data.headTopPrimaryColor = color;
+                return true;
+            case AvatarPart.HeadTopSecondaryColor:
+                data.headTopSecondaryColor = color;
+                return true;
+            case AvatarPart.GlassesColor:
+                data.glassesColor = color;
+                return true;
+            case AvatarPart.FacialHairColor:
+                data.facialHairColor = color;
+                return true;
+            case AvatarPart.HandsColor:
+                data.handsColor = color;
+                return true;
+            case AvatarPart.ClothesModelPrimaryColor:
+                data.clothesPrimaryColor = color;
+                return true;
+            case AvatarPart.ClothesModelSecondaryColor:
+                data.clothesSecondaryColor = color;
+                return true;
+            case AvatarPart.ClothesModelDetailColor:
+                data.clothesDetailColor = color;
+                return true;
+            default:
+                return false;
+        }
+    }
 }

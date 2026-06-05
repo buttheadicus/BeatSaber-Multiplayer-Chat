@@ -7,8 +7,6 @@ namespace MultiplayerChat.Core;
 
 internal static class VoiceReceiveDiagnostics
 {
-    public static bool EnableVerboseChunkLogs;
-
     private const float DropLogThrottleSec = 1.0f;
     private const float HotMicChunkLogIntervalSec = 0.35f;
     private const int MaxScheduleDetailLogs = 12;
@@ -71,7 +69,7 @@ internal static class VoiceReceiveDiagnostics
 
     public static bool ShouldLogVoiceMessageChunkLine(string userId)
     {
-        if (!EnableVerboseChunkLogs || VoiceBareStreamMode.Enabled) return false;
+        if (!MpChatVerboseDebug.IsOn || VoiceBareStreamMode.Enabled) return false;
         var now = Time.realtimeSinceStartup;
         if (s_nextVoiceMsgChunkLog.TryGetValue(userId, out var next) && now < next) return false;
         s_nextVoiceMsgChunkLog[userId] = now + HotMicChunkLogIntervalSec;

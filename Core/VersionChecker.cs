@@ -8,6 +8,7 @@ using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.SceneManagement;
 using Zenject;
 
 namespace MultiplayerChat.Core;
@@ -15,30 +16,30 @@ namespace MultiplayerChat.Core;
 public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 {
     private const string ApiUrl = "https://api.github.com/repos/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
+    private const string ReleasePageUrl = "https://github.com/buttheadicus/BeatSaber-Multiplayer-Chat/releases/latest";
+    private const float MainMenuUpdateNoticeDelaySec = 2f;
+    private const float MaxWaitForMainMenuSec = 120f;
 
-    [Inject] private readonly DiContainer _container = null!;
-    [Inject] private readonly MainFlowCoordinator _mainFlowCoordinator = null!;
+    public static VersionChecker? Instance { get; private set; }
 
     public static string UpdateMessage { get; private set; } = "Checking for updates...";
 
     public void Initialize()
     {
+        Instance = this;
         StartCoroutine(CheckForUpdates());
     }
 
     private IEnumerator CheckForUpdates()
     {
-        MultiplayerChat.Plugin.Log?.Info("[MPChat] Version check starting...");
+        MpChatLog.DebugLine("[MPChat] Version check starting...");
         yield return new WaitForSeconds(0.5f);
         var currentVersion = GetCurrentVersion();
         if (string.IsNullOrEmpty(currentVersion))
         {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not read current version from manifest");
             UpdateMessage = "Could not read this mod version.";
             yield break;
         }
-
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Current version: {currentVersion}");
 
         using var request = UnityWebRequest.Get(ApiUrl);
         request.SetRequestHeader("User-Agent", "MultiplayerChat-Mod");
@@ -46,7 +47,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
         if (request.result != UnityWebRequest.Result.Success)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Version check failed: {request.error}");
             UpdateMessage = "Could not reach GitHub to check for updates.";
             yield break;
         }
@@ -55,29 +55,21 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         var latestVersion = ParseVersionFromJson(json);
         if (string.IsNullOrEmpty(latestVersion))
         {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not parse version from GitHub response");
             UpdateMessage = "Could not parse the latest release version.";
             yield break;
         }
 
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Latest GitHub version: {latestVersion}");
-
         var updateAvailable = IsNewerVersion(latestVersion!, currentVersion!);
         UpdateMessage = updateAvailable
-            ? "An update to Multiplayer Chat is available."
+            ? ChatBubbleManager.UpdateAvailableHeaderMessage
             : "Multiplayer Chat is up to date.";
 
         if (!updateAvailable)
-        {
-            MultiplayerChat.Plugin.Log?.Info("[MPChat] No update needed (up to date or ahead)");
             yield break;
-        }
-
-        MultiplayerChat.Plugin.Log?.Info($"[MPChat] Update available: {currentVersion} -> {latestVersion}");
 
         if (!ModSettings.EnableCau)
         {
-            PresentUpdateFlowCoordinator();
+            yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: true);
             yield break;
         }
 
@@ -88,30 +80,25 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
             if (cauReleaseReq.result != UnityWebRequest.Result.Success)
             {
-                MultiplayerChat.Plugin.Log?.Warn(
-                    $"[MPChat][CAU] Could not fetch CAU release: {cauReleaseReq.error}");
                 UpdateMessage =
                     "An update is available. Enable CAU is on, but the CAU updater release could not be reached.";
-                PresentUpdateFlowCoordinator();
+                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
                 yield break;
             }
 
             var cauReleaseJson = cauReleaseReq.downloadHandler.text;
             if (!GitHubReleaseVersion.TryGetCauExeDownloadUrl(cauReleaseJson, out var cauUrl))
             {
-                MultiplayerChat.Plugin.Log?.Warn(
-                    $"[MPChat][CAU] CAU repo latest release has no {GitHubReleaseVersion.CauExeAssetFileName} asset.");
                 UpdateMessage =
                     $"An update is available. Enable CAU is on, but {GitHubReleaseVersion.CauExeAssetFileName} was not found on the CAU repo's latest release.";
-                PresentUpdateFlowCoordinator();
+                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
                 yield break;
             }
 
             var maybeDest = CauBootstrap.GetCauExePath();
             if (string.IsNullOrEmpty(maybeDest))
             {
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat][CAU] Could not resolve Plugins path.");
-                PresentUpdateFlowCoordinator();
+                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
                 yield break;
             }
 
@@ -120,9 +107,8 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
             if (!File.Exists(destPath))
             {
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat][CAU] Download did not produce the exe.");
                 UpdateMessage = "An update is available. CAU download failed.";
-                PresentUpdateFlowCoordinator();
+                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
                 yield break;
             }
 
@@ -130,6 +116,72 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
 
         yield break;
+    }
+
+    public void PresentUpdateNoticeForDebug() =>
+        StartCoroutine(ShowUpdateNoticeWhenMainMenuReady(
+            openReleasePage: true,
+            message: ChatBubbleManager.UpdateAvailableHeaderMessage));
+
+    private IEnumerator ShowUpdateNoticeWhenMainMenuReady(bool openReleasePage, string? message = null)
+    {
+        yield return WaitForMainMenuReadyThenDelay(MainMenuUpdateNoticeDelaySec);
+        if (!IsMainMenuSceneActive())
+            yield break;
+
+        yield return PresentTitleBarNoticeRoutine(openReleasePage, message);
+    }
+
+    private static IEnumerator WaitForMainMenuReadyThenDelay(float delayAfterMenu)
+    {
+        var deadline = Time.realtimeSinceStartup + MaxWaitForMainMenuSec;
+        while (Time.realtimeSinceStartup < deadline && !IsMainMenuSceneActive())
+            yield return null;
+
+        if (!IsMainMenuSceneActive())
+        {
+            MpChatLog.Warn("[MPChat] Update notice skipped: main menu scene not active.");
+            yield break;
+        }
+
+        yield return new WaitForSeconds(delayAfterMenu);
+    }
+
+    private static bool IsMainMenuSceneActive()
+    {
+        var scene = SceneManager.GetActiveScene();
+        return scene.IsValid() && scene.name == "MainMenu";
+    }
+
+    private static IEnumerator PresentTitleBarNoticeRoutine(bool openReleasePage, string? message)
+    {
+        var text = message ?? UpdateMessage;
+        if (openReleasePage || text == ChatBubbleManager.UpdateAvailableHeaderMessage)
+            OpenReleasePage();
+
+        for (var i = 0; i < 48 && ChatBubbleManager.Instance == null; i++)
+            yield return new WaitForSeconds(0.25f);
+
+        if (ChatBubbleManager.Instance == null)
+        {
+            MpChatLog.Warn("[MPChat] Update notice skipped: title-bar chat host not ready.");
+            yield break;
+        }
+
+        ChatBubbleManager.Instance.ShowTimedHeaderSystemMessage(text, 30f);
+        MpChatLog.DebugLine("[MPChat] Update notice shown on main menu title bar.");
+    }
+
+    private static void OpenReleasePage()
+    {
+        try
+        {
+            Application.OpenURL(ReleasePageUrl);
+        }
+        catch (Exception ex)
+        {
+            MpChatLog.Warn($"[MPChat] Failed to open release page: {ex.Message}");
+        }
     }
 
     private static IEnumerator DownloadToFileCoroutine(string url, string destPath)
@@ -142,7 +194,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
         catch
         {
-            /* ignore */
         }
 
         using var req = UnityWebRequest.Get(url);
@@ -151,17 +202,11 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
-        {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][CAU] Download failed: {req.error}");
             yield break;
-        }
 
         var data = req.downloadHandler.data;
         if (data == null || data.Length == 0)
-        {
-            MultiplayerChat.Plugin.Log?.Warn("[MPChat][CAU] Download empty.");
             yield break;
-        }
 
         try
         {
@@ -175,7 +220,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][CAU] Write/move failed: {ex.Message}");
+            MpChatLog.Warn($"[MPChat][CAU] Write/move failed: {ex.Message}");
             try
             {
                 if (File.Exists(tmp))
@@ -183,7 +228,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             }
             catch
             {
-                /* ignore */
             }
         }
     }
@@ -195,8 +239,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             var gameRoot = Path.GetDirectoryName(Application.dataPath);
             if (string.IsNullOrEmpty(gameRoot))
             {
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat][CAU] Could not get Beat Saber path.");
-                PresentUpdateFlowCoordinator();
+                StartCoroutine(ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false));
                 return;
             }
 
@@ -211,28 +254,15 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][CAU] Failed to launch: {ex.Message}");
-            PresentUpdateFlowCoordinator();
-        }
-    }
-
-    private void PresentUpdateFlowCoordinator()
-    {
-        try
-        {
-            var fc = _container.InstantiateComponentOnNewGameObject<UpdateFlowCoordinator>();
-            fc.ParentFlow = _mainFlowCoordinator;
-            fc.SetMessage(UpdateMessage);
-            _mainFlowCoordinator.PresentFlowCoordinator(fc);
-        }
-        catch (Exception ex)
-        {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to present update tab: {ex.Message}");
+            MpChatLog.Warn($"[MPChat][CAU] Failed to launch: {ex.Message}");
+            StartCoroutine(ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false));
         }
     }
 
     public void Dispose()
     {
+        if (ReferenceEquals(Instance, this))
+            Instance = null;
     }
 
     private static string? GetCurrentVersion()
@@ -251,7 +281,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to read version: {ex.Message}");
+            MpChatLog.Warn($"[MPChat] Failed to read version: {ex.Message}");
             return null;
         }
     }

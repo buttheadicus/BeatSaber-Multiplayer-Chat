@@ -9,8 +9,7 @@ releases/
 *.suo
 .vs/
 .cursor/
+BeatSaber-Multiplayer-Chat.code-workspace
 *.dll
 *.zip
 !manifest.json
-*BeatSaber-Multiplayer-Chat-Quest.MD
-*BeatSaber-Multiplayer-Chat.code-workspace

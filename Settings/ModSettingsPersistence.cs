@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -25,10 +26,24 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("avatarColorDirectNumberEntry")]
         public bool AvatarColorDirectNumberEntry { get; set; }
+
+        [JsonProperty("enableQuickBinds")]
+        public bool EnableQuickBinds { get; set; }
+
+        [JsonProperty("quickJoinQuickPlayCombo")]
+        public List<int> QuickJoinQuickPlayCombo { get; set; } = new();
+
+        [JsonProperty("quickDisconnectCombo")]
+        public List<int> QuickDisconnectCombo { get; set; } = new();
+
+        [JsonProperty("quickReadyUpCombo")]
+        public List<int> QuickReadyUpCombo { get; set; } = new();
     }
 
     internal sealed class PerformanceSettingsSection
     {
+        [JsonProperty("limitIncomingAvatarDataDuringSongs")]
+        public bool LimitIncomingAvatarDataDuringSongs { get; set; }
     }
 
     internal sealed class Data
@@ -55,6 +70,8 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("pttBindingIndex")] public int PttBindingIndex { get; set; }
 
+        [JsonProperty("enableVoiceMessages")] public bool EnableVoiceMessages { get; set; }
+
         [JsonProperty("voiceDuckingEnabled")] public bool VoiceDuckingEnabled { get; set; }
 
         [JsonProperty("voiceDuckTargetPercent")] public int VoiceDuckTargetPercent { get; set; } = 35;
@@ -70,6 +87,10 @@ internal static class ModSettingsPersistence
         [JsonProperty("lobbyCustomAvatarRelativePath")] public string LobbyCustomAvatarRelativePath { get; set; } = "";
 
         [JsonProperty("lobbyCustomAvatarContentHash")] public string LobbyCustomAvatarContentHash { get; set; } = "";
+
+        // 0 = unset. Saved when you press Calibrate Height; reapplied on later lobby joins.
+        [JsonProperty("lobbyCustomAvatarSavedEyeHeightMeters")]
+        public float LobbyCustomAvatarSavedEyeHeightMeters { get; set; }
 
         [JsonProperty("enableCau")] public bool EnableCau { get; set; }
 
@@ -237,6 +258,27 @@ internal static class ModSettingsPersistence
         if (hash.Length > 32)
             hash = hash.Substring(0, 32);
         d.LobbyCustomAvatarContentHash = CustomAvatarHashUtil.LooksLikeMd5Hex(hash) ? hash : "";
+
+        if (d.LobbyCustomAvatarSavedEyeHeightMeters > 0f)
+            d.LobbyCustomAvatarSavedEyeHeightMeters = Mathf.Clamp(
+                d.LobbyCustomAvatarSavedEyeHeightMeters,
+                0.8f,
+                2.6f);
+
+        d.Addons.QuickJoinQuickPlayCombo ??= new List<int>();
+        d.Addons.QuickDisconnectCombo ??= new List<int>();
+        d.Addons.QuickReadyUpCombo ??= new List<int>();
+        NormalizeQuickBindCombo(d.Addons.QuickJoinQuickPlayCombo);
+        NormalizeQuickBindCombo(d.Addons.QuickDisconnectCombo);
+        NormalizeQuickBindCombo(d.Addons.QuickReadyUpCombo);
+    }
+
+    private static void NormalizeQuickBindCombo(List<int> combo)
+    {
+        if (combo == null)
+            return;
+        for (var i = 0; i < combo.Count; i++)
+            combo[i] = Mathf.Clamp(combo[i], 0, 3);
     }
 
     private static void PushNameColorToInstallExtensions(string normalizedHex6)

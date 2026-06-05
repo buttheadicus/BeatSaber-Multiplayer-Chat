@@ -9,14 +9,12 @@ using UnityEngine;
 
 namespace MultiplayerChat.UI;
 
-[ViewDefinition("MultiplayerChat.UI.VoiceSettingsView.bsml")]
-public class VoiceSettingsViewController : BSMLAutomaticViewController
+[ViewDefinition("MultiplayerChat.UI.MicSettingsView.bsml")]
+public sealed class MicSettingsViewController : BSMLAutomaticViewController
 {
     private const string MicDefaultLabel = "Windows Default";
 
-    public event EventHandler? ApplyClicked;
-
-    public event Action? ConfigureLowerVolumeWhenSpeakingClicked;
+    public event Action? MicSettingsApplied;
 
     [UIComponent("MicInput")] private DropDownListSetting? _micInput;
 
@@ -24,8 +22,12 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
 
     [UIComponent("PushToTalkToggle")] private ToggleSetting? _pushToTalkToggle;
 
+    [UIComponent("EnableVoiceMessagesToggle")] private ToggleSetting? _enableVoiceMessagesToggle;
+
     private readonly List<object> _micOptionObjects = new() { MicDefaultLabel };
     private readonly List<object> _pttOptionObjects = new() { "Primary", "Secondary", "Trigger", "Grip" };
+
+    private bool _draftEnableVoiceMessages;
 
     [UIValue("MicOptions")]
     public IList MicOptions => _micOptionObjects;
@@ -40,9 +42,17 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
         set => ModSettings.PushToTalkEnabled = value;
     }
 
+    [UIValue("EnableVoiceMessagesDraft")]
+    public bool EnableVoiceMessagesDraft
+    {
+        get => _draftEnableVoiceMessages;
+        set => _draftEnableVoiceMessages = value;
+    }
+
     [UIAction("#post-parse")]
     private void PostParse()
     {
+        _draftEnableVoiceMessages = ModSettings.EnableVoiceMessages;
         BuildMicList();
         BuildPttDropdown();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
@@ -51,6 +61,7 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
+        _draftEnableVoiceMessages = ModSettings.EnableVoiceMessages;
         BuildMicList();
         BuildPttDropdown();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
@@ -99,9 +110,6 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
         _pttDropdown.ReceiveValue();
     }
 
-    [UIAction("ConfigureLowerVolumeWhenSpeakingClicked")]
-    private void OnConfigureLowerVolumeWhenSpeakingClicked() => ConfigureLowerVolumeWhenSpeakingClicked?.Invoke();
-
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
@@ -123,10 +131,13 @@ public class VoiceSettingsViewController : BSMLAutomaticViewController
             };
         }
 
-        // BSML toggles do not always sync [UIValue] back to PlayerPrefs until Apply; persist explicitly from components.
         if (_pushToTalkToggle != null)
             ModSettings.PushToTalkEnabled = _pushToTalkToggle.Value;
 
-        ApplyClicked?.Invoke(this, EventArgs.Empty);
+        if (_enableVoiceMessagesToggle != null)
+            _draftEnableVoiceMessages = _enableVoiceMessagesToggle.Value;
+
+        ModSettings.EnableVoiceMessages = _draftEnableVoiceMessages;
+        MicSettingsApplied?.Invoke();
     }
 }

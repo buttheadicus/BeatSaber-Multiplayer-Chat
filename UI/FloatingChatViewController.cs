@@ -32,6 +32,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         if (firstActivation)
         {
             _chatManager.MessageReceived += OnMessageReceived;
+            _chatManager.SystemMessageRemovalRequested += OnSystemMessageRemovalRequested;
         }
         // Force content flat every activation - FloatingScreen can inherit rotation
         EnsureFlatTransform();
@@ -78,7 +79,36 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         if (removedFromHierarchy)
         {
             _chatManager.MessageReceived -= OnMessageReceived;
+            _chatManager.SystemMessageRemovalRequested -= OnSystemMessageRemovalRequested;
         }
+    }
+
+    private void OnSystemMessageRemovalRequested(string exactMessageText)
+    {
+        if (string.IsNullOrEmpty(exactMessageText) || _messageRows.Count == 0)
+            return;
+
+        for (var i = _messageRows.Count - 1; i >= 0; i--)
+        {
+            var row = _messageRows[i];
+            if (row == null)
+            {
+                _messageRows.RemoveAt(i);
+                continue;
+            }
+
+            var tmp = row.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp == null || tmp.text != exactMessageText)
+                continue;
+
+            _messageRows.RemoveAt(i);
+            row.SetActive(false);
+            Destroy(row);
+        }
+
+        var contentRect = _chatLogContent?.GetComponent<RectTransform>();
+        if (contentRect != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
     }
 
     private void OnMessageReceived(object? sender, ChatMessageEventArgs e)
@@ -142,7 +172,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
-            ? (systemMessageRichText ? message : EscapeRichText(message))
+            ? (systemMessageRichText ? message : message)
             : $"<color=#{hex}>{EscapeRichText(userName)}:</color> {EscapeRichText(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;

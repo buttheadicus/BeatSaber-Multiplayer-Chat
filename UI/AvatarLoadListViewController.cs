@@ -93,16 +93,17 @@ public sealed class AvatarLoadListViewController : BSMLAutomaticViewController
             return;
         if (_deleteMode)
         {
-            tmp.text = "TAP ON AVATAR NAME TO DELETE IT. PRESS THIS BUTTON AGAIN TO END DELETE MODE.";
+            tmp.text =
+                "DELETE MODE ON. TAP ON AVATAR NAME TO DELETE THE AVATAR. TAP ON THIS BUTTON AGAIN TO TURN DELETE MODE OFF.";
             tmp.fontSize = 2.35f;
             tmp.enableWordWrapping = true;
             tmp.alignment = TextAlignmentOptions.Center;
         }
         else
         {
-            tmp.text = "DELETE MODE OFF. PRESS THIS BUTTON TO ENABLE IT.";
+            tmp.text = "Delete mode is off. Tap on this button to turn it on!";
             tmp.fontSize = 3.2f;
-            tmp.enableWordWrapping = false;
+            tmp.enableWordWrapping = true;
             tmp.alignment = TextAlignmentOptions.Center;
         }
     }

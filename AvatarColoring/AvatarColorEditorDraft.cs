@@ -120,8 +120,20 @@ internal static class AvatarColorEditorDraft
 
     internal static void CommitPendingChangeColor(EditAvatarColorViewController vc)
     {
+        var color = vc.color;
+        if (AvatarColoringAlphaSliderPatcher.TryGetCommittedEditColor(out var merged))
+            color = merged;
+
+        vc.SetColor(color);
         using (CommitBypassScope())
-            vc.InvokeMethod<object, EditAvatarColorViewController>("ChangeColor", vc.color);
+            vc.InvokeMethod<object, EditAvatarColorViewController>("ChangeColor", color);
+
+        // Stock ChangeColor / HSV paths often persist RGB only (alpha becomes 1). Write full RGBA from our controls.
+        if (_model?.avatarData != null
+            && AvatarDataColorResolver.TrySetColor(_model.avatarData, AvatarColorEditContext.LastPart, color))
+        {
+            _model.ReportAvatarChanged();
+        }
     }
 
     private static void RevertVisualAndModel(EditAvatarColorViewController vc,

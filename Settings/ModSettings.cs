@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using MultiplayerChat.Core;
 
@@ -125,6 +126,16 @@ public static class ModSettings
         }
     }
 
+    public static bool EnableVoiceMessages
+    {
+        get => D.EnableVoiceMessages;
+        set
+        {
+            D.EnableVoiceMessages = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
     public static bool VoiceDuckingEnabled
     {
         get => D.VoiceDuckingEnabled;
@@ -228,6 +239,60 @@ public static class ModSettings
         }
     }
 
+    public static bool EnableQuickBinds
+    {
+        get => D.Addons.EnableQuickBinds;
+        set
+        {
+            D.Addons.EnableQuickBinds = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static IReadOnlyList<int> QuickJoinQuickPlayCombo => D.Addons.QuickJoinQuickPlayCombo ?? new List<int>();
+
+    public static IReadOnlyList<int> QuickDisconnectCombo => D.Addons.QuickDisconnectCombo ?? new List<int>();
+
+    public static IReadOnlyList<int> QuickReadyUpCombo => D.Addons.QuickReadyUpCombo ?? new List<int>();
+
+    public static void SetQuickJoinQuickPlayCombo(IReadOnlyList<int> combo)
+    {
+        D.Addons.QuickJoinQuickPlayCombo = NormalizeQuickBindComboCopy(combo);
+        ModSettingsPersistence.Save();
+    }
+
+    public static void SetQuickDisconnectCombo(IReadOnlyList<int> combo)
+    {
+        D.Addons.QuickDisconnectCombo = NormalizeQuickBindComboCopy(combo);
+        ModSettingsPersistence.Save();
+    }
+
+    public static void SetQuickReadyUpCombo(IReadOnlyList<int> combo)
+    {
+        D.Addons.QuickReadyUpCombo = NormalizeQuickBindComboCopy(combo);
+        ModSettingsPersistence.Save();
+    }
+
+    public static bool LimitIncomingAvatarDataDuringSongs
+    {
+        get => D.Performance.LimitIncomingAvatarDataDuringSongs;
+        set
+        {
+            D.Performance.LimitIncomingAvatarDataDuringSongs = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    private static List<int> NormalizeQuickBindComboCopy(IReadOnlyList<int> combo)
+    {
+        var list = new List<int>();
+        if (combo == null)
+            return list;
+        foreach (var raw in combo)
+            list.Add(Mathf.Clamp(raw, 0, 3));
+        return list;
+    }
+
     public static bool EnableLobbyCustomAvatars
     {
         get => D.EnableLobbyCustomAvatars;
@@ -269,6 +334,21 @@ public static class ModSettings
             D.LobbyCustomAvatarContentHash = CustomAvatarHashUtil.LooksLikeMd5Hex(h) ? h : "";
             ModSettingsPersistence.Save();
         }
+    }
+
+    public static bool HasLobbyCustomAvatarSavedEyeHeight =>
+        TryGetLobbyCustomAvatarSavedEyeHeight(out _);
+
+    public static bool TryGetLobbyCustomAvatarSavedEyeHeight(out float eyeHeightMeters)
+    {
+        eyeHeightMeters = D.LobbyCustomAvatarSavedEyeHeightMeters;
+        return eyeHeightMeters >= 0.8f && eyeHeightMeters <= 2.6f;
+    }
+
+    public static void SetLobbyCustomAvatarSavedEyeHeight(float eyeHeightMeters)
+    {
+        D.LobbyCustomAvatarSavedEyeHeightMeters = Mathf.Clamp(eyeHeightMeters, 0.8f, 2.6f);
+        ModSettingsPersistence.Save();
     }
 
 }

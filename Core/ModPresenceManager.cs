@@ -50,7 +50,8 @@ public class ModPresenceManager : IInitializable, IDisposable
 
         // Presence sends immediately. Reply waits 6 seconds. Ignored from song -> retry in 3 seconds.
         MultiplayerChat.Plugin.Log?.Info("[MPChat] ModPresenceManager initialized");
-        BroadcastPresence();
+        if (!MpChatLobbyDiagnostics.SongGameplayLikelyActive())
+            BroadcastPresence();
         _coroutineHost.StartCoroutine(RepeatBroadcast());
     }
 
@@ -59,7 +60,8 @@ public class ModPresenceManager : IInitializable, IDisposable
         for (var i = 0; i < 20; i++) // Try for ~40 seconds
         {
             yield return new WaitForSeconds(2f);
-            BroadcastPresence();
+            if (!MpChatLobbyDiagnostics.SongGameplayLikelyActive())
+                BroadcastPresence();
         }
     }
 
@@ -123,19 +125,29 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     private void OnPlayerConnected(IConnectedPlayer player)
     {
+        if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+            return;
+
         var local = _sessionManager.localPlayer;
         if (local != null && !string.IsNullOrEmpty(local.userId))
         {
             lock (_lock) _playersWithMod.Add(local.userId);
         }
+
         BroadcastPresence();
-        PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnPlayerDisconnected(IConnectedPlayer player)
     {
-        lock (_lock) _playersWithMod.Remove(player.userId);
-        PresenceUpdated?.Invoke(this, EventArgs.Empty);
+        if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+            return;
+
+        var removed = false;
+        lock (_lock)
+            removed = _playersWithMod.Remove(player.userId);
+
+        if (removed)
+            PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     // Updates ChatPlayerIdRegistry when SenderChatId is valid; still drives has-mod UI when SenderChatId is temporarily invalid (reset/regenerate window).
@@ -209,10 +221,10 @@ public class ModPresenceManager : IInitializable, IDisposable
                     SchedulePresenceRetry();
                 return;
             }
-            // Proper reply - they have the mod. Lyra waits 6 seconds before showing "X has chat".
+            // Proper reply - they have the mod.
             _hasReceivedPresenceReply = true;
-            _coroutineHost.StartCoroutine(ShowPlayerWithModAfter6Seconds(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient));
             CancelPresenceRetry();
+            TryRegisterRemotePlayerWithMod(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient);
             return;
         }
 
@@ -224,22 +236,34 @@ public class ModPresenceManager : IInitializable, IDisposable
             return;
         }
 
-        // We're in lobby - process immediately (everyone sees "Lyra has chat" right away), reply immediately
+        // We're in lobby - register mod user and reply immediately.
         // Skip if sender already left (e.g. delayed packet)
         var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
         if (!connected.Any(p => p.userId == sender.userId))
             return;
-        lock (_lock)
-        {
-            if (_playersWithMod.Add(sender.userId))
-            {
-                MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {sender.userName} has chat mod");
-                PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient));
-            }
-        }
+        TryRegisterRemotePlayerWithMod(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient);
 
         SendPresenceTo(sender.userId);
+    }
+
+    private void TryRegisterRemotePlayerWithMod(string userId, string userName, string? senderNameColor, bool isSlzCompanionClient)
+    {
+        if (string.IsNullOrEmpty(userId))
+            return;
+
+        var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
+        if (!connected.Any(p => p.userId == userId))
+            return;
+
+        lock (_lock)
+        {
+            if (!_playersWithMod.Add(userId))
+                return;
+
+            MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {userName} has chat mod");
+            PresenceUpdated?.Invoke(this, EventArgs.Empty);
+            PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor, isSlzCompanionClient));
+        }
     }
 
     private void SchedulePresenceRetry()
@@ -263,24 +287,6 @@ public class ModPresenceManager : IInitializable, IDisposable
         _presenceRetryCoroutine = null;
         BroadcastPresence();
         MultiplayerChat.Plugin.Log?.Info("[MPChat] Presence retry (was ignored from song)");
-    }
-
-    private IEnumerator ShowPlayerWithModAfter6Seconds(string userId, string userName, string? senderNameColor, bool isSlzCompanionClient)
-    {
-        yield return new WaitForSeconds(6f);
-        // Don't add if they left during the delay
-        var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
-        if (!connected.Any(p => p.userId == userId))
-            yield break;
-        lock (_lock)
-        {
-            if (_playersWithMod.Add(userId))
-            {
-                MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence reply: {userName} has chat mod");
-                PresenceUpdated?.Invoke(this, EventArgs.Empty);
-                PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor, isSlzCompanionClient));
-            }
-        }
     }
 
     private ModPresencePacket BuildPresencePacket(string? targetUserId = null, bool ignoredFromSong = false)
@@ -335,6 +341,17 @@ public class ModPresenceManager : IInitializable, IDisposable
     {
         if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current)) return;
         _sessionManager.Send(BuildPresencePacket());
+    }
+
+    // After gameplay when lobby UI is active again (presence was skipped during the song).
+    public void RefreshAfterLobbyReturn()
+    {
+        if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+            return;
+        if (!MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+            return;
+        BroadcastPresence();
+        PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 }
 

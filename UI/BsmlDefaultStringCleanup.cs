@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
@@ -18,6 +19,14 @@ internal static class BsmlDefaultStringCleanup
             if (string.Equals(trimmed, "Default String", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(trimmed, "Default Text", StringComparison.OrdinalIgnoreCase))
                 t.text = "";
+        }
+
+        foreach (var input in root.GetComponentsInChildren<TMP_InputField>(true))
+        {
+            if (input == null) continue;
+            var s = input.text;
+            if (string.Equals(s?.Trim(), "10", StringComparison.Ordinal))
+                input.text = "";
         }
     }
 }

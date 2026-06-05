@@ -22,11 +22,13 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     public static ChatBubbleManager? Instance { get; private set; }
 
     [Inject] private readonly DiContainer _container = null!;
-    [Inject] private readonly ChatManager _chatManager = null!;
+    [Inject(Optional = true)] private readonly ChatManager? _chatManager;
 
     private ChatManager? _messageSubscriptionTarget;
 
     private readonly List<ChatBubble> _stackedBubbles = new();
+
+    private const float AvatarTransferStatusBubbleSeconds = 5f;
     private readonly Dictionary<string, ChatBubble> _ephemeralTypingByUserId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ChatBubble> _ephemeralRecordingByUserId = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ChatBubble> _ephemeralLocalByKey = new(StringComparer.Ordinal);
@@ -38,7 +40,13 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private Coroutine? _moveModeHelperCoroutine;
 
     private float _nextNametagEnsureRealtime = -999f;
-    private const float NametagEnsureMinIntervalSec = 2.75f;
+    private const float NametagEnsureMinIntervalSec = 4.5f;
+
+    private ChatBubble? _timedHeaderNoticeBubble;
+    private Coroutine? _timedHeaderNoticeCoroutine;
+
+    public const string UpdateAvailableHeaderMessage =
+        "There is an update for MultiplayerChat! I've already opened a link in your browser to download and install it!";
 
     private static readonly string[] LobbyUiScanRoots =
     {
@@ -46,6 +54,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     };
 
     private const float SongLobbyPollSleepSec = 2f;
+
+    private const float MainMenuIdlePollSleepSec = 1.25f;
 
     public bool IsMoveMode => _isMoveMode;
 
@@ -76,6 +86,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             $"prevSub={prev} nextSub={live.GetHashCode()} lobby={MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby()} resultsLike={MpChatLobbyDiagnostics.ResultsLikeUiVisible()}");
         if (_messageSubscriptionTarget != null)
             _messageSubscriptionTarget.MessageReceived -= OnMessageReceived;
+
         _messageSubscriptionTarget = live;
         _messageSubscriptionTarget.MessageReceived += OnMessageReceived;
     }
@@ -83,9 +94,27 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     public void Dispose()
     {
         // Zenject disposes lobby-scoped bindings when leaving MP UI; we migrate to DontDestroyOnLoad in Initialize.
-        if (ReferenceEquals(Instance, this) && gameObject.scene.IsValid() &&
-            gameObject.scene.name.IndexOf("DontDestroy", StringComparison.OrdinalIgnoreCase) >= 0)
+        if (!this)
             return;
+
+        if (ReferenceEquals(Instance, this))
+        {
+            try
+            {
+                var host = gameObject;
+                if (host != null)
+                {
+                    var scene = host.scene;
+                    if (scene.IsValid() &&
+                        scene.name.IndexOf("DontDestroy", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return;
+                }
+            }
+            catch (MissingReferenceException)
+            {
+                return;
+            }
+        }
 
         SceneManager.sceneLoaded -= OnSceneLoaded;
         if (Instance == this)
@@ -94,23 +123,54 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         RemoveMoveHandle();
         if (_messageSubscriptionTarget != null)
             _messageSubscriptionTarget.MessageReceived -= OnMessageReceived;
+
         _messageSubscriptionTarget = null;
         ClearEphemeralPresenceMaps();
         foreach (var bubble in _stackedBubbles)
         {
-            if (bubble != null)
-                UnityEngine.Object.Destroy(bubble.gameObject);
+            if (bubble == null)
+                continue;
+            try
+            {
+                var bubbleGo = bubble.gameObject;
+                if (bubbleGo != null)
+                    UnityEngine.Object.Destroy(bubbleGo);
+            }
+            catch (MissingReferenceException)
+            {
+                /* destroyed with scene */
+            }
         }
+
         _stackedBubbles.Clear();
         if (_lobbyHeaderRoot != null)
-            UnityEngine.Object.Destroy(_lobbyHeaderRoot.gameObject);
+        {
+            try
+            {
+                var headerGo = _lobbyHeaderRoot.gameObject;
+                _lobbyHeaderRoot = null;
+                if (headerGo != null)
+                    UnityEngine.Object.Destroy(headerGo);
+            }
+            catch (MissingReferenceException)
+            {
+                _lobbyHeaderRoot = null;
+            }
+        }
     }
 
     private void OnMessageReceived(object? sender, ChatMessageEventArgs e)
     {
         if (e.IsSystem)
         {
-            ShowStackedBubble("", e.Message);
+            var systemText = e.Message ?? "";
+            if (IsAvatarTransferStatusMessage(systemText))
+            {
+                TryShowStackedBubble("", systemText, durationSeconds: AvatarTransferStatusBubbleSeconds);
+                return;
+            }
+
+            ShowStackedBubble("", systemText);
             return;
         }
         var name = TrimName(e.UserName ?? "", 30);
@@ -129,9 +189,13 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         while (true)
         {
             var quickBannerRetry = _lobbyHeaderRoot == null && _lastPollInLobby && _lobbyBannerMissStreak < 40;
-            yield return new WaitForSeconds(quickBannerRetry ? 0.12f : 0.5f);
-
             var inSong = IsInSong();
+            var inLobby = IsInLobby();
+            var showTitleBarChat = ShouldShowTitleBarChat();
+            var pollDelay = quickBannerRetry ? 0.12f : inLobby || inSong || showTitleBarChat ? 0.5f : MainMenuIdlePollSleepSec;
+            yield return new WaitForSeconds(pollDelay);
+
+            inSong = IsInSong();
             if (inSong)
             {
                 if (_stackedBubbles.Count > 0)
@@ -142,16 +206,19 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 continue;
             }
 
-            var inLobby = IsInLobby();
+            inLobby = IsInLobby();
+            showTitleBarChat = ShouldShowTitleBarChat();
             _lastPollInLobby = inLobby;
 
-            if (_wasInLobby && !inLobby)
+            if (_wasInLobby && !inLobby && !showTitleBarChat)
                 ClearChat();
 
             if (inLobby && !_wasInLobby)
             {
                 _nextNametagEnsureRealtime = -999f;
                 RebindToActiveChatManager();
+                ModPresenceManager.Instance?.RefreshAfterLobbyReturn();
+                MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
             }
 
             _wasInLobby = inLobby;
@@ -159,11 +226,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             if (_lobbyHeaderRoot != null)
             {
                 if (_lobbyHeaderRoot.gameObject != null)
-                    _lobbyHeaderRoot.gameObject.SetActive(inLobby);
+                    _lobbyHeaderRoot.gameObject.SetActive(showTitleBarChat);
                 else
                     _lobbyHeaderRoot = null;
             }
-            if (inLobby)
+
+            if (showTitleBarChat)
             {
                 if (_lobbyHeaderRoot == null)
                 {
@@ -181,7 +249,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
                 if (_lobbyHeaderRoot != null)
                 {
-                    EnsureNametagIcons();
+                    if (inLobby && Time.realtimeSinceStartup >= _nextNametagEnsureRealtime)
+                        EnsureNametagIcons();
                     ApplyPlacementMode();
                 }
             }
@@ -287,8 +356,56 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 StopCoroutine(_moveModeHelperCoroutine);
                 _moveModeHelperCoroutine = null;
             }
-            rt.anchoredPosition = DefaultAnchoredPositionForCurrentLobbyRoot();
+            ApplyDefaultLobbyHeaderAnchoredPosition(rt);
         }
+    }
+
+    public void ShowTimedHeaderSystemMessage(string message, float durationSeconds = 30f)
+    {
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        StopTimedHeaderNotice();
+        if (!TryShowStackedBubble("", message))
+            return;
+
+        if (_stackedBubbles.Count > 0)
+            _timedHeaderNoticeBubble = _stackedBubbles[0];
+        _timedHeaderNoticeCoroutine = StartCoroutine(ClearTimedHeaderNoticeAfter(durationSeconds));
+    }
+
+    public void ShowUpdateAvailableNoticeTest() =>
+        ShowTimedHeaderSystemMessage(UpdateAvailableHeaderMessage, 30f);
+
+    private void StopTimedHeaderNotice()
+    {
+        if (_timedHeaderNoticeCoroutine != null)
+        {
+            StopCoroutine(_timedHeaderNoticeCoroutine);
+            _timedHeaderNoticeCoroutine = null;
+        }
+
+        if (_timedHeaderNoticeBubble != null)
+        {
+            RemoveBubbleFromStack(_timedHeaderNoticeBubble);
+            if (_timedHeaderNoticeBubble.gameObject != null)
+                UnityEngine.Object.Destroy(_timedHeaderNoticeBubble.gameObject);
+            _timedHeaderNoticeBubble = null;
+        }
+    }
+
+    private IEnumerator ClearTimedHeaderNoticeAfter(float durationSeconds)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.5f, durationSeconds));
+        StopTimedHeaderNotice();
+    }
+
+    private void ApplyDefaultLobbyHeaderAnchoredPosition(RectTransform rt)
+    {
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() != null)
+            MpChatTitleBarAnchoredChatRoot.ApplyAnchoredPosition(rt, ModSettings.CustomPlacement, ModSettings.LobbyChatPosition);
+        else
+            rt.anchoredPosition = DefaultAnchoredPositionForCurrentLobbyRoot();
     }
 
     private IEnumerator MoveModeHelperMessages()
@@ -550,23 +667,21 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootRect.anchorMax = new Vector2(1f, 1f);
         rootRect.pivot = new Vector2(0.5f, 1f);
         rootRect.sizeDelta = new Vector2(0f, 320f);
-        rootRect.anchoredPosition = ModSettings.CustomPlacement
-            ? ModSettings.LobbyChatPosition
-            : DefaultChatPosition + TitleBarLobbyChatAnchoredPositionOffset;
-
         rootObj.AddComponent<MpChatTitleBarAnchoredChatRoot>();
 
         var le = rootObj.AddComponent<LayoutElement>();
         le.preferredHeight = 320f;
         le.minHeight = 96f;
         le.flexibleHeight = 0f;
+        le.ignoreLayout = true;
 
         EnsureCanvasRaycaster(rootObj.transform);
 
         ApplyLobbyBubbleStackLayout(rootObj);
+        MpChatTitleBarAnchoredChatRoot.ApplyAnchoredPosition(rootRect, ModSettings.CustomPlacement, ModSettings.LobbyChatPosition);
 
-        MultiplayerChat.Plugin.Log?.Info(
-            $"[MPChat] Chat strip above title bar (before {titleView.name} in layout; parent={parent.name}; anchoredYOffset+= {TitleBarLobbyChatAnchoredPositionOffset.y})");
+        MpChatLog.DebugLine(
+            $"[MPChat] Chat strip above title bar (before {titleView.name}; parent={parent.name})");
         return rootObj.transform;
     }
 
@@ -768,14 +883,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private static readonly Vector2 DefaultChatPosition = Vector2.zero;
 
-    // Extra anchoredPosition applied only when the lobby chat strip is parented above TitleViewController.
-    // Increase Y to shift the strip toward the top of the screen (away from the lobby floor); decrease if it moves the wrong way.
-    private static readonly Vector2 TitleBarLobbyChatAnchoredPositionOffset = new(0f, 310f);
-
     private Vector2 DefaultAnchoredPositionForCurrentLobbyRoot()
     {
         if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() != null)
-            return DefaultChatPosition + TitleBarLobbyChatAnchoredPositionOffset;
+            return MpChatTitleBarAnchoredChatRoot.DefaultAnchoredOffset;
         return DefaultChatPosition;
     }
 
@@ -943,21 +1054,32 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    private void ShowStackedBubble(string userName, string message, string? nameColorHex = null)
+    private static bool IsAvatarTransferStatusMessage(string message) =>
+        message.IndexOf("Downloading ", StringComparison.Ordinal) >= 0 &&
+        message.IndexOf("avatar. Please wait.", StringComparison.Ordinal) >= 0;
+
+    private bool TryShowStackedBubble(
+        string userName,
+        string message,
+        string? nameColorHex = null,
+        float? durationSeconds = null)
     {
-        if (!IsInLobby()) return;
+        if (!ShouldShowTitleBarChat())
+            return false;
 
         if (_lobbyHeaderRoot == null)
         {
             var newRoot = FindOrCreateLobbyHeaderChatRoot();
-            if (newRoot == null) return;
+            if (newRoot == null)
+                return false;
             _lobbyHeaderRoot = newRoot;
             if (_isMoveMode)
                 EnsureMoveHandle();
         }
 
         var bubble = CreateStackedBubble(_lobbyHeaderRoot);
-        if (bubble == null) return;
+        if (bubble == null)
+            return false;
 
         var trimmed = TrimName(userName ?? "", 30);
         var safeName = string.IsNullOrEmpty(trimmed) ? "" : trimmed.Replace("<", "&lt;").Replace(">", "&gt;");
@@ -979,7 +1101,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             text = $"{safeName}: {message}";
         }
         bubble.SetText(text);
-        bubble.Show(ModSettings.BubbleDuration, isStacked: true);
+        bubble.Show(durationSeconds ?? ModSettings.BubbleDuration, isStacked: true);
         bubble.transform.SetAsFirstSibling();
         _stackedBubbles.Insert(0, bubble);
 
@@ -996,7 +1118,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 UnityEngine.Object.Destroy(oldest.gameObject);
             }
         }
+
+        return true;
     }
+
+    private void ShowStackedBubble(string userName, string message, string? nameColorHex = null) =>
+        TryShowStackedBubble(userName, message, nameColorHex);
 
     private ChatBubble? CreateStackedBubble(Transform parent)
     {
@@ -1030,11 +1157,16 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         textRect.offsetMax = new Vector2(-8, -4);
 
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
+        if (TMP_Settings.defaultFontAsset != null)
+            tmp.font = TMP_Settings.defaultFontAsset;
         tmp.fontSize = 14;
         tmp.color = Color.white;
         tmp.richText = true;
-        tmp.outlineWidth = 0.2f;
-        tmp.outlineColor = new Color32(0, 0, 0, 200);
+        if (tmp.font != null)
+        {
+            tmp.outlineWidth = 0.2f;
+            tmp.outlineColor = new Color32(0, 0, 0, 200);
+        }
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.enableWordWrapping = true;
         tmp.overflowMode = TextOverflowModes.Overflow;
@@ -1048,6 +1180,15 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private static float _deepLobbyLayoutScanTime = -999f;
 
     private static bool _deepLobbyLayoutScanHit;
+
+    private bool ShouldShowTitleBarChat()
+    {
+        if (MpChatLobbyDiagnostics.SongGameplayLikelyActive())
+            return false;
+        if (IsInLobby())
+            return true;
+        return FindTitleViewControllerTransformForChatAnchor() != null;
+    }
 
     private bool IsInLobby()
     {
@@ -1125,7 +1266,42 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     }
 }
 
-// Marker on RectTransforms positioned via title-bar-relative layout so placement helpers can detect that mode.
+// Title-bar chat strip: ignore parent layout groups and keep a stable anchored offset above TitleViewController.
 internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
 {
+    internal static readonly Vector2 DefaultAnchoredOffset = new(0f, 310f);
+
+    private int _stabilizeFramesLeft;
+
+    private void OnEnable()
+    {
+        _stabilizeFramesLeft = 12;
+        StabilizeNow();
+    }
+
+    private void LateUpdate()
+    {
+        if (_stabilizeFramesLeft <= 0)
+            return;
+        _stabilizeFramesLeft--;
+        StabilizeNow();
+    }
+
+    private void StabilizeNow()
+    {
+        var rt = GetComponent<RectTransform>();
+        if (rt == null)
+            return;
+        if (TryGetComponent<LayoutElement>(out var le))
+            le.ignoreLayout = true;
+        ApplyAnchoredPosition(rt, ModSettings.CustomPlacement, ModSettings.LobbyChatPosition);
+    }
+
+    internal static void ApplyAnchoredPosition(RectTransform rt, bool customPlacement, Vector2 customPosition)
+    {
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = customPlacement ? customPosition : DefaultAnchoredOffset;
+    }
 }

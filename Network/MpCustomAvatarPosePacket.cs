@@ -11,6 +11,8 @@ public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.
 
     public const byte FlagHasFbtBlob = 2;
 
+    public const byte FlagHasScale = 4;
+
     public const int MaxDescriptorChars = 160;
 
     public const int MaxFbtBlobBytes = 512;
@@ -18,6 +20,8 @@ public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.
     public byte Flags;
 
     public string? AvatarDescriptorId;
+
+    public float AvatarScale = 1f;
 
     public byte[]? FbtBlob;
 
@@ -27,6 +31,9 @@ public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.
         writer.Put(Flags);
         if ((Flags & FlagHasDescriptor) != 0)
             writer.Put(TruncateDescriptor(AvatarDescriptorId));
+
+        if ((Flags & FlagHasScale) != 0)
+            writer.Put(AvatarScale);
 
         if ((Flags & FlagHasFbtBlob) != 0)
         {
@@ -46,6 +53,7 @@ public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.
     {
         Flags = 0;
         AvatarDescriptorId = null;
+        AvatarScale = 1f;
         FbtBlob = null;
 
         if (reader.AvailableBytes <= 0)
@@ -69,6 +77,9 @@ public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.
             if (!string.IsNullOrEmpty(d))
                 AvatarDescriptorId = d.Length > MaxDescriptorChars ? d.Substring(0, MaxDescriptorChars) : d;
         }
+
+        if ((Flags & FlagHasScale) != 0 && reader.AvailableBytes > 0)
+            AvatarScale = reader.GetFloat();
 
         if ((Flags & FlagHasFbtBlob) != 0 && reader.AvailableBytes > 0)
         {

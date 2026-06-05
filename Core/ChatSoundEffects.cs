@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Reflection;
+using MultiplayerChat.AvatarExtras.Assets;
 using MultiplayerChat.Settings;
 using UnityEngine;
 
@@ -9,6 +10,8 @@ namespace MultiplayerChat.Core;
 
 public static class ChatSoundEffects
 {
+    private const string EmbeddedSoundPrefix = "MultiplayerChat.Assets.Sounds.";
+
     public static AudioClip? ChatClip { get; private set; }
     public static AudioClip? MutedClip { get; private set; }
     public static AudioClip? UnmutedClip { get; private set; }
@@ -22,36 +25,39 @@ public static class ChatSoundEffects
             yield break;
         _loadStarted = true;
 
-        var dllPath = Assembly.GetExecutingAssembly().Location;
-        var pluginDir = Path.GetDirectoryName(dllPath);
-        if (string.IsNullOrEmpty(pluginDir))
-            yield break;
-
-        yield return LoadOggFromSearchRoots(pluginDir, "Chat.ogg", c => ChatClip = c);
-        yield return LoadOggFromSearchRoots(pluginDir, "Muted.ogg", c => MutedClip = c);
-        yield return LoadOggFromSearchRoots(pluginDir, "Unmuted.ogg", c => UnmutedClip = c);
-        yield return LoadOggFromSearchRoots(pluginDir, "Error.ogg", c => ErrorClip = c);
+        yield return LoadEmbeddedOgg("Chat.ogg", c => ChatClip = c);
+        yield return LoadEmbeddedOgg("Muted.ogg", c => MutedClip = c);
+        yield return LoadEmbeddedOgg("Unmuted.ogg", c => UnmutedClip = c);
+        yield return LoadEmbeddedOgg("Error.ogg", c => ErrorClip = c);
     }
 
-    private static IEnumerator LoadOggFromSearchRoots(string pluginDir, string fileName, Action<AudioClip?> setClip)
+    private static IEnumerator LoadEmbeddedOgg(string fileName, Action<AudioClip?> setClip)
     {
-        var candidates = new[]
+        var resourceName = EmbeddedSoundPrefix + fileName;
+        var bytes = ResourceHelpers.GetResource(Assembly.GetExecutingAssembly(), resourceName);
+        if (bytes == null || bytes.Length == 0)
         {
-            Path.Combine(pluginDir, "Sounds", fileName),
-            Path.Combine(pluginDir, "..", "Sounds", fileName),
-            Path.Combine(pluginDir, "MultiplayerChat", "Sounds", fileName)
-        };
-
-        foreach (var path in candidates)
-        {
-            if (!File.Exists(path))
-                continue;
-            yield return LoadOgg(path, setClip);
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Could not find embedded sound: {resourceName}");
+            setClip(null);
             yield break;
         }
 
-        MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Sound missing (searched next to DLL, ../Sounds, MultiplayerChat/Sounds): {fileName}");
-        setClip(null);
+        var cacheDir = Path.Combine(Application.temporaryCachePath, "MultiplayerChat", "Sounds");
+        string path;
+        try
+        {
+            Directory.CreateDirectory(cacheDir);
+            path = Path.Combine(cacheDir, fileName);
+            File.WriteAllBytes(path, bytes);
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to stage embedded sound {fileName}: {ex.Message}");
+            setClip(null);
+            yield break;
+        }
+
+        yield return LoadOgg(path, setClip);
     }
 
     private static IEnumerator LoadOgg(string path, Action<AudioClip?> setClip)

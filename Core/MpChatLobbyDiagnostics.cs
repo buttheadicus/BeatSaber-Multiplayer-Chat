@@ -1,6 +1,8 @@
+using System;
+using System.Reflection;
 using System.Text;
-using MultiplayerChat;
 using MultiplayerChat.UI;
+using MultiplayerCore.Models;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -8,16 +10,19 @@ namespace MultiplayerChat.Core;
 
 public static class MpChatLobbyDiagnostics
 {
-    public static readonly bool DetailedVoipSnapshots = false;
-
-    public static bool VerboseVoipReloadLogs;
-
     private static float _lastFullSnapshotRealtime = -999f;
     private const float FullSnapshotCooldownSec = 1.25f;
 
+    private static Type? _spectatingSpotType;
+    private static PropertyInfo? _spectatingIsObservedProperty;
+    private static bool _spectatingReflectionReady;
+    private static float _spectatingCacheTime = -999f;
+    private static bool _spectatingCached;
+    private const float SpectatingCacheTtlSec = 0.4f;
+
     public static void LogVoipTransition(string tag, string? detail = null)
     {
-        if (!DetailedVoipSnapshots)
+        if (!MpChatVerboseDebug.IsOn)
             return;
 
         var sb = new StringBuilder(256);
@@ -33,12 +38,12 @@ public static class MpChatLobbyDiagnostics
         sb.Append(" hotMicMgr=").Append(VoiceHotMicManager.Instance != null ? VoiceHotMicManager.Instance.GetHashCode().ToString() : "null");
         if (!string.IsNullOrEmpty(detail))
             sb.Append(" | ").Append(detail);
-        Plugin.Log?.Info(sb.ToString());
+        MpChatLog.Info(sb.ToString());
     }
 
     public static void LogFullUiSnapshotThrottled(string reason)
     {
-        if (!DetailedVoipSnapshots)
+        if (!MpChatVerboseDebug.IsOn)
             return;
 
         var now = Time.realtimeSinceStartup;
@@ -69,7 +74,61 @@ public static class MpChatLobbyDiagnostics
         }
 
         sb.Append(" resultsLike=").Append(ResultsLikeUiVisible());
-        Plugin.Log?.Info(sb.ToString());
+        MpChatLog.Info(sb.ToString());
+    }
+
+    public static bool QuickBindsAllowedDuringGameplay()
+    {
+        if (!SongGameplayLikelyActive())
+            return true;
+        return IsSpectatingInActiveMultiplayerSong();
+    }
+
+    public static bool IsSpectatingInActiveMultiplayerSong()
+    {
+        if (!SongGameplayLikelyActive())
+            return false;
+
+        var now = Time.realtimeSinceStartup;
+        if (now - _spectatingCacheTime < SpectatingCacheTtlSec)
+            return _spectatingCached;
+        _spectatingCached = IsSpectatingInActiveMultiplayerSongUncached();
+        _spectatingCacheTime = now;
+        return _spectatingCached;
+    }
+
+    private static bool IsSpectatingInActiveMultiplayerSongUncached()
+    {
+        EnsureSpectatingReflection();
+        if (_spectatingSpotType == null || _spectatingIsObservedProperty == null)
+            return false;
+
+        try
+        {
+            var spot = UnityEngine.Object.FindObjectOfType(_spectatingSpotType);
+            if (spot == null)
+                return false;
+            var val = _spectatingIsObservedProperty.GetValue(spot);
+            return val is bool observed && observed;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void EnsureSpectatingReflection()
+    {
+        if (_spectatingReflectionReady)
+            return;
+        _spectatingReflectionReady = true;
+        _spectatingSpotType = Type.GetType("MultiplayerCore.Gameplay.MultiplayerConnectedPlayerSpectatingSpot, MultiplayerCore")
+                              ?? Type.GetType("MultiplayerConnectedPlayerSpectatingSpot, MultiplayerCore");
+        if (_spectatingSpotType == null)
+            return;
+        _spectatingIsObservedProperty = _spectatingSpotType.GetProperty(
+            "isObserved",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
     }
 
     public static bool AnyGameCoreLoaded()
@@ -88,6 +147,9 @@ public static class MpChatLobbyDiagnostics
     {
         _lobbyHeuristicCacheTime = -999f;
         _songGameplayCacheTime = -999f;
+        _beatmapGameplayCacheTime = -999f;
+        _spectatingCacheTime = -999f;
+        _resultsLikeCacheTime = -999f;
     }
 
     private static float _lobbyHeuristicCacheTime = -999f;
@@ -97,6 +159,48 @@ public static class MpChatLobbyDiagnostics
     private static float _songGameplayCacheTime = -999f;
     private static bool _songGameplayCached;
     private const float SongGameplayCacheTtlSec = 0.35f;
+
+    private static float _beatmapGameplayCacheTime = -999f;
+    private static bool _beatmapGameplayCached;
+    private const float BeatmapGameplayCacheTtlSec = 0.35f;
+
+    // Active beatmap (notes spawning / song time advancing). False during GameCore intro and lobby.
+    public static bool BeatmapGameplayLikelyActive()
+    {
+        var now = Time.realtimeSinceStartup;
+        if (now - _beatmapGameplayCacheTime < BeatmapGameplayCacheTtlSec)
+            return _beatmapGameplayCached;
+        _beatmapGameplayCached = BeatmapGameplayLikelyActiveUncached();
+        _beatmapGameplayCacheTime = now;
+        return _beatmapGameplayCached;
+    }
+
+    private static bool BeatmapGameplayLikelyActiveUncached()
+    {
+        if (LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
+            return false;
+
+        try
+        {
+            var spawn = UnityEngine.Object.FindObjectOfType<BeatmapObjectSpawnController>();
+            if (spawn != null && spawn.isActiveAndEnabled)
+                return true;
+
+            var levelGm = UnityEngine.Object.FindObjectOfType<StandardLevelGameplayManager>();
+            if (levelGm != null && levelGm.isActiveAndEnabled)
+                return true;
+
+            var atsc = UnityEngine.Object.FindObjectOfType<AudioTimeSyncController>();
+            if (atsc != null && atsc.isActiveAndEnabled && atsc.songTime > 0.05f)
+                return true;
+        }
+        catch
+        {
+            /* ignore */
+        }
+
+        return false;
+    }
 
     public static bool SongGameplayLikelyActive()
     {
@@ -117,13 +221,13 @@ public static class MpChatLobbyDiagnostics
             return false;
         try
         {
-            if (Object.FindObjectOfType<AudioTimeSyncController>() != null)
+            if (UnityEngine.Object.FindObjectOfType<AudioTimeSyncController>() != null)
                 return true;
-            if (Object.FindObjectOfType<BeatmapObjectSpawnController>() != null)
+            if (UnityEngine.Object.FindObjectOfType<BeatmapObjectSpawnController>() != null)
                 return true;
-            if (Object.FindObjectOfType<SongController>() != null)
+            if (UnityEngine.Object.FindObjectOfType<SongController>() != null)
                 return true;
-            if (Object.FindObjectOfType<StandardLevelGameplayManager>() != null)
+            if (UnityEngine.Object.FindObjectOfType<StandardLevelGameplayManager>() != null)
                 return true;
         }
         catch
@@ -134,11 +238,25 @@ public static class MpChatLobbyDiagnostics
         return false;
     }
 
+    private static float _resultsLikeCacheTime = -999f;
+    private static bool _resultsLikeCached;
+    private const float ResultsLikeCacheTtlSec = 1.25f;
+
     public static bool ResultsLikeUiVisible()
+    {
+        var now = Time.realtimeSinceStartup;
+        if (now - _resultsLikeCacheTime < ResultsLikeCacheTtlSec)
+            return _resultsLikeCached;
+        _resultsLikeCached = ResultsLikeUiVisibleUncached();
+        _resultsLikeCacheTime = now;
+        return _resultsLikeCached;
+    }
+
+    private static bool ResultsLikeUiVisibleUncached()
     {
         try
         {
-            foreach (var tmp in Object.FindObjectsOfType<TMPro.TMP_Text>())
+            foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
             {
                 if (tmp == null || !tmp.gameObject.activeInHierarchy) continue;
                 var t = (tmp.text ?? "").ToUpperInvariant();
@@ -150,6 +268,38 @@ public static class MpChatLobbyDiagnostics
         catch { /* ignore */ }
 
         return false;
+    }
+
+    // Prefer lobby heuristic before SongGameplayLikelyActive (avoids FindObjectOfType on player join/leave).
+    public static bool ShouldSkipMultiplayerPlayerSessionHooks()
+    {
+        if (BeatmapGameplayLikelyActive())
+            return true;
+        if (LobbyHierarchyLooksLikeMultiplayerLobby())
+            return false;
+        return SongGameplayLikelyActive();
+    }
+
+    // Lobby / GameCore / active MP session only (skip 1s avatar sync ticks on main menu).
+    public static bool MultiplayerAvatarSyncContextActive(IMultiplayerSessionManager? sessionManager)
+    {
+        if (AnyGameCoreLoaded())
+            return true;
+        if (LobbyHierarchyLooksLikeMultiplayerLobby())
+            return true;
+
+        if (sessionManager == null)
+            return false;
+
+        try
+        {
+            var connected = sessionManager.connectedPlayers;
+            return connected != null && connected.Count > 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static bool LobbyHierarchyLooksLikeMultiplayerLobby()

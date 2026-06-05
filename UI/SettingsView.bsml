@@ -1,25 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
-  <vertical pad="10" spacing="5">
+  <vertical pad="10" spacing="6">
+    <text text="Created by; Butter" font-size="3.5" align="Center"/>
     <text text="Multiplayer Chat Settings" font-size="5" align="Center"/>
-    <slider-setting id="BubbleDuration" text="Chat bubble duration (seconds)" value="BubbleDuration" min="15" max="60" increment="1" show-value="true"/>
-    <horizontal child-expand-width="true">
-      <toggle-setting id="ChatBubbleSoundsToggle" text="Chat bubble sounds" value="ChatBubbleSoundsEnabled"/>
-    </horizontal>
-    <horizontal>
-      <text text="Name color" font-size="4"/>
-      <string-setting id="NameColorInput" text="HEX (6 chars)" value="NameColor" show-buttons="false"/>
-    </horizontal>
-    <horizontal child-expand-width="true">
-      <toggle-setting id="EnableCauToggle" text="Enable CAU" value="EnableCau"/>
-    </horizontal>
-    <horizontal child-expand-width="true">
-      <toggle-setting id="DebugLoggingToggle" text="Debug mode (very verbose; WILL lag.)" value="DebugLogging"/>
-    </horizontal>
+    <button text="Player Settings" pad="2" min-width="48" on-click="PlayerSettingsClicked"/>
+    <button text="Mic Settings" pad="2" min-width="48" on-click="MicSettingsClicked"/>
     <horizontal spacing="4" pad="2" horizontal-fit="PreferredSize">
       <button text="Fused Mods" pad="2" min-width="36" on-click="FusedModsClicked"/>
       <button text="Addons" pad="2" min-width="36" on-click="AddonsClicked"/>
+      <button text="Performance" pad="2" min-width="36" on-click="PerformanceClicked"/>
+    </horizontal>
+    <horizontal child-expand-width="true">
+      <toggle-setting id="EnableCauToggle" text="Enable Chat Auto Updater (CAU)" value="EnableCau"/>
+    </horizontal>
+    <horizontal child-expand-width="true">
+      <toggle-setting id="DebugLoggingToggle" text="Debug mode (very verbose; WILL lag.)" value="DebugLogging"/>
     </horizontal>
     <button text="APPLY" on-click="ApplyClicked"/>
   </vertical>

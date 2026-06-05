@@ -144,9 +144,16 @@ public struct PackedExtrasString
 
         var x = parsed.Value;
         if (x.WireGlassesColor.HasValue)
-            avatarData.glassesColor = x.WireGlassesColor.Value;
+        {
+            var w = x.WireGlassesColor.Value;
+            avatarData.glassesColor = new Color(w.r, w.g, w.b, avatarData.glassesColor.a);
+        }
+
         if (x.WireFacialHairColor.HasValue)
-            avatarData.facialHairColor = x.WireFacialHairColor.Value;
+        {
+            var w = x.WireFacialHairColor.Value;
+            avatarData.facialHairColor = new Color(w.r, w.g, w.b, avatarData.facialHairColor.a);
+        }
     }
 
     private static bool TryParseHexRgb(string hex, out Color c)

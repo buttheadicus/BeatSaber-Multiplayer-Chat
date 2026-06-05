@@ -27,8 +27,8 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     [Inject] private readonly DiContainer _container = null!;
     [Inject] private readonly ChatDMState _dmState = null!;
     [Inject] private readonly ChatIdConfigStore _chatIdConfigStore = null!;
-    [Inject] private readonly VoiceSettingsFlowCoordinator _voiceSettingsFlowCoordinator = null!;
     [Inject] private readonly VoiceHotMicManager _voiceHotMicManager = null!;
+    [Inject] private readonly MicSettingsViewController _micSettingsViewController = null!;
 
     [UIComponent("ChatInput")]
     private BeatSaberMarkupLanguage.Components.Settings.StringSetting? _chatInput;
@@ -36,8 +36,17 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     [UIComponent("RecordButton")]
     private Button? _recordButton;
 
-    [UIComponent("MuteButton")]
-    private Button? _muteButton;
+    [UIComponent("VoicePlayButton")]
+    private Button? _voicePlayButton;
+
+    [UIComponent("VoiceSendButton")]
+    private Button? _voiceSendButton;
+
+    [UIComponent("EndVoiceButton")]
+    private Button? _endVoiceButton;
+
+    [UIComponent("ResetVoiceButton")]
+    private Button? _resetVoiceButton;
 
     [UIComponent("DMButton")]
     private Button? _dmButton;
@@ -50,6 +59,21 @@ public class LobbyChatTabRegistrar : MonoBehaviour
 
     [UIComponent("HearButton")]
     private Button? _hearButton;
+
+    [UIComponent("MutePlayerButton")]
+    private Button? _mutePlayerButton;
+
+    [UIComponent("SettingsButton")]
+    private Button? _settingsButton;
+
+    [UIComponent("VoiceMessageButtonsColumn")]
+    private GameObject? _voiceMessageButtonsColumn;
+
+    [UIComponent("VoiceUtilityRow")]
+    private GameObject? _voiceUtilityRow;
+
+    private bool _voiceUiRefsResolved;
+    private bool _lastAppliedVoiceMessagesEnabled = true;
 
     private ColorBlock _lobbyActionDefaultColors;
     private bool _lobbyActionColorsCached;
@@ -80,12 +104,14 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         _dmState.DMTargetChanged += OnDmTargetChanged;
         _chatIdConfigStore.MutedStateChanged += OnMutedConfigChanged;
         VoiceChatRuntimeState.Changed += OnVoiceStateChanged;
+        _micSettingsViewController.MicSettingsApplied += OnMicSettingsApplied;
         StartCoroutine(TryAddTabWhenReady());
     }
 
     private void OnDestroy()
     {
         UnbindLobbyChatTypingListeners();
+        _micSettingsViewController.MicSettingsApplied -= OnMicSettingsApplied;
         _dmState.DMTargetChanged -= OnDmTargetChanged;
         _chatIdConfigStore.MutedStateChanged -= OnMutedConfigChanged;
         VoiceChatRuntimeState.Changed -= OnVoiceStateChanged;
@@ -135,6 +161,9 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     private void LobbyChatTabPostParse()
     {
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        if (_chatInput != null)
+            _chatInput.Text = "";
+        ApplyVoiceMessageUiVisibility();
     }
 
     [UIAction("SettingsClicked")]
@@ -144,15 +173,6 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         var topFlow = FlowCoordinatorHelper.GetTopFlowCoordinator(mainFlow);
         _settingsFlowCoordinator.ParentFlow = topFlow;
         topFlow.PresentFlowCoordinator(_settingsFlowCoordinator);
-    }
-
-    [UIAction("VoiceSettingsClicked")]
-    private void VoiceSettingsClicked()
-    {
-        var mainFlow = BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator;
-        var topFlow = FlowCoordinatorHelper.GetTopFlowCoordinator(mainFlow);
-        _voiceSettingsFlowCoordinator.ParentFlow = topFlow;
-        topFlow.PresentFlowCoordinator(_voiceSettingsFlowCoordinator);
     }
 
     [UIAction("DeafClicked")]
@@ -179,10 +199,10 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         UpdateLobbyActionButtonHighlights();
     }
 
-    [UIAction("PlayerVolumeClicked")]
-    private void PlayerVolumeClicked()
+    [UIAction("MutePlayerClicked")]
+    private void MutePlayerClicked()
     {
-        OpenMuteOrDmGrid(PlayerListViewController.Mode.Volume);
+        OpenMuteOrDmGrid(PlayerListViewController.Mode.Mute);
     }
 
     [UIAction("HearClicked")]
@@ -207,12 +227,6 @@ public class LobbyChatTabRegistrar : MonoBehaviour
             return;
         _chatInput!.Text = "";
         StartCoroutine(DeferredRefreshLobbyActionHighlights());
-    }
-
-    [UIAction("MuteClicked")]
-    private void MuteClicked()
-    {
-        OpenMuteOrDmGrid(PlayerListViewController.Mode.Mute);
     }
 
     private void OpenMuteOrDmGrid(PlayerListViewController.Mode mode)
@@ -279,6 +293,19 @@ public class LobbyChatTabRegistrar : MonoBehaviour
             StartCoroutine(RefreshLobbyUiWhenTabShown());
     }
 
+    private void Update()
+    {
+        if (!_tabAdded || !gameObject.activeInHierarchy)
+            return;
+        var enabled = ModSettings.EnableVoiceMessages;
+        if (enabled == _lastAppliedVoiceMessagesEnabled)
+            return;
+        _lastAppliedVoiceMessagesEnabled = enabled;
+        ApplyVoiceMessageUiVisibility();
+    }
+
+    private void OnMicSettingsApplied() => ApplyVoiceMessageUiVisibility();
+
     private void OnDisable()
     {
         ClearLobbyTypingBroadcastIfNeeded();
@@ -289,7 +316,38 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         yield return null;
         yield return null;
         yield return null;
+        ApplyVoiceMessageUiVisibility();
         UpdateLobbyActionButtonHighlights();
+    }
+
+    private void ResolveVoiceUiRefs()
+    {
+        if (_voiceUiRefsResolved)
+            return;
+        _voiceUiRefsResolved = true;
+        var root = transform;
+        _voiceMessageButtonsColumn ??= BsmlUiRefs.FindChildGameObject(root, "VoiceMessageButtonsColumn");
+        _voiceUtilityRow ??= BsmlUiRefs.FindChildGameObject(root, "VoiceUtilityRow");
+    }
+
+    private void ApplyVoiceMessageUiVisibility()
+    {
+        var enabled = ModSettings.EnableVoiceMessages;
+        _lastAppliedVoiceMessagesEnabled = enabled;
+        ResolveVoiceUiRefs();
+
+        BsmlUiRefs.SetActive(_voiceMessageButtonsColumn, enabled);
+        BsmlUiRefs.SetActive(_voiceUtilityRow, enabled);
+        if (_recordButton != null)
+            _recordButton.gameObject.SetActive(enabled);
+        if (_voicePlayButton != null)
+            _voicePlayButton.gameObject.SetActive(enabled);
+        if (_voiceSendButton != null)
+            _voiceSendButton.gameObject.SetActive(enabled);
+        if (_endVoiceButton != null)
+            _endVoiceButton.gameObject.SetActive(enabled);
+        if (_resetVoiceButton != null)
+            _resetVoiceButton.gameObject.SetActive(enabled);
     }
 
     private IEnumerator DeferredRefreshLobbyActionHighlights()
@@ -311,7 +369,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     private void CacheLobbyActionDefaultColorsOnce()
     {
         if (_lobbyActionColorsCached) return;
-        var src = _dmButton != null ? _dmButton : _muteButton;
+        var src = _dmButton != null ? _dmButton : _mutePlayerButton ?? _hearButton;
         if (src == null) return;
         _lobbyActionDefaultColors = src.colors;
         _lobbyActionColorsCached = true;
@@ -341,12 +399,15 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         var hearOn = VoiceChatRuntimeState.IsListenFilterActive || VoiceChatRuntimeState.IsTalkToActive;
 
         ApplyHighlight(_dmButton, dmOn);
-        ApplyHighlight(_muteButton, muteOn);
+        ApplyHighlight(_mutePlayerButton, muteOn);
         ApplyHighlight(_voiceHotMicMuteButton, hotMicMuteOn);
         ApplyHighlight(_hearButton, hearOn);
+        ApplyHighlight(_settingsButton, true);
         ApplyLobbyActionButtonLabelColor(_dmButton, dmOn, _dmButtonLabelDefaultColor);
+        ApplyLobbyActionButtonLabelColor(_mutePlayerButton, muteOn, _dmButtonLabelDefaultColor);
         ApplyLobbyActionButtonLabelColor(_voiceHotMicMuteButton, hotMicMuteOn, _dmButtonLabelDefaultColor);
         ApplyLobbyActionButtonLabelColor(_hearButton, hearOn, _dmButtonLabelDefaultColor);
+        ApplyLobbyActionButtonLabelColor(_settingsButton, true, _dmButtonLabelDefaultColor);
 
         if (_deafButton != null)
         {
@@ -528,12 +589,6 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         if (!_lobbyTypingBroadcastToOthers) return;
         _chatManager.BroadcastChatActivity(ChatActivityPacket.TypingStop);
         _lobbyTypingBroadcastToOthers = false;
-    }
-
-    [UIAction("ForceClearClicked")]
-    private void ForceClearClicked()
-    {
-        _chatBubbleManager.ForceClearChat();
     }
 
     [UIAction("ForceEndVoiceClicked")]

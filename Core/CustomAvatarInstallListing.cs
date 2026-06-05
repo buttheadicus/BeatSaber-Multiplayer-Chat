@@ -6,7 +6,18 @@ namespace MultiplayerChat.Core;
 
 internal static class CustomAvatarInstallListing
 {
-    internal const string NoneLabel = "(none)";
+    internal const string DefaultBeatSaberAvatarLabel = "Default Beat Saber Avatar";
+
+    // Wire sentinel: receivers restore the stock multiplayer lobby rig.
+    internal const string VanillaDescriptorHash = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+
+    internal static bool IsDefaultBeatSaberAvatarLabel(string? label) =>
+        !string.IsNullOrEmpty(label) &&
+        (string.Equals(label, DefaultBeatSaberAvatarLabel, StringComparison.Ordinal) ||
+         string.Equals(label, "(none)", StringComparison.Ordinal));
+
+    internal static bool IsVanillaDescriptorHash(string? hash) =>
+        string.Equals(hash?.Trim(), VanillaDescriptorHash, StringComparison.OrdinalIgnoreCase);
 
     internal static List<string> ListRelativeAvatarFilenames()
     {

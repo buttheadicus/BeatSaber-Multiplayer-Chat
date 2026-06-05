@@ -8,8 +8,11 @@ namespace MultiplayerChat.UI;
 public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly SettingsViewController _settingsViewController = null!;
+    [Inject] private readonly PlayerSettingsFlowCoordinator _playerSettingsFlowCoordinator = null!;
+    [Inject] private readonly MicSettingsFlowCoordinator _micSettingsFlowCoordinator = null!;
     [Inject] private readonly FusedModsSettingsFlowCoordinator _fusedModsSettingsFlowCoordinator = null!;
     [Inject] private readonly AddonsSettingsFlowCoordinator _addonsSettingsFlowCoordinator = null!;
+    [Inject] private readonly PerformanceSettingsFlowCoordinator _performanceSettingsFlowCoordinator = null!;
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
 
@@ -21,11 +24,15 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
             SetTitle("Multiplayer Chat Settings");
             ProvideInitialViewControllers(_settingsViewController);
         }
+
         if (addedToHierarchy)
         {
             _settingsViewController.ApplyClicked += OnApply;
+            _settingsViewController.PlayerSettingsClicked += OnPlayerSettingsClicked;
+            _settingsViewController.MicSettingsClicked += OnMicSettingsClicked;
             _settingsViewController.FusedModsClicked += OnFusedModsClicked;
             _settingsViewController.AddonsClicked += OnAddonsClicked;
+            _settingsViewController.PerformanceClicked += OnPerformanceClicked;
         }
     }
 
@@ -34,13 +41,35 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
         if (removedFromHierarchy)
         {
             _settingsViewController.ApplyClicked -= OnApply;
+            _settingsViewController.PlayerSettingsClicked -= OnPlayerSettingsClicked;
+            _settingsViewController.MicSettingsClicked -= OnMicSettingsClicked;
             _settingsViewController.FusedModsClicked -= OnFusedModsClicked;
             _settingsViewController.AddonsClicked -= OnAddonsClicked;
+            _settingsViewController.PerformanceClicked -= OnPerformanceClicked;
         }
-        // Do not destroy - instance is reused to prevent overlap when reopening
     }
 
     private void OnApply(object? sender, EventArgs e) => Dismiss();
+
+    private void OnPlayerSettingsClicked()
+    {
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _playerSettingsFlowCoordinator)
+            return;
+
+        _playerSettingsFlowCoordinator.ParentFlow = this;
+        PresentFlowCoordinator(_playerSettingsFlowCoordinator);
+    }
+
+    private void OnMicSettingsClicked()
+    {
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _micSettingsFlowCoordinator)
+            return;
+
+        _micSettingsFlowCoordinator.ParentFlow = this;
+        PresentFlowCoordinator(_micSettingsFlowCoordinator);
+    }
 
     private void OnFusedModsClicked()
     {
@@ -62,10 +91,17 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
         PresentFlowCoordinator(_addonsSettingsFlowCoordinator);
     }
 
-    protected override void BackButtonWasPressed(ViewController topViewController)
+    private void OnPerformanceClicked()
     {
-        Dismiss();
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _performanceSettingsFlowCoordinator)
+            return;
+
+        _performanceSettingsFlowCoordinator.ParentFlow = this;
+        PresentFlowCoordinator(_performanceSettingsFlowCoordinator);
     }
+
+    protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();
 
     private void Dismiss()
     {

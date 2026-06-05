@@ -58,9 +58,22 @@ public class Plugin
             {
                 logger.Warn($"[MPChat] Lobby ScaleAnimator Harmony patches failed (custom lobby avatars may look wrong): {ex.Message}");
             }
+
+            try
+            {
+                var arenaHarmony = new Harmony("com.multiplayerchat.arenaavatar");
+                MpChatArenaAvatarHarmony.Apply(arenaHarmony);
+            }
+            catch (Exception ex)
+            {
+                logger.Warn($"[MPChat] Arena custom avatar Harmony failed: {ex.Message}");
+            }
         }
 
         if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
+            return;
+
+        if (!CustomAvatarDependenciesBootstrap.TryContinueAfterEnsuringDependencies(logger))
             return;
 
         CauBootstrap.DeleteCauExeIfEnabled();
@@ -86,6 +99,19 @@ public class Plugin
         var globalAudioHost = new GameObject("MPChatGlobalAudioHost");
         UnityEngine.Object.DontDestroyOnLoad(globalAudioHost);
         globalAudioHost.AddComponent<Core.GlobalChatAudioHost>();
+
+        var quickBindsHost = new GameObject("MPChatQuickBindsHost");
+        UnityEngine.Object.DontDestroyOnLoad(quickBindsHost);
+        quickBindsHost.AddComponent<Core.QuickBinds.QuickBindsRuntimeManager>();
+        quickBindsHost.AddComponent<Core.MpChatUpdateNoticeTest>();
+
+        if (MpChatFeatures.LobbyCustomAvatars)
+        {
+            var lobbyAvatarHost = new GameObject("MPChatLobbyAvatarLifecycleHost");
+            UnityEngine.Object.DontDestroyOnLoad(lobbyAvatarHost);
+            lobbyAvatarHost.AddComponent<Core.MpChatLobbyAvatarLifecycleHost>();
+        }
+
         zenjector.UseLogger(logger);
         zenjector.UseMetadataBinder<Plugin>();
 
@@ -117,13 +143,22 @@ public class Plugin
         zenjector.Install(Location.Menu, container =>
         {
             container.Bind<UpdateMessageViewController>().FromNewComponentAsViewController().AsTransient();
+            container.BindInterfacesAndSelfTo<ChatBubbleManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             container.BindInterfacesAndSelfTo<VersionChecker>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
-            container.BindInterfacesAndSelfTo<SettingsMenuButton>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         });
 
         zenjector.Install<MultiplayerLobbyInstaller>(container => InstallChatBindings(container, lobbyUi: true));
 
-        zenjector.Install(Location.GameCore, container => InstallChatBindings(container, lobbyUi: false));
+        zenjector.Install(Location.GameCore, container => InstallGameCoreBindings(container));
+
+        if (MpChatFeatures.LobbyCustomAvatars && MpChatFeatures.LobbyCustomAvatarsInArena)
+        {
+            zenjector.Install(Location.ConnectedPlayer, container =>
+            {
+                container.RegisterRedecorator(new ConnectedPlayerRegistration(DecorateConnectedPlayer));
+                container.RegisterRedecorator(new ConnectedPlayerDuelRegistration(DecorateConnectedPlayer));
+            });
+        }
 
         UnityEngine.Application.quitting += OnApplicationQuitting;
     }
@@ -133,6 +168,23 @@ public class Plugin
         UnityEngine.Application.quitting -= OnApplicationQuitting;
         AvatarExtrasConfigPersistence.Save(AvatarExtrasConfig);
         VoiceChatRuntimeState.ClearTalkToOnGameQuit();
+    }
+
+    private static void InstallGameCoreBindings(DiContainer container)
+    {
+        InstallChatBindings(container, lobbyUi: false);
+
+        if (MpChatFeatures.LobbyCustomAvatars && MpChatFeatures.LobbyCustomAvatarsInArena)
+        {
+            container.BindInterfacesAndSelfTo<MpCustomAvatarSyncManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+            container.BindInterfacesAndSelfTo<MpCustomAvatarLobbyTransferManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+        }
+    }
+
+    private static MultiplayerConnectedPlayerFacade DecorateConnectedPlayer(MultiplayerConnectedPlayerFacade original)
+    {
+        MpChatArenaAvatarAttach.RefreshAttachForGameplay(original);
+        return original;
     }
 
     private static void InstallChatBindings(DiContainer container, bool lobbyUi)
@@ -151,24 +203,33 @@ public class Plugin
 
         if (lobbyUi)
         {
-            container.BindInterfacesAndSelfTo<ChatBubbleManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+            // ChatBubbleManager is bound once in Location.Menu (main menu + title-bar bubbles). Do not bind again here (Zenject 6+ rejects duplicate AsSingle).
             container.BindInterfacesAndSelfTo<FloorChatButton>().FromNewComponentOnNewGameObject().AsSingle();
             container.BindInterfacesAndSelfTo<FloatingHotMicMuteButton>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             container.Bind<SettingsViewController>().FromNewComponentAsViewController().AsTransient();
-            container.Bind<VoiceSettingsViewController>().FromNewComponentAsViewController().AsTransient();
+            container.Bind<PlayerSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<PlayerSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<MicSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<MicSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<MultiplayerChatSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
-            container.Bind<VoiceSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<VoiceDuckSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<VoiceDuckSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<FusedModsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<FusedModsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<AddonsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<AddonsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<AvatarColoringExtensionsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<AvatarColoringExtensionsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<PerformanceSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<PerformanceSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<QuickBindsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<QuickBindsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             if (MpChatFeatures.LobbyCustomAvatars)
             {
                 container.Bind<CustomAvatarsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
                 container.Bind<CustomAvatarsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
                 container.BindInterfacesAndSelfTo<MpCustomAvatarSyncManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
+                container.BindInterfacesAndSelfTo<MpCustomAvatarLobbyTransferManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             }
 
             container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
@@ -183,24 +244,28 @@ public class Plugin
     {
         AddChatBubbleAnchorToCaption(original.transform);
         if (MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
+        {
+            original.gameObject.AddComponent<MpChatLobbyPedestalScaleGuard>();
             original.gameObject.AddComponent<MpChatLobbyCustomAvatarDriver>();
+        }
+
         return original;
     }
 
     private static MultiplayerLobbyAvatarPlace DecorateAvatarPlace(MultiplayerLobbyAvatarPlace original)
     {
-        AddChatBubbleAnchorToCaption(original.transform);
         return original;
     }
 
     private static void AddChatBubbleAnchorToCaption(Transform root)
     {
         var avatarCaption = root.Find("AvatarCaption") ?? FindInChildren(root, "AvatarCaption");
-        if (avatarCaption != null && avatarCaption.GetComponent<ChatBubbleAnchor>() == null)
-        {
-            avatarCaption.gameObject.AddComponent<ChatBubbleAnchor>();
-            MultiplayerChat.Plugin.Log?.Debug($"[MultiplayerChat] Added ChatBubbleAnchor to {avatarCaption.name}");
-        }
+        if (avatarCaption == null || avatarCaption.GetComponent<ChatBubbleAnchor>() != null)
+            return;
+
+        var anchor = avatarCaption.gameObject.AddComponent<ChatBubbleAnchor>();
+        MpChatLobbyAvatarZenject.TryInject(anchor);
+        MultiplayerChat.Plugin.Log?.Debug($"[MultiplayerChat] Added ChatBubbleAnchor to {avatarCaption.name}");
     }
 
     private static Transform? FindInChildren(Transform parent, string name)

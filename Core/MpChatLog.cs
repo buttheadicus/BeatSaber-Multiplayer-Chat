@@ -2,16 +2,19 @@ using System;
 using System.Reflection;
 using IPALogger = IPA.Logging.Logger;
 
+using MultiplayerChat.Settings;
+
 namespace MultiplayerChat.Core;
 
-// Maps ModSettings.DebugLogging to BSIPA FilterLevel on this logger so Debug() lines appear in _latest.log.
-// Changing DebugLogging runs MpChatLog.Apply immediately from the ModSettings setter (toggle or Apply). No game restart.
+// Debug off: BSIPA FilterLevel Error (errors only). Debug on: FilterLevel Debug (info, warn, debug, error).
 internal static class MpChatLog
 {
     private static IPALogger? _logger;
     private static PropertyInfo? _filterLevelProperty;
     private static object? _filterDebug;
-    private static object? _filterInfo;
+    private static object? _filterError;
+
+    internal static bool IsVerbose => ModSettings.DebugLogging;
 
     internal static void Init(IPALogger logger)
     {
@@ -27,31 +30,57 @@ internal static class MpChatLog
             if (!enumType.IsEnum)
                 return;
             _filterDebug = Enum.Parse(enumType, "Debug");
-            _filterInfo = Enum.Parse(enumType, "Info");
+            _filterError = Enum.Parse(enumType, "Error");
         }
         catch
         {
             _filterLevelProperty = null;
             _filterDebug = null;
-            _filterInfo = null;
+            _filterError = null;
         }
     }
 
     internal static void Apply(bool debugEnabled)
     {
-        if (_logger == null || _filterLevelProperty == null || _filterDebug == null || _filterInfo == null)
+        VoiceDynamicTransmitGate.NotifyPushToTalkHeld(false);
+
+        if (_logger == null || _filterLevelProperty == null || _filterDebug == null || _filterError == null)
             return;
+
         try
         {
-            _filterLevelProperty.SetValue(_logger, debugEnabled ? _filterDebug : _filterInfo);
+            _filterLevelProperty.SetValue(_logger, debugEnabled ? _filterDebug : _filterError);
             if (debugEnabled)
-                _logger.Info("[MPChat] Debug logging is ON for this logger (FilterLevel Debug).");
-            else
-                _logger.Info("[MPChat] Debug logging is OFF (FilterLevel Info).");
+            {
+                _logger.Debug("[MPChat] Verbose logging ON (FilterLevel Debug).");
+                MpChatLobbyDiagnostics.LogVoipTransition("DebugLogging:enabled", "verbose diagnostics armed");
+            }
         }
         catch
         {
-            // Older BSIPA layout without FilterLevel; Info/Debug still work at compile time but IPA.yml may control filtering.
         }
+    }
+
+    internal static void Error(string message) => _logger?.Error(message);
+
+    internal static void Info(string message)
+    {
+        if (!IsVerbose)
+            return;
+        _logger?.Info(message);
+    }
+
+    internal static void Warn(string message)
+    {
+        if (!IsVerbose)
+            return;
+        _logger?.Warn(message);
+    }
+
+    internal static void DebugLine(string message)
+    {
+        if (!IsVerbose)
+            return;
+        _logger?.Debug(message);
     }
 }

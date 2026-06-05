@@ -5,7 +5,7 @@
     <Version>0.3.6</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
-    <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
+    <BeatSaberDir>F:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -14,6 +14,10 @@
     <NoWarn>CS0618;CS1591;CS0649;CS0436</NoWarn>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <TieredCompilation Condition="'$(Configuration)' == 'Release'">true</TieredCompilation>
     <!-- nicoco007 plugin is usually CustomAvatar.dll; some installs use CustomAvatars.dll -->
     <CustomAvatarHintPath Condition="Exists('$(BeatSaberDir)\Plugins\CustomAvatar.dll')">$(BeatSaberDir)\Plugins\CustomAvatar.dll</CustomAvatarHintPath>
     <CustomAvatarHintPath Condition="'$(CustomAvatarHintPath)' == '' and Exists('$(BeatSaberDir)\Plugins\CustomAvatars.dll')">$(BeatSaberDir)\Plugins\CustomAvatars.dll</CustomAvatarHintPath>
@@ -22,12 +26,6 @@
   <ItemGroup>
     <Compile Remove="SlzMarkerTool\**" />
     <Compile Remove="_reflect\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Sounds\Chat.ogg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Sounds\Muted.ogg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Sounds\Unmuted.ogg" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="Sounds\Error.ogg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all" />
@@ -194,6 +192,18 @@
     <EmbeddedResource Include="Assets\playerhaschat.png">
       <LogicalName>MultiplayerChat.Assets.playerhaschat.png</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="Sounds\Chat.ogg">
+      <LogicalName>MultiplayerChat.Assets.Sounds.Chat.ogg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Sounds\Muted.ogg">
+      <LogicalName>MultiplayerChat.Assets.Sounds.Muted.ogg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Sounds\Unmuted.ogg">
+      <LogicalName>MultiplayerChat.Assets.Sounds.Unmuted.ogg</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Sounds\Error.ogg">
+      <LogicalName>MultiplayerChat.Assets.Sounds.Error.ogg</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="manifest.json">
       <LogicalName>MultiplayerChat.manifest.json</LogicalName>
     </EmbeddedResource>
@@ -215,8 +225,11 @@
     <EmbeddedResource Include="UI\SettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.SettingsView.bsml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\VoiceSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.VoiceSettingsView.bsml</LogicalName>
+    <EmbeddedResource Include="UI\PlayerSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.PlayerSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\MicSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.MicSettingsView.bsml</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="UI\FusedModsSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.FusedModsSettingsView.bsml</LogicalName>
@@ -236,6 +249,15 @@
     <EmbeddedResource Include="UI\AddonsSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.AddonsSettingsView.bsml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\PerformanceSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.PerformanceSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\QuickBindsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.QuickBindsSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\AvatarColoringExtensionsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.AvatarColoringExtensionsSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="AvatarExtras\Assets\Sprites\Glasses.png">
       <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.Glasses.png</LogicalName>
     </EmbeddedResource>
@@ -252,22 +274,14 @@
   <!-- Install into Beat Saber for testing (only if BeatSaberDir exists). -->
   <Target Name="CopyToBeatSaber" AfterTargets="Build">
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
-    <MakeDir Directories="$(BeatSaberDir)\Plugins\Sounds\" Condition="Exists('$(BeatSaberDir)')" />
-    <MakeDir Directories="$(BeatSaberDir)\Plugins\MultiplayerChat\Sounds\" Condition="Exists('$(BeatSaberDir)')" />
-    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(BeatSaberDir)\Plugins\Sounds\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
-    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(BeatSaberDir)\Plugins\MultiplayerChat\Sounds\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
   </Target>
 
-  <!-- Release layout: manifest at root, Plugins/ dll, Plugins/Sounds/ (matches manifest files[] and build-zip.ps1). -->
+  <!-- Release layout: manifest at root, Plugins/ dll (matches manifest files[]). -->
   <Target Name="CopyToReleasesFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <ReleasesDir>$(ProjectDir)releases</ReleasesDir>
     </PropertyGroup>
-    <MakeDir Directories="$(ReleasesDir)\Plugins\Sounds" />
-    <MakeDir Directories="$(ReleasesDir)\Plugins\MultiplayerChat\Sounds" />
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ReleasesDir)\Plugins\" SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ReleasesDir)\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(ReleasesDir)\Plugins\Sounds\" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="$(ProjectDir)Sounds\Chat.ogg;$(ProjectDir)Sounds\Muted.ogg;$(ProjectDir)Sounds\Unmuted.ogg;$(ProjectDir)Sounds\Error.ogg" DestinationFolder="$(ReleasesDir)\Plugins\MultiplayerChat\Sounds\" SkipUnchangedFiles="true" />
   </Target>
 </Project>

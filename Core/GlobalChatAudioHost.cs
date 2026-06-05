@@ -159,8 +159,9 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     {
         yield return null;
         ApplySongVoicePolicy();
-        Plugin.Log?.Info(
-            $"[MPChat][SongVoice] deferred sync ({reason}): songGameplay={MpChatLobbyDiagnostics.SongGameplayLikelyActive()} anyGameCore={MpChatLobbyDiagnostics.AnyGameCoreLoaded()} micLatch={_songMicLatch} deafLatch={_songDeafLatch}");
+        if (MpChatVerboseDebug.IsOn)
+            Plugin.Log?.Info(
+                $"[MPChat][SongVoice] deferred sync ({reason}): songGameplay={MpChatLobbyDiagnostics.SongGameplayLikelyActive()} anyGameCore={MpChatLobbyDiagnostics.AnyGameCoreLoaded()} micLatch={_songMicLatch} deafLatch={_songDeafLatch}");
     }
 
     public static void ForceResetVoipFromUi(string logLine)
@@ -177,7 +178,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         _lastVoipReloadRealtime = Time.realtimeSinceStartup;
         var cm = ChatManager.Instance;
         var vm = VoiceHotMicManager.Instance;
-        if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+        if (MpChatVerboseDebug.IsOn)
             Plugin.Log?.Info(
                 $"[MPChat][VoIP] TryRunVoipReload begin: {logLine} activeScene={SceneManager.GetActiveScene().name} chatMgrNull={cm == null} voiceHotMicMgrNull={vm == null}");
         ReleaseDuckingIfNeeded();
@@ -185,11 +186,12 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         cm?.LogVoipReloadContext("TryRunVoipReload (before pipeline)");
         cm?.ForceFullVoipReset();
         vm?.ForceReloadMicrophone();
+        VoiceHotMicManager.OnVoipPipelineReloaded();
         ChatBubbleManager.Instance?.RebindToActiveChatManager();
         cm?.LogVoipReloadContext("TryRunVoipReload (after pipeline)");
         MpChatLobbyDiagnostics.LogVoipTransition("TryRunVoipReload:after", logLine);
         MpChatLobbyDiagnostics.LogFullUiSnapshotThrottled(logLine);
-        if (MpChatLobbyDiagnostics.VerboseVoipReloadLogs)
+        if (MpChatVerboseDebug.IsOn)
             Plugin.Log?.Info($"[MPChat][VoIP] TryRunVoipReload end: {logLine}");
 
         // Arena entry: GameCore is loaded and this reload just ran  -  apply mute/deaf-during-song in lockstep with the new ChatManager / mic pipeline.

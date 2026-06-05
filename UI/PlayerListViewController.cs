@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
@@ -30,9 +29,17 @@ public class PlayerListViewController : BSMLAutomaticViewController
     [Inject] private readonly ChatManager _chatManager = null!;
     [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
+    [UIComponent("MuteDmPanel")] private GameObject? _muteDmPanel;
+    [UIComponent("HearPanel")] private GameObject? _hearPanel;
     [UIComponent("GridTitle")] private TMP_Text? _gridTitle;
     [UIComponent("GridHint")] private TMP_Text? _gridHint;
-    [UIComponent("VoiceModeSwitchButton")] private Button? _voiceModeSwitchButton;
+    [UIComponent("HearGridHint")] private TMP_Text? _hearGridHint;
+    [UIComponent("HearModeRow")] private GameObject? _hearModeRow;
+    [UIComponent("TalkToModeButton")] private Button? _talkToModeButton;
+    [UIComponent("ListenModeButton")] private Button? _listenModeButton;
+    [UIComponent("HearFooterRow")] private GameObject? _hearFooterRow;
+    [UIComponent("PlayerVolumeButton")] private Button? _playerVolumeButton;
+    [UIComponent("ConfigureDuckButton")] private Button? _configureDuckButton;
     [UIComponent("ClearAllMutesButton")] private Button? _clearAllMutesButton;
 
     [UIComponent("VolumeAdjustPanel")] private RectTransform? _volumeAdjustPanel;
@@ -59,10 +66,37 @@ public class PlayerListViewController : BSMLAutomaticViewController
     private List<IConnectedPlayer> _players = new();
     private string? _selectedVolumeUserId;
 
+    private static readonly Color AccentBlue = new(0.32f, 0.58f, 1f, 1f);
+    private ColorBlock _hearModeDefaultColors;
+    private bool _hearModeDefaultColorsCached;
+
+    public event Action<Mode>? RequestSubMode;
+
+    public event Action? RequestDuckSettings;
+
     public void SetMode(Mode mode, Action? onDismiss = null)
     {
         _mode = mode;
         _onDismiss = onDismiss;
+        RefreshUi();
+    }
+
+    internal void ForceRefreshUi() => RefreshUi();
+
+    private void RefreshUi()
+    {
+        if (!isActiveAndEnabled)
+            return;
+
+        if (_clearAllMutesButton != null)
+            _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
+        if (_volumeAdjustPanel != null && _mode != Mode.Volume)
+            _volumeAdjustPanel.gameObject.SetActive(false);
+        if (_mode == Mode.Volume)
+            ResetVolumeAdjustPanel();
+        ApplyTitle();
+        UpdateVoiceChrome();
+        ReloadGrid();
     }
 
     [UIAction("#post-parse")]
@@ -88,27 +122,42 @@ public class PlayerListViewController : BSMLAutomaticViewController
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
-        if (_clearAllMutesButton != null)
-            _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
-        if (_volumeAdjustPanel != null && _mode != Mode.Volume)
-            _volumeAdjustPanel.gameObject.SetActive(false);
-        if (_mode == Mode.Volume)
-            ResetVolumeAdjustPanel();
-        ApplyTitle();
-        UpdateVoiceChrome();
-        ReloadGrid();
+        RefreshUi();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
-    [UIAction("VoiceModeSwitchClicked")]
-    private void VoiceModeSwitchClicked()
+    [UIAction("TalkToModeClicked")]
+    private void TalkToModeClicked()
     {
         if (_mode != Mode.Listen && _mode != Mode.TalkTo)
             return;
-        _mode = _mode == Mode.TalkTo ? Mode.Listen : Mode.TalkTo;
-        ApplyTitle();
-        UpdateVoiceChrome();
-        ReloadGrid();
+        _mode = Mode.TalkTo;
+        RefreshUi();
+    }
+
+    [UIAction("ListenModeClicked")]
+    private void ListenModeClicked()
+    {
+        if (_mode != Mode.Listen && _mode != Mode.TalkTo)
+            return;
+        _mode = Mode.Listen;
+        RefreshUi();
+    }
+
+    [UIAction("PlayerVolumeClicked")]
+    private void PlayerVolumeClicked()
+    {
+        if (_mode != Mode.Listen && _mode != Mode.TalkTo)
+            return;
+        RequestSubMode?.Invoke(Mode.Volume);
+    }
+
+    [UIAction("ConfigureDuckClicked")]
+    private void ConfigureDuckClicked()
+    {
+        if (_mode != Mode.Listen && _mode != Mode.TalkTo)
+            return;
+        RequestDuckSettings?.Invoke();
     }
 
     [UIAction("SaveVolumesAndCloseClicked")]
@@ -143,43 +192,168 @@ public class PlayerListViewController : BSMLAutomaticViewController
             {
                 Mode.Mute => "Mute / Unmute",
                 Mode.DM => "Press DM again to end the DM!",
-                Mode.Volume => "Player volume (voice)",
-                Mode.Listen => "Listen (voice)",
-                Mode.TalkTo => "Talk to (voice)",
                 _ => ""
             };
         }
 
         if (_gridHint != null)
+            _gridHint.gameObject.SetActive(_mode == Mode.Mute || _mode == Mode.DM);
+
+        if (_hearGridHint != null)
         {
-            _gridHint.text = _mode switch
+            var hearHint = _mode == Mode.Listen || _mode == Mode.TalkTo || _mode == Mode.Volume;
+            _hearGridHint.gameObject.SetActive(hearHint);
+            _hearGridHint.text = _mode switch
             {
                 Mode.Listen =>
                     "Tap names to add or remove (listening). If nobody is selected, you hear everyone.",
                 Mode.TalkTo =>
                     "Listen and talk to a player (you can select as many people as you'd like, doesn't have to be one person; good for groups!).",
                 Mode.Volume => "Tap a player, then use - / + to adjust their volume. There is no cap, so you can adjust it as high as you want.",
-                _ => "Tap a name"
+                _ => ""
             };
+        }
+    }
+
+    private Color _hearModeDefaultLabelColor = Color.white;
+    private bool _uiRefsResolved;
+
+    private void EnsureUiRefsResolved()
+    {
+        if (_uiRefsResolved)
+            return;
+        _uiRefsResolved = true;
+        var root = transform;
+        _muteDmPanel ??= BsmlUiRefs.FindChildGameObject(root, "MuteDmPanel");
+        _hearPanel ??= BsmlUiRefs.FindChildGameObject(root, "HearPanel");
+        _hearModeRow ??= BsmlUiRefs.FindChildGameObject(root, "HearModeRow");
+        _hearFooterRow ??= BsmlUiRefs.FindChildGameObject(root, "HearFooterRow");
+        if (_volumeAdjustPanel == null)
+        {
+            var volGo = BsmlUiRefs.FindChildGameObject(root, "VolumeAdjustPanel");
+            if (volGo != null)
+                _volumeAdjustPanel = volGo.GetComponent<RectTransform>();
         }
     }
 
     private void UpdateVoiceChrome()
     {
-        if (_voiceModeSwitchButton != null)
-        {
-            var show = _mode == Mode.Listen || _mode == Mode.TalkTo;
-            _voiceModeSwitchButton.gameObject.SetActive(show);
-            if (show)
-            {
-                var tmp = _voiceModeSwitchButton.GetComponentInChildren<TMP_Text>(true);
-                if (tmp != null)
-                    tmp.text = _mode == Mode.TalkTo ? "Listen" : "Talk to";
-            }
-        }
+        EnsureUiRefsResolved();
+
+        var muteOrDm = _mode == Mode.Mute || _mode == Mode.DM;
+        var hearMode = _mode == Mode.Listen || _mode == Mode.TalkTo;
+        var hearPanelVisible = _mode == Mode.Listen || _mode == Mode.TalkTo || _mode == Mode.Volume;
+
+        BsmlUiRefs.SetActive(_muteDmPanel, muteOrDm);
+        BsmlUiRefs.SetActive(_hearPanel, hearPanelVisible);
+
+        BsmlUiRefs.SetActive(_hearModeRow, hearMode);
+        BsmlUiRefs.SetActive(_hearFooterRow, hearMode);
+
+        if (_hearGridHint != null)
+            _hearGridHint.gameObject.SetActive(hearPanelVisible);
+
+        if (_volumeAdjustPanel != null)
+            _volumeAdjustPanel.gameObject.SetActive(_mode == Mode.Volume && !string.IsNullOrEmpty(_selectedVolumeUserId));
 
         if (_saveVolumesButton != null)
             _saveVolumesButton.gameObject.SetActive(_mode == Mode.Volume);
+
+        if (_clearAllMutesButton != null)
+            _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
+
+        SetButtonVisible(_talkToModeButton, hearMode);
+        SetButtonVisible(_listenModeButton, hearMode);
+        SetButtonVisible(_playerVolumeButton, hearMode);
+        SetButtonVisible(_configureDuckButton, hearMode);
+
+        if (muteOrDm)
+        {
+            if (_hearModeDefaultColorsCached)
+            {
+                RestoreHearModeButtonDefaultLook(_talkToModeButton);
+                RestoreHearModeButtonDefaultLook(_listenModeButton);
+            }
+
+            _hearModeDefaultColorsCached = false;
+            return;
+        }
+
+        if (hearMode)
+        {
+            if (!_hearModeDefaultColorsCached)
+                CacheHearModeDefaultColorsOnce();
+            ApplyHearModeHighlight(_talkToModeButton, _mode == Mode.TalkTo);
+            ApplyHearModeHighlight(_listenModeButton, _mode == Mode.Listen);
+            return;
+        }
+
+        if (_hearModeDefaultColorsCached)
+        {
+            RestoreHearModeButtonDefaultLook(_talkToModeButton);
+            RestoreHearModeButtonDefaultLook(_listenModeButton);
+        }
+
+        _hearModeDefaultColorsCached = false;
+    }
+
+    private static void SetButtonVisible(Button? btn, bool visible)
+    {
+        if (btn != null)
+            btn.gameObject.SetActive(visible);
+    }
+
+    private void RestoreHearModeButtonDefaultLook(Button? btn)
+    {
+        if (btn == null)
+            return;
+        btn.colors = _hearModeDefaultColors;
+        var label = btn.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = _hearModeDefaultLabelColor;
+    }
+
+    private void CacheHearModeDefaultColorsOnce()
+    {
+        if (_hearModeDefaultColorsCached)
+            return;
+        var src = _listenModeButton ?? _talkToModeButton;
+        if (src == null)
+            return;
+        _hearModeDefaultColors = src.colors;
+        var label = src.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            _hearModeDefaultLabelColor = label.color;
+        _hearModeDefaultColorsCached = true;
+    }
+
+    private void ApplyHearModeHighlight(Button? btn, bool active)
+    {
+        if (btn == null)
+            return;
+
+        var c = btn.colors;
+        if (active)
+        {
+            c.normalColor = AccentBlue;
+            c.highlightedColor = AccentBlue;
+            c.selectedColor = AccentBlue;
+            c.pressedColor = AccentBlue;
+        }
+        else if (_hearModeDefaultColorsCached)
+        {
+            c.normalColor = _hearModeDefaultColors.normalColor;
+            c.highlightedColor = _hearModeDefaultColors.highlightedColor;
+            c.selectedColor = _hearModeDefaultColors.selectedColor;
+            c.pressedColor = _hearModeDefaultColors.pressedColor;
+            c.disabledColor = _hearModeDefaultColors.disabledColor;
+        }
+
+        btn.colors = c;
+
+        var label = btn.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+            label.color = active ? Color.white : _hearModeDefaultLabelColor;
     }
 
     [UIAction("OnSlot0")] private void OnSlot0() => OnSlotClicked(0);
@@ -210,7 +384,13 @@ public class PlayerListViewController : BSMLAutomaticViewController
         _players = GetConnectedPlayers();
         var localId = _sessionManager?.localPlayer?.userId;
         if (!string.IsNullOrEmpty(localId))
-            _players = _players.Where(p => p.userId != localId).ToList();
+        {
+            for (var i = _players.Count - 1; i >= 0; i--)
+            {
+                if (_players[i].userId == localId)
+                    _players.RemoveAt(i);
+            }
+        }
 
         for (var i = 0; i < SlotCount; i++)
         {
@@ -388,70 +568,112 @@ public class PlayerListViewController : BSMLAutomaticViewController
 
     private List<IConnectedPlayer> GetConnectedPlayers()
     {
-        var list = new List<IConnectedPlayer>();
+        var list = new List<IConnectedPlayer>(SlotCount);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
         var cm = _chatManager;
         if (cm != null)
         {
-            var fromChat = cm.GetLobbyPlayers();
-            foreach (var p in fromChat)
-                if (p != null && !string.IsNullOrEmpty(p.userId) && !list.Any(x => x.userId == p.userId))
-                    list.Add(p);
+            foreach (var p in cm.GetLobbyPlayers())
+            {
+                if (p == null || string.IsNullOrEmpty(p.userId) || !seen.Add(p.userId))
+                    continue;
+                list.Add(p);
+            }
         }
 
         if (list.Count == 0)
         {
-            foreach (var avatar in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarController>())
-            {
-                var p = GetPlayerFromAvatar(avatar);
-                if (p != null && !string.IsNullOrEmpty(p.userId) && !list.Any(x => x.userId == p.userId))
-                    list.Add(p);
-            }
+            TryAddPlayersFromLobbyScene(list, seen);
+        }
 
-            foreach (var place in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarPlace>())
-            {
-                var p = GetPlayerFromPlace(place);
-                if (p != null && !string.IsNullOrEmpty(p.userId) && !list.Any(x => x.userId == p.userId))
-                    list.Add(p);
-            }
+        var modPresence = ModPresenceManager.Instance;
+        if (modPresence == null)
+            return list;
+
+        for (var i = list.Count - 1; i >= 0; i--)
+        {
+            if (!modPresence.HasMod(list[i].userId))
+                list.RemoveAt(i);
         }
 
         return list;
     }
 
+    private static void TryAddPlayersFromLobbyScene(List<IConnectedPlayer> list, HashSet<string> seen)
+    {
+        foreach (var avatar in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarController>())
+        {
+            var p = GetPlayerFromAvatar(avatar);
+            if (p == null || string.IsNullOrEmpty(p.userId) || !seen.Add(p.userId))
+                continue;
+            list.Add(p);
+        }
+
+        foreach (var place in UnityEngine.Object.FindObjectsOfType<MultiplayerLobbyAvatarPlace>())
+        {
+            var p = GetPlayerFromPlace(place);
+            if (p == null || string.IsNullOrEmpty(p.userId) || !seen.Add(p.userId))
+                continue;
+            list.Add(p);
+        }
+    }
+
     private static readonly BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+    private static readonly string[] ConnectedPlayerFieldNames =
+        { "_connectedPlayer", "_player", "m_ConnectedPlayer", "connectedPlayer" };
+
+    private static FieldInfo? _lobbyAvatarConnectedPlayerField;
+    private static FieldInfo? _lobbyPlaceConnectedPlayerField;
+    private static bool _lobbyAvatarFieldResolved;
+    private static bool _lobbyPlaceFieldResolved;
 
     private static IConnectedPlayer? GetPlayerFromAvatar(MultiplayerLobbyAvatarController ctrl)
     {
-        if (ctrl == null) return null;
-        var t = ctrl.GetType();
-        foreach (var name in new[] { "_connectedPlayer", "_player", "m_ConnectedPlayer", "connectedPlayer" })
-        {
-            var f = t.GetField(name, Flags);
-            if (f != null && typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
-                return f.GetValue(ctrl) as IConnectedPlayer;
-        }
+        if (ctrl == null)
+            return null;
 
-        foreach (var f in t.GetFields(Flags))
-            if (typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
-                return f.GetValue(ctrl) as IConnectedPlayer;
-        return null;
+        var field = ResolveConnectedPlayerField(ctrl.GetType(), ref _lobbyAvatarConnectedPlayerField, ref _lobbyAvatarFieldResolved);
+        return field?.GetValue(ctrl) as IConnectedPlayer;
     }
 
     private static IConnectedPlayer? GetPlayerFromPlace(MultiplayerLobbyAvatarPlace place)
     {
-        if (place == null) return null;
-        var t = place.GetType();
-        foreach (var name in new[] { "_connectedPlayer", "_player", "m_ConnectedPlayer", "connectedPlayer" })
+        if (place == null)
+            return null;
+
+        var field = ResolveConnectedPlayerField(place.GetType(), ref _lobbyPlaceConnectedPlayerField, ref _lobbyPlaceFieldResolved);
+        return field?.GetValue(place) as IConnectedPlayer;
+    }
+
+    private static FieldInfo? ResolveConnectedPlayerField(
+        Type type,
+        ref FieldInfo? cachedField,
+        ref bool resolved)
+    {
+        if (resolved)
+            return cachedField;
+
+        resolved = true;
+        foreach (var name in ConnectedPlayerFieldNames)
         {
-            var f = t.GetField(name, Flags);
+            var f = type.GetField(name, Flags);
             if (f != null && typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
-                return f.GetValue(place) as IConnectedPlayer;
+            {
+                cachedField = f;
+                return cachedField;
+            }
         }
 
-        foreach (var f in t.GetFields(Flags))
-            if (typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
-                return f.GetValue(place) as IConnectedPlayer;
+        foreach (var f in type.GetFields(Flags))
+        {
+            if (!typeof(IConnectedPlayer).IsAssignableFrom(f.FieldType))
+                continue;
+            cachedField = f;
+            return cachedField;
+        }
+
         return null;
     }
 
