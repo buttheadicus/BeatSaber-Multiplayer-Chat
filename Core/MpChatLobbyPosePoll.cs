@@ -48,7 +48,8 @@ internal static class MpChatLobbyPosePoll
         if (MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
             return;
 
-        MpChatLocalPlayerPoseBridge.TickCached();
+        if (MpChatFeatures.LobbyUseCustomAvatarTrackingRig)
+            MpChatLocalPlayerPoseBridge.TickCached();
 
         for (var i = ActiveInputs.Count - 1; i >= 0; i--)
             ActiveInputs[i]?.PollThrottled();

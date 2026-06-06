@@ -43,13 +43,11 @@ public class EncryptionManager
 
         _lastSessionState = state;
 
-        using var deriveBytes = new Rfc2898DeriveBytes(
-            Encoding.UTF8.GetBytes(state),
-            Encoding.UTF8.GetBytes(KeyDerivationSalt),
-            10000,
-            HashAlgorithmName.SHA256);
-
-        _sessionKey = deriveBytes.GetBytes(KeySize);
+        // Fast deterministic session key (sorted platform user ids are the secret material).
+        // Avoid PBKDF2 here: 10k iterations on the main thread caused visible lobby join/leave hitches.
+        using var sha = SHA256.Create();
+        var material = Encoding.UTF8.GetBytes(state + "\0" + KeyDerivationSalt);
+        _sessionKey = sha.ComputeHash(material);
     }
 
     public byte[]? Encrypt(string plaintext)

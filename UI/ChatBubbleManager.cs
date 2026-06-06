@@ -55,7 +55,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private const float SongLobbyPollSleepSec = 2f;
 
-    private const float MainMenuIdlePollSleepSec = 1.25f;
+    private const float MainMenuIdlePollSleepSec = 4f;
+
+    private const float MainMenuTitleBarPollSleepSec = 4f;
 
     public bool IsMoveMode => _isMoveMode;
 
@@ -192,7 +194,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             var inSong = IsInSong();
             var inLobby = IsInLobby();
             var showTitleBarChat = ShouldShowTitleBarChat();
-            var pollDelay = quickBannerRetry ? 0.12f : inLobby || inSong || showTitleBarChat ? 0.5f : MainMenuIdlePollSleepSec;
+            var pollDelay = ResolveLobbyHeaderPollDelay(quickBannerRetry, inLobby, inSong, showTitleBarChat);
             yield return new WaitForSeconds(pollDelay);
 
             inSong = IsInSong();
@@ -244,7 +246,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     else
                         _lobbyBannerMissStreak++;
                 }
-                else
+                else if (!IsMainMenuTitleBarPollContext(inLobby))
                     TryUpgradeLobbyHeaderRootToTitleBarPreferred();
 
                 if (_lobbyHeaderRoot != null)
@@ -646,7 +648,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private static Transform? CreateLobbyChatRootAboveTitleBar()
     {
-        var titleView = FindTitleViewControllerTransformForChatAnchor();
+        var titleView = TryGetCachedTitleViewForChatAnchor();
         if (titleView == null)
             return null;
         var parent = titleView.parent;
@@ -779,7 +781,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             }
         }
 
-        var titleTf = FindTitleViewControllerTransformForChatAnchor();
+        var titleTf = TryGetCachedTitleViewForChatAnchor();
         var titleView = titleTf != null ? titleTf.gameObject : null;
 
         if (titleView != null)
@@ -1181,13 +1183,53 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private static bool _deepLobbyLayoutScanHit;
 
+    private static Transform? _cachedTitleViewForChatAnchor;
+
+    private static float ResolveLobbyHeaderPollDelay(
+        bool quickBannerRetry,
+        bool inLobby,
+        bool inSong,
+        bool showTitleBarChat)
+    {
+        if (quickBannerRetry)
+            return 0.12f;
+        if (inSong || inLobby)
+            return 0.5f;
+        if (showTitleBarChat && IsMainMenuTitleBarPollContext(inLobby))
+            return MainMenuTitleBarPollSleepSec;
+        if (showTitleBarChat)
+            return 0.5f;
+        return MainMenuIdlePollSleepSec;
+    }
+
+    private static bool IsMainMenuTitleBarPollContext(bool inLobby) =>
+        !inLobby && MpChatLobbyDiagnostics.ActiveSceneIsMainMenuWithoutGameCore();
+
     private bool ShouldShowTitleBarChat()
     {
         if (MpChatLobbyDiagnostics.SongGameplayLikelyActive())
             return false;
         if (IsInLobby())
             return true;
-        return FindTitleViewControllerTransformForChatAnchor() != null;
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.gameObject != null)
+            return true;
+        return TryGetCachedTitleViewForChatAnchor() != null;
+    }
+
+    private static void InvalidateTitleViewChatAnchorCache() =>
+        _cachedTitleViewForChatAnchor = null;
+
+    private static Transform? TryGetCachedTitleViewForChatAnchor()
+    {
+        if (_cachedTitleViewForChatAnchor != null)
+        {
+            if (_cachedTitleViewForChatAnchor)
+                return _cachedTitleViewForChatAnchor;
+            _cachedTitleViewForChatAnchor = null;
+        }
+
+        _cachedTitleViewForChatAnchor = FindTitleViewControllerTransformForChatAnchor();
+        return _cachedTitleViewForChatAnchor;
     }
 
     private bool IsInLobby()
@@ -1251,6 +1293,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
+        InvalidateTitleViewChatAnchorCache();
         RebindToActiveChatManager();
         _lobbyBannerMissStreak = 0;
         if (scene.name != "GameCore" || _stackedBubbles.Count == 0)

@@ -51,7 +51,7 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
 
         MpChatLobbyCustomAvatarDriver.ProcessPlayerJoinedImmediate(userId);
         if (broadcastMetadata && MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
-            MpCustomAvatarSyncManager.BroadcastMetadataNow(applySavedEyeHeight: false);
+            MpCustomAvatarSyncManager.BroadcastMetadataNow(applySavedEyeHeight: false, forceSend: true);
     }
 
     private void EnsureJoinBatchCoroutine()
@@ -90,7 +90,7 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
         }
 
         if (broadcastMetadata && MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
-            MpCustomAvatarSyncManager.BroadcastMetadataNow(applySavedEyeHeight: false);
+            MpCustomAvatarSyncManager.BroadcastMetadataNow(applySavedEyeHeight: false, forceSend: true);
 
         _pendingJoinBatch = null;
     }

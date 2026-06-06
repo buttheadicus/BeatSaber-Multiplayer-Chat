@@ -221,14 +221,17 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.UnregisterCallback<MpCustomAvatarFileChunkPacket>();
     }
 
+    private Coroutine? _pendingSessionEncryptionRefresh;
+
+    private string? _pendingSessionEncryptionExtraUserId;
+
     private void OnPlayerConnected(IConnectedPlayer player)
     {
-        // Include connecting user in key material immediately; connectedPlayers / GetLobbyPlayers can lag the event by a frame.
-        UpdateEncryptionKey(player?.userId);
+        // connectedPlayers can lag the event by a frame; refresh key next frame with the new user id included.
+        ScheduleSessionEncryptionRefresh(player?.userId);
         TryFlushHotMicOutboundQueue();
 
-        if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId) &&
-            !MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+        if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId))
         {
             MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(
                 player.userId,
@@ -242,16 +245,41 @@ public class ChatManager : IInitializable, IDisposable
         {
             ClearHotMicForUser(player.userId);
             VoiceChatRuntimeState.RemoveListenUserId(player.userId);
-            if (MpChatFeatures.LobbyCustomAvatars && !MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+            if (MpChatFeatures.LobbyCustomAvatars)
                 MpCustomAvatarSyncManager.ClearRemote(player.userId);
         }
 
-        UpdateEncryptionKey();
+        ScheduleSessionEncryptionRefresh();
         if (!HasRemotePeerInSession())
         {
             ClearHotMicOutboundPending();
             VoiceChatRuntimeState.ClearListenFilterOnly();
         }
+    }
+
+    private void ScheduleSessionEncryptionRefresh(string? extraUserId = null)
+    {
+        if (!string.IsNullOrEmpty(extraUserId))
+            _pendingSessionEncryptionExtraUserId = extraUserId;
+
+        if (_pendingSessionEncryptionRefresh != null)
+            return;
+
+        _pendingSessionEncryptionRefresh = _coroutineHost.StartCoroutine(RefreshSessionEncryptionNextFrame());
+    }
+
+    private IEnumerator RefreshSessionEncryptionNextFrame()
+    {
+        yield return null;
+
+        var extra = _pendingSessionEncryptionExtraUserId;
+        _pendingSessionEncryptionExtraUserId = null;
+        _pendingSessionEncryptionRefresh = null;
+
+        if (!string.IsNullOrEmpty(extra))
+            UpdateEncryptionKey(extra);
+        else
+            UpdateEncryptionKey();
     }
 
     private void ClearHotMicForUser(string userId)

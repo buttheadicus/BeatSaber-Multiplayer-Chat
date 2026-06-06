@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>MultiplayerChat</AssemblyName>
     <RootNamespace>MultiplayerChat</RootNamespace>
-    <Version>0.3.7</Version>
+    <Version>0.3.6</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
     <BeatSaberDir>F:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
@@ -207,6 +207,9 @@
     <EmbeddedResource Include="manifest.json">
       <LogicalName>MultiplayerChat.manifest.json</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="version">
+      <LogicalName>MultiplayerChat.version</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="UI\KeyboardView.bsml">
       <LogicalName>MultiplayerChat.UI.KeyboardView.bsml</LogicalName>
     </EmbeddedResource>
@@ -283,5 +286,6 @@
     </PropertyGroup>
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(ReleasesDir)\Plugins\" SkipUnchangedFiles="true" />
     <Copy SourceFiles="$(ProjectDir)manifest.json" DestinationFolder="$(ReleasesDir)\" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(ProjectDir)version" DestinationFolder="$(ReleasesDir)\" SkipUnchangedFiles="true" />
   </Target>
 </Project>

@@ -18,19 +18,27 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     public static event Action<string>? LobbyAvatarFileCached;
 
-    private const float RequestCooldownSeconds = 12f;
+    private const float RequestCooldownSeconds = 4f;
 
-    private const float ChunkSendIntervalSeconds = 0.02f;
+    private const int SendBytesBudgetSmallLobby = 768 * 1024;
+
+    private const int SendBytesBudgetLargeLobby = 384 * 1024;
+
+    private const int LargeLobbyPlayerThreshold = 10;
 
     private static readonly object Gate = new();
 
     private static readonly Dictionary<string, float> RequestSentAt =
         new(StringComparer.Ordinal);
 
-    private static readonly Dictionary<string, IncomingAssembly> IncomingByKey =
+    private static readonly Dictionary<string, IncomingAssembly> IncomingByHash =
         new(StringComparer.Ordinal);
 
     private static readonly HashSet<string> OutboundHashesInFlight = new(StringComparer.Ordinal);
+
+    private static readonly HashSet<string> DownloadNotifiedHashes = new(StringComparer.Ordinal);
+
+    private static readonly Dictionary<string, byte[]> OutboundBytesByHash = new(StringComparer.Ordinal);
 
     private static readonly Queue<PendingCacheWrite> DeferredCacheWrites = new();
 
@@ -46,19 +54,45 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     private readonly MpCustomAvatarFileChunkPacket _chunkPacket = new();
 
+    private byte[] _chunkScratch = Array.Empty<byte>();
+
+    private Coroutine? _deferredPollRoutine;
+
     public void Initialize()
     {
         Instance = this;
+        _deferredPollRoutine = StartCoroutine(PollDeferredTransferWorkRoutine());
     }
 
     private void OnDestroy()
     {
+        if (_deferredPollRoutine != null)
+        {
+            StopCoroutine(_deferredPollRoutine);
+            _deferredPollRoutine = null;
+        }
+
         if (ReferenceEquals(Instance, this))
             Instance = null;
     }
 
+    private static IEnumerator PollDeferredTransferWorkRoutine()
+    {
+        var wait = new WaitForSeconds(0.12f);
+        while (true)
+        {
+            yield return wait;
+            if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+                continue;
+
+            PollDeferredCacheWrites();
+            PollDeferredOutbound();
+        }
+    }
+
     public static void RequestLobbyAvatarFile(string md5HexUpper, string ownerUserId)
     {
+        _ = ownerUserId;
         if (!MpChatFeatures.LobbyCustomAvatars)
             return;
         if (!CustomAvatarHashUtil.LooksLikeMd5Hex(md5HexUpper))
@@ -70,13 +104,16 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         if (CustomAvatarLobbyHashCache.TryGetPath(md5HexUpper, out _))
             return;
 
-        var key = md5HexUpper + "|" + (ownerUserId ?? "");
         var now = Time.realtimeSinceStartup;
         lock (Gate)
         {
-            if (RequestSentAt.TryGetValue(key, out var last) && now - last < RequestCooldownSeconds)
+            if (IncomingByHash.ContainsKey(md5HexUpper))
                 return;
-            RequestSentAt[key] = now;
+
+            if (RequestSentAt.TryGetValue(md5HexUpper, out var last) && now - last < RequestCooldownSeconds)
+                return;
+
+            RequestSentAt[md5HexUpper] = now;
         }
 
         if (Instance == null)
@@ -100,19 +137,14 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     public void HandleFileRequest(MpCustomAvatarFileRequestPacket packet, IConnectedPlayer sender)
     {
+        _ = sender;
         if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
             return;
-        if (sender == null)
+        if (!ModSettings.EnableLobbyCustomAvatars)
             return;
 
         var hash = (packet.HashMd5Hex ?? "").Trim().ToUpperInvariant();
         if (!CustomAvatarHashUtil.LooksLikeMd5Hex(hash))
-            return;
-
-        var localHash = (ModSettings.LobbyCustomAvatarContentHash ?? "").Trim().ToUpperInvariant();
-        if (!string.Equals(hash, localHash, StringComparison.Ordinal))
-            return;
-        if (!ModSettings.EnableLobbyCustomAvatars)
             return;
 
         if (!CustomAvatarLobbyHashCache.TryGetPath(hash, out var path) || !File.Exists(path))
@@ -156,25 +188,27 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         if (CustomAvatarLobbyHashCache.TryGetPath(hash, out _))
             return;
 
-        var key = sender.userId + ":" + hash;
         IncomingAssembly assembly;
         var startedNewDownload = false;
         lock (Gate)
         {
-            if (!IncomingByKey.TryGetValue(key, out assembly!))
+            if (!IncomingByHash.TryGetValue(hash, out assembly!))
             {
                 assembly = new IncomingAssembly(hash, packet.ChunkCount);
-                IncomingByKey[key] = assembly;
+                IncomingByHash[hash] = assembly;
                 startedNewDownload = true;
             }
 
             if (assembly.ChunkCount != packet.ChunkCount)
                 return;
 
+            if (assembly.Chunks[packet.ChunkIndex] != null)
+                return;
+
             assembly.Chunks[packet.ChunkIndex] = packet.Payload;
         }
 
-        if (startedNewDownload)
+        if (startedNewDownload && DownloadNotifiedHashes.Add(hash))
             MpCustomAvatarUserNotifier.PostDownloading(sender.userId, sender.userName);
 
         if (!assembly.IsComplete())
@@ -189,37 +223,38 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         {
             MultiplayerChat.Plugin.Log?.Warn($"[MPChat][LobbyAvatar] Assemble failed for {hash}: {ex.Message}");
             lock (Gate)
-                IncomingByKey.Remove(key);
+            {
+                IncomingByHash.Remove(hash);
+                DownloadNotifiedHashes.Remove(hash);
+            }
+
             return;
         }
 
-        if (fileBytes.Length > MpCustomAvatarFileChunkPacket.MaxTotalFileBytes)
+        lock (Gate)
         {
-            lock (Gate)
-                IncomingByKey.Remove(key);
-            return;
+            IncomingByHash.Remove(hash);
+            DownloadNotifiedHashes.Remove(hash);
         }
+
+        if (fileBytes.Length > MpCustomAvatarFileChunkPacket.MaxTotalFileBytes)
+            return;
 
         var computed = CustomAvatarHashUtil.Md5HexBytes(fileBytes);
         if (!string.Equals(computed, hash, StringComparison.OrdinalIgnoreCase))
         {
             MultiplayerChat.Plugin.Log?.Warn($"[MPChat][LobbyAvatar] Download hash mismatch for {hash} (got {computed})");
-            lock (Gate)
-                IncomingByKey.Remove(key);
             return;
         }
-
-        lock (Gate)
-            IncomingByKey.Remove(key);
 
         if (MpChatPerformanceGate.ShouldBlockAvatarHeavyWork)
         {
             lock (Gate)
-                DeferredCacheWrites.Enqueue(new PendingCacheWrite(fileBytes, hash, sender.userId));
+                DeferredCacheWrites.Enqueue(new PendingCacheWrite(fileBytes, hash));
             return;
         }
 
-        FinishCachedRemoteAvatar(fileBytes, hash, sender.userId);
+        FinishCachedRemoteAvatar(fileBytes, hash);
     }
 
     public static void PollDeferredCacheWrites()
@@ -238,10 +273,10 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         }
 
         foreach (var job in batch)
-            FinishCachedRemoteAvatar(job.FileBytes, job.Hash, job.OwnerUserId);
+            FinishCachedRemoteAvatar(job.FileBytes, job.Hash);
     }
 
-    private static void FinishCachedRemoteAvatar(byte[] fileBytes, string hash, string ownerUserId)
+    private static void FinishCachedRemoteAvatar(byte[] fileBytes, string hash)
     {
         try
         {
@@ -255,10 +290,13 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             return;
         }
 
+        lock (Gate)
+            OutboundBytesByHash[hash] = fileBytes;
+
         CustomAvatarLobbyHashCache.Invalidate();
         MultiplayerChat.Plugin.Log?.Info($"[MPChat][LobbyAvatar] Cached remote .avatar {hash} ({fileBytes.Length} bytes)");
         LobbyAvatarFileCached?.Invoke(hash);
-        MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(ownerUserId);
+        MpCustomAvatarSyncManager.NotifyAllRemotesWithHash(hash);
     }
 
     public static void PollDeferredOutbound()
@@ -285,7 +323,6 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     private IEnumerator SendChunksRoutine()
     {
-        var wait = new WaitForSeconds(ChunkSendIntervalSeconds);
         while (_sendQueue.Count > 0)
         {
             if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
@@ -301,14 +338,8 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             }
 
             var job = _sendQueue.Dequeue();
-            byte[] bytes;
-            try
+            if (!TryGetOutboundBytes(job, out var bytes))
             {
-                bytes = File.ReadAllBytes(job.Path);
-            }
-            catch (Exception ex)
-            {
-                MultiplayerChat.Plugin.Log?.Warn($"[MPChat][LobbyAvatar] Read for upload failed: {ex.Message}");
                 lock (Gate)
                     OutboundHashesInFlight.Remove(job.Hash);
                 continue;
@@ -327,6 +358,9 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             if (chunkCount == 0)
                 chunkCount = 1;
 
+            var bytesBudget = GetSendBytesBudgetPerFrame();
+            var sentThisFrame = 0;
+
             for (ushort i = 0; i < chunkCount; i++)
             {
                 if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
@@ -334,14 +368,16 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
                 var offset = i * chunkSize;
                 var len = Math.Min(chunkSize, bytes.Length - offset);
-                var slice = new byte[len];
-                Buffer.BlockCopy(bytes, offset, slice, 0, len);
+                if (_chunkScratch.Length < len)
+                    _chunkScratch = new byte[len];
+
+                Buffer.BlockCopy(bytes, offset, _chunkScratch, 0, len);
 
                 _chunkPacket.Version = MpCustomAvatarFileChunkPacket.WireVersion;
                 _chunkPacket.HashMd5Hex = job.Hash;
                 _chunkPacket.ChunkIndex = i;
                 _chunkPacket.ChunkCount = chunkCount;
-                _chunkPacket.Payload = slice;
+                _chunkPacket.Payload = CopyChunkSlice(len);
 
                 try
                 {
@@ -353,7 +389,12 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
                     break;
                 }
 
-                yield return wait;
+                sentThisFrame += len;
+                if (sentThisFrame >= bytesBudget)
+                {
+                    sentThisFrame = 0;
+                    yield return null;
+                }
             }
 
             lock (Gate)
@@ -363,20 +404,71 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         _sendRoutine = null;
     }
 
+    private bool TryGetOutboundBytes(OutboundJob job, out byte[] bytes)
+    {
+        lock (Gate)
+        {
+            if (OutboundBytesByHash.TryGetValue(job.Hash, out var cached) && cached.Length > 0)
+            {
+                bytes = cached;
+                return true;
+            }
+        }
+
+        try
+        {
+            bytes = File.ReadAllBytes(job.Path);
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][LobbyAvatar] Read for upload failed: {ex.Message}");
+            bytes = Array.Empty<byte>();
+            return false;
+        }
+
+        lock (Gate)
+            OutboundBytesByHash[job.Hash] = bytes;
+
+        return bytes.Length > 0;
+    }
+
+    private byte[] CopyChunkSlice(int len)
+    {
+        var slice = new byte[len];
+        Buffer.BlockCopy(_chunkScratch, 0, slice, 0, len);
+        return slice;
+    }
+
+    private int GetSendBytesBudgetPerFrame()
+    {
+        return GetConnectedPlayerCount() >= LargeLobbyPlayerThreshold
+            ? SendBytesBudgetLargeLobby
+            : SendBytesBudgetSmallLobby;
+    }
+
+    private int GetConnectedPlayerCount()
+    {
+        try
+        {
+            return _sessionManager.connectedPlayers?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     private readonly struct PendingCacheWrite
     {
-        public PendingCacheWrite(byte[] fileBytes, string hash, string ownerUserId)
+        public PendingCacheWrite(byte[] fileBytes, string hash)
         {
             FileBytes = fileBytes;
             Hash = hash;
-            OwnerUserId = ownerUserId;
         }
 
         public byte[] FileBytes { get; }
 
         public string Hash { get; }
-
-        public string OwnerUserId { get; }
     }
 
     private sealed class OutboundJob

@@ -483,7 +483,8 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     {
         if (Time.realtimeSinceStartup < _nextLobbyHierarchyPollTime)
             return;
-        _nextLobbyHierarchyPollTime = Time.realtimeSinceStartup + 0.5f;
+        var pollInterval = MpChatLobbyDiagnostics.ActiveSceneIsMainMenuWithoutGameCore() ? 2.5f : 0.5f;
+        _nextLobbyHierarchyPollTime = Time.realtimeSinceStartup + pollInterval;
 
         var inGameCore = string.Equals(SceneManager.GetActiveScene().name, "GameCore", System.StringComparison.Ordinal);
         if (inGameCore)

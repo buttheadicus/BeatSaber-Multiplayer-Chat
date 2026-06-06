@@ -2,8 +2,6 @@ using System;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
-using System.Text.RegularExpressions;
 using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
 using UnityEngine;
@@ -34,10 +32,9 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     {
         MpChatLog.DebugLine("[MPChat] Version check starting...");
         yield return new WaitForSeconds(0.5f);
-        var currentVersion = GetCurrentVersion();
-        if (string.IsNullOrEmpty(currentVersion))
+        if (!ModBuildVersion.TryGetEmbeddedBuildNumber(out var currentBuild))
         {
-            UpdateMessage = "Could not read this mod version.";
+            UpdateMessage = "Could not read this mod build number.";
             yield break;
         }
 
@@ -52,14 +49,14 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
 
         var json = request.downloadHandler.text;
-        var latestVersion = ParseVersionFromJson(json);
-        if (string.IsNullOrEmpty(latestVersion))
+        if (!GitHubReleaseVersion.TryGetLatestBuildNumberFromModDllRelease(json, out var latestBuild))
         {
-            UpdateMessage = "Could not parse the latest release version.";
+            UpdateMessage = "Could not parse the latest release build number.";
             yield break;
         }
 
-        var updateAvailable = IsNewerVersion(latestVersion!, currentVersion!);
+        MpChatLog.DebugLine($"[MPChat] Version check: local build {currentBuild}, latest release build {latestBuild}.");
+        var updateAvailable = latestBuild > currentBuild;
         UpdateMessage = updateAvailable
             ? ChatBubbleManager.UpdateAvailableHeaderMessage
             : "Multiplayer Chat is up to date.";
@@ -265,57 +262,4 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             Instance = null;
     }
 
-    private static string? GetCurrentVersion()
-    {
-        try
-        {
-            var asm = Assembly.GetExecutingAssembly();
-            var resourceName = "MultiplayerChat.manifest.json";
-            using var stream = asm.GetManifestResourceStream(resourceName);
-            if (stream == null) return null;
-
-            using var reader = new StreamReader(stream);
-            var json = reader.ReadToEnd();
-            var match = Regex.Match(json, @"""version""\s*:\s*""([^""]+)""");
-            return match.Success ? match.Groups[1].Value : null;
-        }
-        catch (Exception ex)
-        {
-            MpChatLog.Warn($"[MPChat] Failed to read version: {ex.Message}");
-            return null;
-        }
-    }
-
-    private static string? ParseVersionFromJson(string json)
-    {
-        if (GitHubReleaseVersion.TryGetLatestVersionFromModDllRelease(json, out var fromDll))
-            return fromDll;
-        if (GitHubReleaseVersion.TryGetLatestVersionFromModZips(json, out var fromZips))
-            return fromZips;
-        if (GitHubReleaseVersion.TryGetLatestVersionLoose(json, out var loose))
-            return loose;
-        return null;
-    }
-
-    private static bool IsNewerVersion(string latest, string current)
-    {
-        try
-        {
-            var latestParts = latest.Split('.');
-            var currentParts = current.Split('.');
-            for (var i = 0; i < Math.Max(latestParts.Length, currentParts.Length); i++)
-            {
-                var l = i < latestParts.Length && int.TryParse(latestParts[i], out var lv) ? lv : 0;
-                var c = i < currentParts.Length && int.TryParse(currentParts[i], out var cv) ? cv : 0;
-                if (l > c) return true;
-                if (l < c) return false;
-            }
-
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-    }
 }

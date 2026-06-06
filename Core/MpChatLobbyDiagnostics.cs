@@ -143,6 +143,14 @@ public static class MpChatLobbyDiagnostics
         return false;
     }
 
+    public static bool ActiveSceneIsMainMenuWithoutGameCore()
+    {
+        if (AnyGameCoreLoaded())
+            return false;
+        var active = SceneManager.GetActiveScene();
+        return active.IsValid() && string.Equals(active.name, "MainMenu", System.StringComparison.Ordinal);
+    }
+
     public static void InvalidateSceneHeuristicCaches()
     {
         _lobbyHeuristicCacheTime = -999f;
@@ -177,6 +185,8 @@ public static class MpChatLobbyDiagnostics
 
     private static bool BeatmapGameplayLikelyActiveUncached()
     {
+        if (ActiveSceneIsMainMenuWithoutGameCore())
+            return false;
         if (LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
             return false;
 
@@ -216,6 +226,8 @@ public static class MpChatLobbyDiagnostics
     {
         if (AnyGameCoreLoaded())
             return true;
+        if (ActiveSceneIsMainMenuWithoutGameCore())
+            return false;
         // Multiplayer lobby UI: not beatmap gameplay  -  avoids repeated FindObjectOfType scans on policy ticks.
         if (LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
             return false;
@@ -270,7 +282,6 @@ public static class MpChatLobbyDiagnostics
         return false;
     }
 
-    // Prefer lobby heuristic before SongGameplayLikelyActive (avoids FindObjectOfType on player join/leave).
     public static bool ShouldSkipMultiplayerPlayerSessionHooks()
     {
         if (BeatmapGameplayLikelyActive())
@@ -280,26 +291,12 @@ public static class MpChatLobbyDiagnostics
         return SongGameplayLikelyActive();
     }
 
-    // Lobby / GameCore / active MP session only (skip 1s avatar sync ticks on main menu).
+    // Lobby pedestal sync and metadata ticks only in lobby UI or arena (GameCore), not main menu while still in session.
     public static bool MultiplayerAvatarSyncContextActive(IMultiplayerSessionManager? sessionManager)
     {
         if (AnyGameCoreLoaded())
             return true;
-        if (LobbyHierarchyLooksLikeMultiplayerLobby())
-            return true;
-
-        if (sessionManager == null)
-            return false;
-
-        try
-        {
-            var connected = sessionManager.connectedPlayers;
-            return connected != null && connected.Count > 0;
-        }
-        catch
-        {
-            return false;
-        }
+        return LobbyHierarchyLooksLikeMultiplayerLobby();
     }
 
     public static bool LobbyHierarchyLooksLikeMultiplayerLobby()

@@ -96,7 +96,8 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         else
         {
             _avatarInput = new MpChatLobbyLivePoseInput(pose);
-            _avatarInput.EnableLocalCustomAvatarTracking(ShouldUseLocalAvatarSettingsHash());
+            _avatarInput.EnableLocalCustomAvatarTracking(
+                MpChatFeatures.LobbyUseCustomAvatarTrackingRig && ShouldUseLocalAvatarSettingsHash());
         }
 
         if (_spawnedAvatar?.gameObject != null)
@@ -982,7 +983,8 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         MpChatLobbyPedestalVisual.PrepareForCustomAvatar(_poseController.transform);
 
         _avatarInput ??= new MpChatLobbyLivePoseInput(_poseController);
-        _avatarInput.EnableLocalCustomAvatarTracking(ShouldUseLocalAvatarSettingsHash());
+        _avatarInput.EnableLocalCustomAvatarTracking(
+            MpChatFeatures.LobbyUseCustomAvatarTrackingRig && ShouldUseLocalAvatarSettingsHash());
 
         var spawnParent = _poseController.transform;
         if (IsArenaContext())
@@ -1112,6 +1114,13 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private void UpdateLocalPoseBridgeTarget()
     {
+        if (!MpChatFeatures.LobbyUseCustomAvatarTrackingRig)
+        {
+            if (MpChatLocalPlayerPoseBridge.TargetIs(_poseController))
+                MpChatLocalPlayerPoseBridge.ClearLocalTarget();
+            return;
+        }
+
         if (ShouldUseLocalAvatarSettingsHash() || IsDisplayingLocalPlayer())
             MpChatLocalPlayerPoseBridge.SetLocalTarget(_poseController);
         else if (MpChatLocalPlayerPoseBridge.TargetIs(_poseController))

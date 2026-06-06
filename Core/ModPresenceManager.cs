@@ -125,9 +125,6 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     private void OnPlayerConnected(IConnectedPlayer player)
     {
-        if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
-            return;
-
         var local = _sessionManager.localPlayer;
         if (local != null && !string.IsNullOrEmpty(local.userId))
         {
@@ -139,12 +136,20 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     private void OnPlayerDisconnected(IConnectedPlayer player)
     {
-        if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
+        if (player == null || string.IsNullOrEmpty(player.userId))
+            return;
+
+        RemoveRemotePlayerWithMod(player.userId);
+    }
+
+    private void RemoveRemotePlayerWithMod(string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
             return;
 
         var removed = false;
         lock (_lock)
-            removed = _playersWithMod.Remove(player.userId);
+            removed = _playersWithMod.Remove(userId);
 
         if (removed)
             PresenceUpdated?.Invoke(this, EventArgs.Empty);
@@ -224,7 +229,11 @@ public class ModPresenceManager : IInitializable, IDisposable
             // Proper reply - they have the mod.
             _hasReceivedPresenceReply = true;
             CancelPresenceRetry();
-            TryRegisterRemotePlayerWithMod(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient);
+            TryRegisterRemotePlayerWithMod(
+                sender.userId,
+                sender.userName ?? sender.userId,
+                packet.SenderNameColor,
+                packet.IsSlzCompanionClient);
             return;
         }
 
@@ -241,7 +250,11 @@ public class ModPresenceManager : IInitializable, IDisposable
         var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
         if (!connected.Any(p => p.userId == sender.userId))
             return;
-        TryRegisterRemotePlayerWithMod(sender.userId, sender.userName ?? sender.userId, packet.SenderNameColor, packet.IsSlzCompanionClient);
+        TryRegisterRemotePlayerWithMod(
+            sender.userId,
+            sender.userName ?? sender.userId,
+            packet.SenderNameColor,
+            packet.IsSlzCompanionClient);
 
         SendPresenceTo(sender.userId);
     }

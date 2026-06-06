@@ -511,7 +511,8 @@ internal sealed class MpChatLobbyLivePoseInput : IAvatarInput
 
     {
 
-        if (!HasValidBoneSeparation(headWorld, rightWorld, leftWorld))
+        if (MpChatFeatures.LobbyDeferCollapsedRemoteBones &&
+            !HasValidBoneSeparation(headWorld, rightWorld, leftWorld))
 
             return true;
 
