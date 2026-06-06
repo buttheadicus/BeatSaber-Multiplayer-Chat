@@ -82,6 +82,41 @@ internal static class MpChatLobbyCustomAvatarDriverRegistry
         }
     }
 
+    internal static int ActiveLobbyPedestalDriverCount()
+    {
+        var count = 0;
+        for (var i = 0; i < AllDrivers.Count; i++)
+        {
+            var driver = AllDrivers[i];
+            if (driver != null && driver.isActiveAndEnabled && !driver.IsArenaContextForRegistry())
+                count++;
+        }
+
+        return count;
+    }
+
+    internal static float GetLobbyVisualMaintainIntervalSeconds()
+    {
+        var n = ActiveLobbyPedestalDriverCount();
+        if (n <= 3)
+            return 0.25f;
+        if (n <= 6)
+            return 0.5f;
+        if (n <= 10)
+            return 0.85f;
+        return 1.25f;
+    }
+
+    internal static float GetLobbySpawnRetryIntervalSeconds()
+    {
+        var n = ActiveLobbyPedestalDriverCount();
+        if (n <= 4)
+            return 0.5f;
+        if (n <= 8)
+            return 0.85f;
+        return 1.25f;
+    }
+
     private static void IndexDriver(MpChatLobbyCustomAvatarDriver driver)
     {
         var userId = driver.RegistryUserId;

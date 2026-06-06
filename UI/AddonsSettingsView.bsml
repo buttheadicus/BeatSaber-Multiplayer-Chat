@@ -5,6 +5,5 @@
     <button text="Avatar Coloring Extensions" pad="2" min-width="48" on-click="AvatarColoringClicked"/>
     <button text="Custom Avatars" pad="2" min-width="36" on-click="CustomAvatarsClicked"/>
     <button text="Quick Binds setup" pad="2" min-width="36" on-click="QuickBindsClicked"/>
-    <button text="Apply" pad="2" on-click="ApplyClicked"/>
   </vertical>
 </bg>

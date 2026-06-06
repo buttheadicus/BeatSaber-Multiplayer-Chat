@@ -7,8 +7,6 @@ namespace MultiplayerChat.UI;
 [ViewDefinition("MultiplayerChat.UI.AddonsSettingsView.bsml")]
 public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
 {
-    public event Action? AddonsSettingsApplied;
-
     public event Action? CustomAvatarsClicked;
 
     public event Action? QuickBindsClicked;
@@ -32,7 +30,4 @@ public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
 
     [UIAction("QuickBindsClicked")]
     private void OnQuickBindsClicked() => QuickBindsClicked?.Invoke();
-
-    [UIAction("ApplyClicked")]
-    private void OnApplyClicked() => AddonsSettingsApplied?.Invoke();
 }

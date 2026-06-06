@@ -41,9 +41,15 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private const float ArenaMaintainIntervalSeconds = 0.25f;
 
-    private const float LobbyVisualMaintainIntervalSeconds = 0.25f;
-
     private float _nextLobbyVisualMaintainRealtime;
+
+    private float _nextLobbySpawnRetryRealtime;
+
+    private static int _lobbyAvatarLoadsInFlight;
+
+    private const int MaxConcurrentLobbyAvatarLoads = 2;
+
+    private bool _holdsLobbyLoadSlot;
 
     private string? _registryIndexedUserId;
 
@@ -152,7 +158,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
-            _loadCoroutine = null;
+            EndLoadCoroutine();
         }
     }
 
@@ -259,7 +265,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
-            _loadCoroutine = null;
+            EndLoadCoroutine();
         }
 
         if (_spawnedAvatar == null)
@@ -483,7 +489,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
             if (_loadCoroutine != null)
             {
                 StopCoroutine(_loadCoroutine);
-                _loadCoroutine = null;
+                EndLoadCoroutine();
             }
 
             return;
@@ -499,7 +505,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
-            _loadCoroutine = null;
+            EndLoadCoroutine();
         }
 
         DestroySpawned();
@@ -515,7 +521,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
-            _loadCoroutine = null;
+            EndLoadCoroutine();
         }
 
         if (!IsArenaContext())
@@ -742,10 +748,41 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (_loadCoroutine != null)
         {
             StopCoroutine(_loadCoroutine);
+            ReleaseLobbyLoadSlot();
             _loadCoroutine = null;
         }
 
+        if (!TryAcquireLobbyLoadSlot())
+        {
+            _pendingHash = hash;
+            return;
+        }
+
         _loadCoroutine = StartCoroutine(LoadAndSpawnCoroutine(hash, scale));
+    }
+
+    private bool TryAcquireLobbyLoadSlot()
+    {
+        if (IsArenaContext())
+            return true;
+        if (_holdsLobbyLoadSlot)
+            return true;
+        if (_lobbyAvatarLoadsInFlight >= MaxConcurrentLobbyAvatarLoads)
+            return false;
+
+        _lobbyAvatarLoadsInFlight++;
+        _holdsLobbyLoadSlot = true;
+        return true;
+    }
+
+    private void ReleaseLobbyLoadSlot()
+    {
+        if (!_holdsLobbyLoadSlot)
+            return;
+
+        _holdsLobbyLoadSlot = false;
+        if (_lobbyAvatarLoadsInFlight > 0)
+            _lobbyAvatarLoadsInFlight--;
     }
 
     private IEnumerator FinishSpawnNextFrame(float scale)
@@ -805,6 +842,15 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
             if (!string.IsNullOrEmpty(_lastSpawnedHash) && _loadCoroutine == null &&
                 !MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
             {
+                if (!IsArenaContext())
+                {
+                    if (Time.realtimeSinceStartup < _nextLobbySpawnRetryRealtime)
+                        return;
+
+                    _nextLobbySpawnRetryRealtime = Time.realtimeSinceStartup +
+                        MpChatLobbyCustomAvatarDriverRegistry.GetLobbySpawnRetryIntervalSeconds();
+                }
+
                 _lastSpawnedHash = null;
                 _finalizeComplete = false;
                 if (UsesLocalAvatarHash())
@@ -815,6 +861,9 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
             return;
         }
+
+        if (!IsArenaContext() && Time.realtimeSinceStartup < _nextLobbyVisualMaintainRealtime)
+            return;
 
         var spawnedGo = _spawnedAvatar.gameObject;
         if (spawnedGo == null)
@@ -838,9 +887,10 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
                 }
             }
         }
-        else if (Time.realtimeSinceStartup >= _nextLobbyVisualMaintainRealtime)
+        else
         {
-            _nextLobbyVisualMaintainRealtime = Time.realtimeSinceStartup + LobbyVisualMaintainIntervalSeconds;
+            _nextLobbyVisualMaintainRealtime = Time.realtimeSinceStartup +
+                MpChatLobbyCustomAvatarDriverRegistry.GetLobbyVisualMaintainIntervalSeconds();
             MpChatLobbyPedestalVisual.EnsureSpawnedVisible(spawnedGo, _lastAppliedScale);
             MpChatLobbyPedestalVisual.ApplyCustomAvatarVisibility(_poseController.transform, _avatarInput);
         }
@@ -1030,6 +1080,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private void EndLoadCoroutine()
     {
+        ReleaseLobbyLoadSlot();
         _loadCoroutine = null;
     }
 

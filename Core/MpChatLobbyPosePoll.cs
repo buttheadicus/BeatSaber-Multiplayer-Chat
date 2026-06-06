@@ -7,8 +7,6 @@ namespace MultiplayerChat.Core;
 // One throttled poll loop for all lobby custom-avatar pose inputs (avoids per-driver LateUpdate + FindObjectsOfType).
 internal static class MpChatLobbyPosePoll
 {
-    private const float PollIntervalSeconds = 0.05f;
-
     private static readonly List<MpChatLobbyLivePoseInput> ActiveInputs = new();
 
     private static float _nextPollTime;
@@ -45,7 +43,7 @@ internal static class MpChatLobbyPosePoll
         if (Time.unscaledTime < _nextPollTime)
             return;
 
-        _nextPollTime = Time.unscaledTime + PollIntervalSeconds;
+        _nextPollTime = Time.unscaledTime + GetPollIntervalSeconds();
 
         if (MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
             return;
@@ -54,5 +52,15 @@ internal static class MpChatLobbyPosePoll
 
         for (var i = ActiveInputs.Count - 1; i >= 0; i--)
             ActiveInputs[i]?.PollThrottled();
+    }
+
+    private static float GetPollIntervalSeconds()
+    {
+        var n = ActiveInputs.Count;
+        if (n <= 4)
+            return 0.05f;
+        if (n <= 8)
+            return 0.08f;
+        return 0.12f;
     }
 }

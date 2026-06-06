@@ -24,7 +24,9 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
 
     [UIComponent("CalibrateHeightButton")] private Button? _calibrateHeightButton;
 
-    [UIComponent("EnabledSection")] private RectTransform? _enabledSection;
+    [UIComponent("ApplyButton")] private Button? _applyButton;
+
+    [UIComponent("ControlsSection")] private RectTransform? _controlsSection;
 
     [UIComponent("DescriptionText")] private TextMeshProUGUI? _descriptionText;
 
@@ -32,7 +34,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
 
     private bool _enableDraft;
 
-    private CanvasGroup? _enabledSectionCanvasGroup;
+    private CanvasGroup? _controlsSectionCanvasGroup;
 
     private bool _suppressAvatarDraftUpdate;
 
@@ -53,7 +55,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
                 return;
 
             _enableDraft = value;
-            RefreshEnabledSectionInteractable();
+            RefreshControlsSectionInteractable();
         }
     }
 
@@ -77,11 +79,11 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
     private void PostParse()
     {
         ReloadDraftFromDisk();
-        EnsureEnabledSectionCanvasGroup();
+        EnsureControlsSectionCanvasGroup();
         BuildAvatarDropdown(selectSaved: true);
         ApplyToggleLabel();
         HookEnableToggleListener();
-        RefreshEnabledSectionInteractable();
+        RefreshControlsSectionInteractable();
         StabilizeCustomAvatarsLayout();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
@@ -90,12 +92,12 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
         ReloadDraftFromDisk();
-        EnsureEnabledSectionCanvasGroup();
+        EnsureControlsSectionCanvasGroup();
         BuildAvatarDropdown(selectSaved: true);
         _enableToggle?.ReceiveValue();
         ApplyToggleLabel();
         HookEnableToggleListener();
-        RefreshEnabledSectionInteractable();
+        RefreshControlsSectionInteractable();
         StabilizeCustomAvatarsLayout();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
@@ -106,21 +108,20 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
     {
         BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "CustomAvatarsRoot"), 4f);
         BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "EnableToggleGroup"), 2f);
-        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "EnabledSection"), 6f);
-        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "ControlsGroup"), 2f);
-        BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "ActionButtonsRow"), 3f);
+        BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "ApplyRow"), 3f);
+        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "ControlsSection"), 2f);
         BsmlLayoutGroups.MirrorSettingRowLayoutFromReference(_avatarDropdown, _enableToggle);
         BsmlLayoutGroups.SetTextPreferredWidth(_descriptionText, CustomAvatarsDescriptionWidthPx);
     }
 
-    private void EnsureEnabledSectionCanvasGroup()
+    private void EnsureControlsSectionCanvasGroup()
     {
-        if (_enabledSection == null || _enabledSectionCanvasGroup != null)
+        if (_controlsSection == null || _controlsSectionCanvasGroup != null)
             return;
 
-        _enabledSectionCanvasGroup = _enabledSection.gameObject.GetComponent<CanvasGroup>();
-        if (_enabledSectionCanvasGroup == null)
-            _enabledSectionCanvasGroup = _enabledSection.gameObject.AddComponent<CanvasGroup>();
+        _controlsSectionCanvasGroup = _controlsSection.gameObject.GetComponent<CanvasGroup>();
+        if (_controlsSectionCanvasGroup == null)
+            _controlsSectionCanvasGroup = _controlsSection.gameObject.AddComponent<CanvasGroup>();
     }
 
     private void HookEnableToggleListener()
@@ -140,19 +141,21 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
             _enableToggle.Text = LabelEnableToggle;
     }
 
-    private void RefreshEnabledSectionInteractable()
+    private void RefreshControlsSectionInteractable()
     {
         var enabled = _enableDraft;
-        if (_enabledSectionCanvasGroup != null)
+        if (_controlsSectionCanvasGroup != null)
         {
-            _enabledSectionCanvasGroup.alpha = enabled ? 1f : DisabledSectionAlpha;
-            _enabledSectionCanvasGroup.interactable = enabled;
-            _enabledSectionCanvasGroup.blocksRaycasts = enabled;
+            _controlsSectionCanvasGroup.alpha = enabled ? 1f : DisabledSectionAlpha;
+            _controlsSectionCanvasGroup.interactable = enabled;
+            _controlsSectionCanvasGroup.blocksRaycasts = enabled;
         }
 
         SetControlInteractable(_avatarDropdown?.gameObject, enabled);
         if (_calibrateHeightButton != null)
             _calibrateHeightButton.interactable = enabled;
+        if (_applyButton != null)
+            _applyButton.interactable = true;
     }
 
     private static void SetControlInteractable(GameObject? root, bool interactable)
@@ -232,9 +235,13 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
 
         ModSettings.EnableLobbyCustomAvatars = _enableDraft;
 
-        var sel = _avatarDropdown?.Value?.ToString() ?? CustomAvatarInstallListing.DefaultBeatSaberAvatarLabel;
-        ApplyAvatarSelection(sel);
+        if (_enableDraft)
+        {
+            var sel = _avatarDropdown?.Value?.ToString() ?? CustomAvatarInstallListing.DefaultBeatSaberAvatarLabel;
+            ApplyAvatarSelection(sel);
+        }
 
+        RefreshControlsSectionInteractable();
         CustomAvatarsSettingsApplied?.Invoke();
     }
 

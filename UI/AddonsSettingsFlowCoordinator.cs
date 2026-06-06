@@ -28,7 +28,6 @@ public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
 
         if (addedToHierarchy)
         {
-            _addonsView.AddonsSettingsApplied += OnAddonsSettingsApplied;
             _addonsView.CustomAvatarsClicked += OnCustomAvatarsClicked;
             _addonsView.QuickBindsClicked += OnQuickBindsClicked;
             _addonsView.AvatarColoringClicked += OnAvatarColoringClicked;
@@ -39,7 +38,6 @@ public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
     {
         if (removedFromHierarchy)
         {
-            _addonsView.AddonsSettingsApplied -= OnAddonsSettingsApplied;
             _addonsView.CustomAvatarsClicked -= OnCustomAvatarsClicked;
             _addonsView.QuickBindsClicked -= OnQuickBindsClicked;
             _addonsView.AvatarColoringClicked -= OnAvatarColoringClicked;
@@ -84,8 +82,6 @@ public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
         _quickBindsFlow.ParentFlow = this;
         PresentFlowCoordinator(_quickBindsFlow);
     }
-
-    private void OnAddonsSettingsApplied() => Dismiss();
 
     protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();
 

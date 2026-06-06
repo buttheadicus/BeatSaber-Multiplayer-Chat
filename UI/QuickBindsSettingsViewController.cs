@@ -58,6 +58,12 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
     [UIComponent("QuickBindsEnableToggle")] private ToggleSetting? _quickBindsEnableToggle;
 
+    [UIComponent("ApplyButton")] private Button? _applyButton;
+
+    [UIComponent("ControlsSection")] private RectTransform? _controlsSection;
+
+    [UIComponent("RecordButton")] private Button? _recordButton;
+
     [UIComponent("RecordingStatusText")] private TextMeshProUGUI? _recordingStatusText;
 
 
@@ -82,11 +88,21 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
     private float _recordingIdleDeadline;
 
+    private CanvasGroup? _controlsSectionCanvasGroup;
+
+    private const float DisabledSectionAlpha = 0.45f;
+
     [UIValue("QuickBindsEnabled")]
     public bool QuickBindsEnabled
     {
         get => _draftQuickBindsEnabled;
-        set => _draftQuickBindsEnabled = value;
+        set
+        {
+            if (_draftQuickBindsEnabled == value)
+                return;
+            _draftQuickBindsEnabled = value;
+            RefreshControlsSectionInteractable();
+        }
     }
 
     [UIAction("#post-parse")]
@@ -95,9 +111,13 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
     {
         ReloadQuickBindsDraft();
+        EnsureControlsSectionCanvasGroup();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        _quickBindsEnableToggle?.ReceiveValue();
         ApplyQuickBindsToggleLabel();
+        HookEnableToggleListener();
         StabilizeQuickBindsLayout();
+        RefreshControlsSectionInteractable();
         RefreshComboPreview();
         RefreshStatusText();
         RefreshDeleteBindingButton();
@@ -107,10 +127,13 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
         ReloadQuickBindsDraft();
-        _quickBindsEnableToggle?.ReceiveValue();
+        EnsureControlsSectionCanvasGroup();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        _quickBindsEnableToggle?.ReceiveValue();
         ApplyQuickBindsToggleLabel();
+        HookEnableToggleListener();
         StabilizeQuickBindsLayout();
+        RefreshControlsSectionInteractable();
         RefreshComboPreview();
         RefreshStatusText();
         RefreshDeleteBindingButton();
@@ -125,6 +148,54 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
             _quickBindsEnableToggle.Text = LabelEnableQuickBinds;
     }
 
+    private void EnsureControlsSectionCanvasGroup()
+    {
+        if (_controlsSection == null || _controlsSectionCanvasGroup != null)
+            return;
+
+        _controlsSectionCanvasGroup = _controlsSection.gameObject.GetComponent<CanvasGroup>();
+        if (_controlsSectionCanvasGroup == null)
+            _controlsSectionCanvasGroup = _controlsSection.gameObject.AddComponent<CanvasGroup>();
+    }
+
+    private void HookEnableToggleListener()
+    {
+        if (_quickBindsEnableToggle?.Toggle == null)
+            return;
+
+        _quickBindsEnableToggle.Toggle.onValueChanged.RemoveListener(OnEnableToggleUnityChanged);
+        _quickBindsEnableToggle.Toggle.onValueChanged.AddListener(OnEnableToggleUnityChanged);
+    }
+
+    private void OnEnableToggleUnityChanged(bool isOn) => QuickBindsEnabled = isOn;
+
+    private void RefreshControlsSectionInteractable()
+    {
+        var enabled = _draftQuickBindsEnabled;
+        if (_controlsSectionCanvasGroup != null)
+        {
+            _controlsSectionCanvasGroup.alpha = enabled ? 1f : DisabledSectionAlpha;
+            _controlsSectionCanvasGroup.interactable = enabled;
+            _controlsSectionCanvasGroup.blocksRaycasts = enabled;
+        }
+
+        SetControlInteractable(_controlsSection?.gameObject, enabled);
+        if (_applyButton != null)
+            _applyButton.interactable = true;
+
+        if (!enabled && _recordingActive)
+            StopRecording(resetCombo: false);
+    }
+
+    private static void SetControlInteractable(GameObject? root, bool interactable)
+    {
+        if (root == null)
+            return;
+
+        foreach (var selectable in root.GetComponentsInChildren<Selectable>(true))
+            selectable.interactable = interactable;
+    }
+
     private const float QuickBindsHelpTextWidthPx = 400f;
 
     private const float QuickBindsStatusTextWidthPx = 360f;
@@ -132,8 +203,10 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
     private void StabilizeQuickBindsLayout()
     {
         BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "QuickBindsRoot"), 4f);
-        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "QuickBindsControls"), 2f);
-        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "QuickBindsFooter"), 3f);
+        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "EnableToggleGroup"), 2f);
+        BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "ApplyRow"), 3f);
+        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "ControlsSection"), 2f);
+        BsmlLayoutGroups.MirrorSettingRowLayoutFromReference(_recordButton, _quickBindsEnableToggle);
         BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "QuickBindsActionRow1"), 3f);
         BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "QuickBindsActionRow2"), 3f);
 
