@@ -40,6 +40,10 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
 
     private const string LabelEnableToggle = "ENABLE ADDON (RESTART REQUIRED)";
 
+    private const string DefaultDescriptionText =
+        "Simple to use! Tap your wanted avatar from the dropdown menu then tap apply, or calibrate height! "
+        + "This addon is designated for future enhancements, not finished yet.";
+
     private const float DisabledSectionAlpha = 0.45f;
 
     [UIValue("AvatarOptions")]
@@ -84,6 +88,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
         ApplyToggleLabel();
         HookEnableToggleListener();
         RefreshControlsSectionInteractable();
+        RefreshDependencyDescription();
         StabilizeCustomAvatarsLayout();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
@@ -98,8 +103,18 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
         ApplyToggleLabel();
         HookEnableToggleListener();
         RefreshControlsSectionInteractable();
+        RefreshDependencyDescription();
         StabilizeCustomAvatarsLayout();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+    }
+
+    private void RefreshDependencyDescription()
+    {
+        if (_descriptionText == null)
+            return;
+
+        var blocked = CustomAvatarDependenciesBootstrap.GetSettingsBlockedMessage();
+        _descriptionText.text = blocked ?? DefaultDescriptionText;
     }
 
     private const float CustomAvatarsDescriptionWidthPx = 400f;
@@ -152,8 +167,9 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
         }
 
         SetControlInteractable(_avatarDropdown?.gameObject, enabled);
+        var actionRowEnabled = enabled || ModSettings.EnableLobbyCustomAvatars;
         if (_calibrateHeightButton != null)
-            _calibrateHeightButton.interactable = enabled;
+            _calibrateHeightButton.interactable = actionRowEnabled;
         if (_applyButton != null)
             _applyButton.interactable = true;
     }
@@ -221,7 +237,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
     [UIAction("CalibrateHeightClicked")]
     private void OnCalibrateHeightClicked()
     {
-        if (!_enableDraft)
+        if (!_enableDraft && !ModSettings.EnableLobbyCustomAvatars)
             return;
 
         MpCustomAvatarHeightCalibration.Run();

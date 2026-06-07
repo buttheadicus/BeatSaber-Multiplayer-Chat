@@ -117,7 +117,11 @@ public class ChatManager : IInitializable, IDisposable
 
         VoiceReceiveDiagnostics.ResetSession();
         if (iAmLobbyScope)
+        {
             _lobbyScopeChatManager = null;
+            if (MpChatFeatures.LobbyCustomAvatars)
+                MpCustomAvatarSyncManager.ClearAllRemotes();
+        }
 
         if (Instance == this)
         {
@@ -233,9 +237,13 @@ public class ChatManager : IInitializable, IDisposable
 
         if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId))
         {
+            if (ModSettings.EnableLobbyCustomAvatars)
+                MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
             MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(
                 player.userId,
                 broadcastMetadata: ModSettings.EnableLobbyCustomAvatars);
+            if (ModSettings.EnableLobbyCustomAvatars)
+                MpCustomAvatarLobbyTransferManager.TryProactiveShareLocalAvatar(player.userId);
         }
     }
 

@@ -22,6 +22,29 @@ internal static class MpChatLobbyCustomAvatarDriverRegistry
             AllDrivers.Add(driver);
 
         IndexDriver(driver);
+        OnRemoteLobbyPedestalRegistered(driver);
+    }
+
+    // Pedestals often appear after playerConnected; retry join work once the driver exists.
+    private static void OnRemoteLobbyPedestalRegistered(MpChatLobbyCustomAvatarDriver driver)
+    {
+        if (!driver.isActiveAndEnabled || driver.IsArenaContextForRegistry())
+            return;
+        if (driver.IsMirrorPedestalForRegistry())
+            return;
+
+        var userId = driver.RegistryUserId;
+        if (string.IsNullOrEmpty(userId))
+            return;
+
+        MpCustomAvatarSyncManager.ScheduleJoinRetry(userId);
+
+        if (!MpCustomAvatarSyncManager.TryGetRemoteState(userId, out var row) ||
+            string.IsNullOrEmpty(row.AvatarDescriptorId) ||
+            CustomAvatarInstallListing.IsVanillaDescriptorHash(row.AvatarDescriptorId))
+            return;
+
+        MpChatLobbyCustomAvatarDriver.ProcessPlayerJoinedImmediate(userId);
     }
 
     internal static void Unregister(MpChatLobbyCustomAvatarDriver driver)
@@ -69,6 +92,46 @@ internal static class MpChatLobbyCustomAvatarDriverRegistry
             if (driver == null || !driver.isActiveAndEnabled || driver.IsArenaContextForRegistry())
                 continue;
             action(driver);
+        }
+    }
+
+    internal static void CollectLobbyPedestals(List<MpChatLobbyCustomAvatarDriver> into)
+    {
+        into.Clear();
+        for (var i = 0; i < AllDrivers.Count; i++)
+        {
+            var driver = AllDrivers[i];
+            if (driver == null || !driver.isActiveAndEnabled || driver.IsArenaContextForRegistry())
+                continue;
+
+            // Mirror preview last: only one concurrent lobby load slot; remotes must not stay pending behind mirror.
+            if (driver.IsMirrorPedestalForRegistry())
+                continue;
+
+            into.Add(driver);
+        }
+
+        for (var i = 0; i < AllDrivers.Count; i++)
+        {
+            var driver = AllDrivers[i];
+            if (driver == null || !driver.isActiveAndEnabled || driver.IsArenaContextForRegistry())
+                continue;
+            if (!driver.IsMirrorPedestalForRegistry())
+                continue;
+
+            into.Add(driver);
+        }
+    }
+
+    internal static void WakePendingLobbyLoads()
+    {
+        for (var i = 0; i < AllDrivers.Count; i++)
+        {
+            var driver = AllDrivers[i];
+            if (driver == null || !driver.isActiveAndEnabled || driver.IsArenaContextForRegistry())
+                continue;
+
+            driver.TryResumePendingLoad();
         }
     }
 

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using BeatSaber.AvatarCore;
-using MultiplayerChat.Settings;
 using UnityEngine;
 
 namespace MultiplayerChat.Core;
@@ -9,7 +8,7 @@ internal static class MpChatArenaAvatarAttach
 {
     internal static void ScanGameCoreAvatars()
     {
-        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+        if (!CustomAvatarDependenciesBootstrap.IsSessionActive())
             return;
         if (!MpChatFeatures.LobbyCustomAvatarsInArena)
             return;
@@ -30,7 +29,7 @@ internal static class MpChatArenaAvatarAttach
 
     internal static void RefreshAttachForFacadeRoot(Transform? facadeRoot)
     {
-        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+        if (!CustomAvatarDependenciesBootstrap.IsSessionActive())
             return;
         if (!MpChatFeatures.LobbyCustomAvatarsInArena)
             return;
@@ -63,7 +62,7 @@ internal static class MpChatArenaAvatarAttach
 
     internal static void TryAttachToPose(MultiplayerAvatarPoseController pose)
     {
-        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+        if (!CustomAvatarDependenciesBootstrap.IsSessionActive())
             return;
         if (!MpChatFeatures.LobbyCustomAvatarsInArena)
             return;
@@ -146,6 +145,7 @@ internal static class MpChatArenaAvatarAttach
             anchor.localPosition = Vector3.zero;
             anchor.localRotation = Quaternion.identity;
             anchor.localScale = Vector3.one;
+            MpChatArenaAnchorRegistry.Register(anchor);
         }
 
         return anchor;
@@ -197,15 +197,7 @@ internal static class MpChatArenaAvatarAttach
         }
     }
 
-    internal static void DestroyOrphanedArenaObjects()
-    {
-        foreach (var anchor in Object.FindObjectsOfType<Transform>(true))
-        {
-            if (anchor == null || anchor.name != "MpChatArenaCustomAvatarAnchor")
-                continue;
-            Object.Destroy(anchor.gameObject);
-        }
-    }
+    internal static void DestroyOrphanedArenaObjects() => MpChatArenaAnchorRegistry.DestroyAll();
 
     internal static bool IsUnderBigAvatarIntro(Transform poseRoot) =>
         poseRoot.GetComponentInParent<MultiplayerBigAvatarAnimator>() != null;

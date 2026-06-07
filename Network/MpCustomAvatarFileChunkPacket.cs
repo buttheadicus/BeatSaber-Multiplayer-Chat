@@ -5,15 +5,20 @@ namespace MultiplayerChat.Network;
 
 public class MpCustomAvatarFileChunkPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
-    public const byte WireVersion = 1;
+    public const byte WireVersion = 2;
 
-    public const int MaxChunkPayloadBytes = 65536;
+    public const byte LegacyWireVersion = 1;
+
+    public const int MaxChunkPayloadBytes = 61440;
 
     public const int MaxTotalFileBytes = 15 * 1024 * 1024;
 
     public byte Version = WireVersion;
 
     public string HashMd5Hex = "";
+
+    // Unicast to the requester; empty broadcasts (legacy v1).
+    public string? TargetUserId;
 
     public ushort ChunkIndex;
 
@@ -25,6 +30,8 @@ public class MpCustomAvatarFileChunkPacket : MultiplayerCore.Networking.Abstract
     {
         writer.Put(Version);
         writer.Put(HashMd5Hex ?? "");
+        if (Version >= WireVersion)
+            writer.Put(TargetUserId ?? "");
         writer.Put(ChunkIndex);
         writer.Put(ChunkCount);
         var data = Payload ?? Array.Empty<byte>();
@@ -42,6 +49,7 @@ public class MpCustomAvatarFileChunkPacket : MultiplayerCore.Networking.Abstract
     {
         Version = WireVersion;
         HashMd5Hex = "";
+        TargetUserId = null;
         ChunkIndex = 0;
         ChunkCount = 0;
         Payload = null;
@@ -50,12 +58,21 @@ public class MpCustomAvatarFileChunkPacket : MultiplayerCore.Networking.Abstract
             return;
 
         Version = reader.GetByte();
-        if (Version != WireVersion)
+        if (Version != WireVersion && Version != LegacyWireVersion)
             return;
 
         HashMd5Hex = reader.GetString() ?? "";
         if (HashMd5Hex.Length > MpCustomAvatarFileRequestPacket.HashLength)
             HashMd5Hex = HashMd5Hex.Substring(0, MpCustomAvatarFileRequestPacket.HashLength);
+
+        if (Version >= WireVersion && reader.AvailableBytes > 0)
+        {
+            var target = reader.GetString();
+            TargetUserId = string.IsNullOrEmpty(target) ? null : target;
+        }
+
+        if (reader.AvailableBytes <= 0)
+            return;
 
         ChunkIndex = reader.GetUShort();
         ChunkCount = reader.GetUShort();

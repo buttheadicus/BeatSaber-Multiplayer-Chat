@@ -130,7 +130,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     }
 
     private static bool HierarchyLooksLikeMultiplayerLobby() =>
-        MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby();
+        MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive();
 
     private IEnumerator ReloadVoipIfMultiplayerLobbyDeferred(string logLine)
     {
@@ -187,6 +187,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         cm?.ForceFullVoipReset();
         vm?.ForceReloadMicrophone();
         VoiceHotMicManager.OnVoipPipelineReloaded();
+        MpCustomAvatarSyncManager.OnVoipPipelineReloaded();
         ChatBubbleManager.Instance?.RebindToActiveChatManager();
         cm?.LogVoipReloadContext("TryRunVoipReload (after pipeline)");
         MpChatLobbyDiagnostics.LogVoipTransition("TryRunVoipReload:after", logLine);
@@ -273,6 +274,10 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     private void LateUpdate()
     {
         ApplySongVoicePolicy();
+        VoiceHotMicManager.EnsureActiveLobbyHostAfterArena();
+        MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
+        if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+            MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
         PollLobbyHierarchyForVoipReload();
 
         if (!ModSettings.VoiceDuckingEnabled)

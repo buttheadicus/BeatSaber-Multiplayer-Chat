@@ -361,7 +361,7 @@ public class ModPresenceManager : IInitializable, IDisposable
     {
         if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())
             return;
-        if (!MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+        if (!MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive())
             return;
         BroadcastPresence();
         PresenceUpdated?.Invoke(this, EventArgs.Empty);

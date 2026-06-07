@@ -35,6 +35,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private Transform? _lobbyHeaderRoot;
     private int _lobbyBannerMissStreak;
     private bool _wasInLobby;
+    private bool _wasResultsLike;
     private bool _isMoveMode;
     private GameObject? _moveHandle;
     private Coroutine? _moveModeHelperCoroutine;
@@ -209,8 +210,23 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             }
 
             inLobby = IsInLobby();
+            var resultsLike = MpChatLobbyDiagnostics.ResultsLikeUiVisible();
             showTitleBarChat = ShouldShowTitleBarChat();
             _lastPollInLobby = inLobby;
+
+            if (_wasResultsLike && !resultsLike)
+            {
+                InvalidateTitleViewChatAnchorCache();
+                if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.gameObject != null)
+                {
+                    TryUpgradeLobbyHeaderRootToTitleBarPreferred();
+                    ApplyPlacementMode();
+                    var titleRoot = _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>();
+                    titleRoot?.RequestStabilizeBurst();
+                }
+            }
+
+            _wasResultsLike = resultsLike;
 
             if (_wasInLobby && !inLobby && !showTitleBarChat)
                 ClearChat();
@@ -221,6 +237,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 RebindToActiveChatManager();
                 ModPresenceManager.Instance?.RefreshAfterLobbyReturn();
                 MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
+                MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
+                MpChatLobbyAvatarLifecycleHost.ScheduleLobbySessionRejoinRefresh();
             }
 
             _wasInLobby = inLobby;
@@ -235,7 +253,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
             if (showTitleBarChat)
             {
-                if (_lobbyHeaderRoot == null)
+                if (_lobbyHeaderRoot == null && !resultsLike)
                 {
                     var root = FindOrCreateLobbyHeaderChatRoot();
                     if (root != null)
@@ -623,10 +641,16 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     // bottom edge of the chat block sits just above the top edge of the title bar.
     private static Transform? FindTitleViewControllerTransformForChatAnchor()
     {
+        Transform? inactiveFallback = null;
+
         var direct = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
                      ?? GameObject.Find("TitleViewController");
         if (direct != null)
-            return direct.transform;
+        {
+            if (direct.activeInHierarchy)
+                return direct.transform;
+            inactiveFallback = direct.transform;
+        }
 
         foreach (var rootName in new[] { "Wrapper", "MenuCore" })
         {
@@ -639,17 +663,24 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     continue;
                 if (tr.GetComponentInParent<Canvas>() == null)
                     continue;
-                return tr;
+                if (tr.gameObject.activeInHierarchy)
+                    return tr;
+                inactiveFallback ??= tr;
             }
         }
 
-        return null;
+        if (MpChatLobbyDiagnostics.ResultsLikeUiVisible())
+            return null;
+
+        return inactiveFallback;
     }
 
     private static Transform? CreateLobbyChatRootAboveTitleBar()
     {
         var titleView = TryGetCachedTitleViewForChatAnchor();
         if (titleView == null)
+            return null;
+        if (!titleView.gameObject.activeInHierarchy)
             return null;
         var parent = titleView.parent;
         if (parent == null)
@@ -1179,10 +1210,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return _container.InstantiateComponent<ChatBubble>(panelObj);
     }
 
-    private static float _deepLobbyLayoutScanTime = -999f;
-
-    private static bool _deepLobbyLayoutScanHit;
-
     private static Transform? _cachedTitleViewForChatAnchor;
 
     private static float ResolveLobbyHeaderPollDelay(
@@ -1209,6 +1236,14 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     {
         if (MpChatLobbyDiagnostics.SongGameplayLikelyActive())
             return false;
+        if (MpChatLobbyDiagnostics.ResultsLikeUiVisible())
+        {
+            // Inactive lobby chrome under results yields wild canvas positions; wait for dismiss.
+            if (_lobbyHeaderRoot == null || _lobbyHeaderRoot.gameObject == null)
+                return false;
+            if (!_lobbyHeaderRoot.gameObject.activeInHierarchy)
+                return false;
+        }
         if (IsInLobby())
             return true;
         if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.gameObject != null)
@@ -1232,61 +1267,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return _cachedTitleViewForChatAnchor;
     }
 
-    private bool IsInLobby()
-    {
-        if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
-            return true;
-
-        // Arena to lobby: MP chrome can stay inactive under results while GameObject.Find misses title rows.
-        if (MpChatLobbyDiagnostics.SongGameplayLikelyActive())
-            return false;
-        if (!MpChatLobbyDiagnostics.ResultsLikeUiVisible())
-            return false;
-
-        return MultiplayerLobbyLayoutExistsIncludingInactiveCached();
-    }
-
-    private static bool MultiplayerLobbyLayoutExistsIncludingInactiveCached()
-    {
-        var now = Time.realtimeSinceStartup;
-        if (now - _deepLobbyLayoutScanTime < 1f)
-            return _deepLobbyLayoutScanHit;
-        _deepLobbyLayoutScanTime = now;
-        _deepLobbyLayoutScanHit = false;
-
-        for (var i = 0; i < SceneManager.sceneCount; i++)
-        {
-            var scene = SceneManager.GetSceneAt(i);
-            if (!scene.isLoaded)
-                continue;
-            foreach (var root in scene.GetRootGameObjects())
-            {
-                if (!DescendantHasInactiveMpLobbyChromeName(root.transform))
-                    continue;
-                _deepLobbyLayoutScanHit = true;
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool DescendantHasInactiveMpLobbyChromeName(Transform root)
-    {
-        var stack = new Stack<Transform>();
-        stack.Push(root);
-        while (stack.Count > 0)
-        {
-            var t = stack.Pop();
-            var n = t.gameObject.name;
-            if (n == "MultiplayerLobbyCenterStage" || n == "LobbySetup" || n == "HostSetup")
-                return true;
-            for (var c = 0; c < t.childCount; c++)
-                stack.Push(t.GetChild(c));
-        }
-
-        return false;
-    }
+    private bool IsInLobby() =>
+        MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive();
 
     private static bool IsInSong() => MpChatLobbyDiagnostics.SongGameplayLikelyActive();
 
@@ -1324,11 +1306,15 @@ internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (_stabilizeFramesLeft <= 0)
+        if (_stabilizeFramesLeft <= 0 && !MpChatLobbyDiagnostics.ResultsLikeUiVisible())
             return;
-        _stabilizeFramesLeft--;
+        if (_stabilizeFramesLeft > 0)
+            _stabilizeFramesLeft--;
         StabilizeNow();
     }
+
+    internal void RequestStabilizeBurst(int frames = 24) =>
+        _stabilizeFramesLeft = Mathf.Max(_stabilizeFramesLeft, frames);
 
     private void StabilizeNow()
     {

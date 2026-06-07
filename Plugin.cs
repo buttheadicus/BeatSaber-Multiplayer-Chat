@@ -47,7 +47,13 @@ public class Plugin
             logger.Warn($"[MPChat] AvatarData multiplayer serialization Harmony init failed: {ex.Message}");
         }
 
-        if (MpChatFeatures.LobbyCustomAvatars)
+        if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
+            return;
+
+        if (!CustomAvatarDependenciesBootstrap.TryContinueAfterEnsuringDependencies(logger))
+            return;
+
+        if (MpChatFeatures.LobbyCustomAvatars && CustomAvatarDependenciesBootstrap.SessionDependenciesReady)
         {
             try
             {
@@ -69,12 +75,10 @@ public class Plugin
                 logger.Warn($"[MPChat] Arena custom avatar Harmony failed: {ex.Message}");
             }
         }
-
-        if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
-            return;
-
-        if (!CustomAvatarDependenciesBootstrap.TryContinueAfterEnsuringDependencies(logger))
-            return;
+        else if (MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
+        {
+            logger.Warn("[MPChat][CustomAvatars] Skipping lobby/arena Harmony patches until dependencies are installed.");
+        }
 
         CauBootstrap.DeleteCauExeIfEnabled();
 
@@ -105,7 +109,7 @@ public class Plugin
         quickBindsHost.AddComponent<Core.QuickBinds.QuickBindsRuntimeManager>();
         quickBindsHost.AddComponent<Core.MpChatUpdateNoticeTest>();
 
-        if (MpChatFeatures.LobbyCustomAvatars)
+        if (CustomAvatarDependenciesBootstrap.IsSessionActive())
         {
             var lobbyAvatarHost = new GameObject("MPChatLobbyAvatarLifecycleHost");
             UnityEngine.Object.DontDestroyOnLoad(lobbyAvatarHost);
@@ -151,7 +155,7 @@ public class Plugin
 
         zenjector.Install(Location.GameCore, container => InstallGameCoreBindings(container));
 
-        if (MpChatFeatures.LobbyCustomAvatars && MpChatFeatures.LobbyCustomAvatarsInArena)
+        if (CustomAvatarDependenciesBootstrap.IsSessionActive() && MpChatFeatures.LobbyCustomAvatarsInArena)
         {
             zenjector.Install(Location.ConnectedPlayer, container =>
             {
@@ -174,10 +178,9 @@ public class Plugin
     {
         InstallChatBindings(container, lobbyUi: false);
 
-        if (MpChatFeatures.LobbyCustomAvatars && MpChatFeatures.LobbyCustomAvatarsInArena)
+        if (CustomAvatarDependenciesBootstrap.IsSessionActive() && MpChatFeatures.LobbyCustomAvatarsInArena)
         {
             container.BindInterfacesAndSelfTo<MpCustomAvatarSyncManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
-            container.BindInterfacesAndSelfTo<MpCustomAvatarLobbyTransferManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
         }
     }
 
@@ -228,6 +231,10 @@ public class Plugin
             {
                 container.Bind<CustomAvatarsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
                 container.Bind<CustomAvatarsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            }
+
+            if (CustomAvatarDependenciesBootstrap.IsSessionActive())
+            {
                 container.BindInterfacesAndSelfTo<MpCustomAvatarSyncManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
                 container.BindInterfacesAndSelfTo<MpCustomAvatarLobbyTransferManager>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
             }
@@ -243,7 +250,7 @@ public class Plugin
     private static MultiplayerLobbyAvatarController DecorateAvatar(MultiplayerLobbyAvatarController original)
     {
         AddChatBubbleAnchorToCaption(original.transform);
-        if (MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars)
+        if (CustomAvatarDependenciesBootstrap.IsSessionActive())
         {
             original.gameObject.AddComponent<MpChatLobbyPedestalScaleGuard>();
             original.gameObject.AddComponent<MpChatLobbyCustomAvatarDriver>();

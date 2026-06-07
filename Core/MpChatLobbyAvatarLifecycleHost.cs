@@ -14,6 +14,10 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
 
     private Coroutine? _pendingRefresh;
 
+    private static bool _lobbyReturnRefreshInProgress;
+
+    internal static bool IsLobbyReturnRefreshInProgress() => _lobbyReturnRefreshInProgress;
+
     private Coroutine? _pendingJoinBatch;
 
     private Coroutine? _pendingLeaveBatch;
@@ -199,7 +203,10 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
     private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
     {
         if (string.Equals(newScene.name, "GameCore", System.StringComparison.Ordinal))
+        {
+            MpCustomAvatarLobbyTransferManager.SuspendLobbyAvatarFileTransfer();
             ScheduleArenaAvatarScan();
+        }
 
         if (string.Equals(oldScene.name, "GameCore", System.StringComparison.Ordinal))
             ScheduleLobbyAvatarRefresh($"left GameCore -> {newScene.name}");
@@ -221,15 +228,19 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
 
     private IEnumerator ScanArenaAvatarsAfterGameCoreLoad()
     {
-        yield return null;
+        yield return new WaitForSecondsRealtime(0.35f);
         MpChatArenaAvatarAttach.ScanGameCoreAvatars();
-        yield return new WaitForSecondsRealtime(0.5f);
-        MpChatArenaAvatarAttach.ScanGameCoreAvatars();
-        yield return new WaitForSecondsRealtime(3f);
-        MpChatArenaAvatarAttach.ScanGameCoreAvatars();
-        yield return new WaitForSecondsRealtime(5f);
+        yield return new WaitForSecondsRealtime(2f);
         MpChatArenaAvatarAttach.ScanGameCoreAvatars();
         _pendingArenaScan = null;
+    }
+
+    public static void ScheduleLobbySessionRejoinRefresh()
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+            return;
+
+        Instance?.ScheduleLobbyAvatarRefresh("lobby session re-entry");
     }
 
     private void ScheduleLobbyAvatarRefresh(string reason)
@@ -244,34 +255,110 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
 
     private IEnumerator RefreshAfterLobbyReturn(string reason)
     {
-        MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
-        MpChatLobbyPosePoll.ClearAll();
-
-        const float lobbyWaitTimeoutSeconds = 3f;
-        var waitStart = Time.realtimeSinceStartup;
-        while (Time.realtimeSinceStartup - waitStart < lobbyWaitTimeoutSeconds)
+        _lobbyReturnRefreshInProgress = true;
+        try
         {
-            yield return null;
-            if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
-                break;
-            yield return new WaitForSecondsRealtime(0.1f);
+            MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
+            MpChatLobbyPosePoll.ClearAll();
+
+            const float lobbyWaitTimeoutSeconds = 6f;
+            var waitStart = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - waitStart < lobbyWaitTimeoutSeconds)
+            {
+                yield return null;
+                if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+                    break;
+                yield return new WaitForSecondsRealtime(0.15f);
+            }
+
+            yield return new WaitForSecondsRealtime(1.5f);
+
+            if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+                yield break;
+
+            if (!MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+                yield break;
+
+            MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
+            MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
+            MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
+            MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
+            yield return MpChatLobbyCustomAvatarDriver.RefreshAllLobbyPedestalsStaggered(forceRespawn: true);
+
+            RebootstrapConnectedLobbyAvatars();
+            yield return FollowUpLobbyAvatarRefreshIfNeeded();
+
+            MultiplayerChat.Plugin.Log?.Debug($"[MPChat][LobbyAvatar] Refreshed lobby avatars after {reason}");
+        }
+        finally
+        {
+            _lobbyReturnRefreshInProgress = false;
+            _pendingRefresh = null;
+        }
+    }
+
+    private static void RebootstrapConnectedLobbyAvatars()
+    {
+        MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
+        var session = UnityEngine.Object.FindObjectOfType<MultiplayerSessionManager>();
+        if (session?.connectedPlayers == null)
+            return;
+
+        var local = session.localPlayer;
+        for (var i = 0; i < session.connectedPlayers.Count; i++)
+        {
+            var player = session.connectedPlayers[i];
+            if (player == null || string.IsNullOrEmpty(player.userId))
+                continue;
+            if (local != null && player.userId == local.userId)
+                continue;
+
+            MpCustomAvatarSyncManager.ScheduleJoinRetry(player.userId);
+            MpChatLobbyCustomAvatarDriver.ProcessPlayerJoinedImmediate(player.userId);
         }
 
-        yield return new WaitForSecondsRealtime(0.25f);
+        MpCustomAvatarSyncManager.BroadcastMetadataNow(applySavedEyeHeight: false, forceSend: true);
+    }
+
+    private static IEnumerator FollowUpLobbyAvatarRefreshIfNeeded()
+    {
+        yield return new WaitForSecondsRealtime(2f);
 
         if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
-        {
-            _pendingRefresh = null;
             yield break;
+
+        if (!MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+            yield break;
+
+        var session = UnityEngine.Object.FindObjectOfType<MultiplayerSessionManager>();
+        if (session?.connectedPlayers == null)
+            yield break;
+
+        var local = session.localPlayer;
+        var anyFollowUp = false;
+        for (var i = 0; i < session.connectedPlayers.Count; i++)
+        {
+            var player = session.connectedPlayers[i];
+            if (player == null || string.IsNullOrEmpty(player.userId))
+                continue;
+            if (local != null && player.userId == local.userId)
+                continue;
+
+            if (!MpCustomAvatarSyncManager.TryGetRemoteState(player.userId, out var row) ||
+                string.IsNullOrEmpty(row.AvatarDescriptorId) ||
+                CustomAvatarInstallListing.IsVanillaDescriptorHash(row.AvatarDescriptorId))
+                continue;
+
+            if (!MpChatLobbyCustomAvatarDriver.AnyPedestalNeedsSpawn(player.userId, row.AvatarDescriptorId))
+                continue;
+
+            anyFollowUp = true;
+            MpCustomAvatarSyncManager.ScheduleJoinRetry(player.userId);
+            MpChatLobbyCustomAvatarDriver.ProcessPlayerJoinedImmediate(player.userId);
+            yield return null;
         }
 
-        MpCustomAvatarHeightCalibration.ApplySavedPresetIfAny();
-        MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
-        MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
-        MpCustomAvatarSyncManager.BroadcastMetadataNow();
-        MpChatLobbyCustomAvatarDriver.RefreshAllLobbyAvatarDrivers(forceRespawn: false);
-
-        MultiplayerChat.Plugin.Log?.Debug($"[MPChat][LobbyAvatar] Refreshed lobby avatars after {reason}");
-        _pendingRefresh = null;
+        if (anyFollowUp)
+            MpChatLobbyCustomAvatarDriverRegistry.WakePendingLobbyLoads();
     }
 }

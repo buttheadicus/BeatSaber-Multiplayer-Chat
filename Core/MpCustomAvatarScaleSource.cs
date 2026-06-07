@@ -5,22 +5,20 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-// Reads the local player's effective Custom Avatars scale (calibrated height / resize result).
+// Reads PlayerAvatarManager.scale after CA resize (same value as "Resized avatar with scale" in CA logs).
 internal static class MpCustomAvatarScaleSource
 {
     private const float MinScale = 0.25f;
 
     private const float MaxScale = 4f;
 
+    private static Assembly? _customAvatarAssembly;
+
     private static Type? _playerAvatarManagerType;
 
-    private static PropertyInfo? _spawnedAvatarProperty;
-
-    private static PropertyInfo? _spawnedAvatarScaleProperty;
-
-    private static FieldInfo? _spawnedAvatarField;
-
     private static PropertyInfo? _managerScaleProperty;
+
+    private static MethodInfo? _calculateAvatarScaleMethod;
 
     private static bool _reflectionReady;
 
@@ -30,11 +28,15 @@ internal static class MpCustomAvatarScaleSource
 
     private const float ManagerCacheSeconds = 2f;
 
+    internal static void InvalidateCachedManager()
+    {
+        _cachedManager = null;
+        _managerCacheTime = 0f;
+    }
+
     public static bool TryGetLocalAvatarScale(out float scale)
     {
         scale = 1f;
-        MpCustomAvatarHeightCalibration.ApplySavedPresetIfAny();
-
         if (!EnsureReflection())
             return false;
 
@@ -42,47 +44,57 @@ internal static class MpCustomAvatarScaleSource
         if (pam == null)
             return TryGetScaleFromSavedEyeHeight(out scale);
 
-        if (_managerScaleProperty != null)
-        {
-            var managerScale = _managerScaleProperty.GetValue(pam, null);
-            if (managerScale is float ms && ms > 0.001f)
-            {
-                scale = ClampScale(ms);
-                return true;
-            }
-        }
-
-        object? spawned = null;
-        if (_spawnedAvatarProperty != null)
-            spawned = _spawnedAvatarProperty.GetValue(pam, null);
-        else if (_spawnedAvatarField != null)
-            spawned = _spawnedAvatarField.GetValue(pam);
-
-        if (spawned == null)
-            return false;
-
-        if (_spawnedAvatarScaleProperty != null)
-        {
-            var val = _spawnedAvatarScaleProperty.GetValue(spawned, null);
-            if (val is float f)
-            {
-                scale = ClampScale(f);
-                return true;
-            }
-        }
-
-        if (spawned is Component component)
-        {
-            var ls = component.transform.localScale;
-            var uniform = (ls.x + ls.y + ls.z) / 3f;
-            if (uniform > 0.001f)
-            {
-                scale = ClampScale(uniform);
-                return true;
-            }
-        }
+        if (TryGetScaleForManager(pam, null, out scale))
+            return true;
 
         return TryGetScaleFromSavedEyeHeight(out scale);
+    }
+
+    internal static bool TryGetScaleForManager(object manager, float? eyeHeightMeters, out float scale)
+    {
+        scale = 1f;
+        if (!EnsureReflection())
+            return false;
+
+        if (TryReadManagerScale(manager, out scale))
+            return true;
+
+        var eyeHeight = eyeHeightMeters;
+        if (!eyeHeight.HasValue && ModSettings.TryGetLobbyCustomAvatarSavedEyeHeight(out var savedEye))
+            eyeHeight = savedEye;
+
+        if (eyeHeight.HasValue && TryCalculateScaleForEyeHeight(manager, eyeHeight.Value, out scale))
+            return true;
+
+        return false;
+    }
+
+    private static bool TryReadManagerScale(object manager, out float scale)
+    {
+        scale = 1f;
+        if (_managerScaleProperty == null)
+            return false;
+
+        var managerScale = _managerScaleProperty.GetValue(manager, null);
+        if (managerScale is not float ms || ms <= 0.001f)
+            return false;
+
+        scale = ClampScale(ms);
+        return true;
+    }
+
+    private static bool TryCalculateScaleForEyeHeight(object manager, float eyeHeightMeters, out float scale)
+    {
+        scale = 1f;
+        if (_calculateAvatarScaleMethod == null)
+            return false;
+
+        var scaleObj = _calculateAvatarScaleMethod.Invoke(manager, new object[] { eyeHeightMeters });
+        if (scaleObj is not float calculated || calculated <= 0.001f)
+            return false;
+
+        scale = ClampScale(calculated);
+        return true;
     }
 
     private static bool TryGetScaleFromSavedEyeHeight(out float scale)
@@ -98,21 +110,7 @@ internal static class MpCustomAvatarScaleSource
         if (pam == null)
             return false;
 
-        var calculate = _playerAvatarManagerType!.GetMethod(
-            "CalculateAvatarScale",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            null,
-            new[] { typeof(float) },
-            null);
-        if (calculate == null)
-            return false;
-
-        var scaleObj = calculate.Invoke(pam, new object[] { eyeHeight });
-        if (scaleObj is not float f || f <= 0.001f)
-            return false;
-
-        scale = ClampScale(f);
-        return true;
+        return TryGetScaleForManager(pam, eyeHeight, out scale);
     }
 
     private static MonoBehaviour? ResolvePlayerAvatarManager()
@@ -121,10 +119,33 @@ internal static class MpCustomAvatarScaleSource
         if (_cachedManager != null && now - _managerCacheTime < ManagerCacheSeconds)
             return _cachedManager;
 
-        _cachedManager = UnityEngine.Object.FindObjectOfType(_playerAvatarManagerType!) as MonoBehaviour;
+        if (_playerAvatarManagerType == null)
+            return null;
+
+        _cachedManager = UnityEngine.Object.FindObjectOfType(_playerAvatarManagerType) as MonoBehaviour;
         _managerCacheTime = now;
         return _cachedManager;
     }
+
+    private static Assembly? ResolveCustomAvatarAssembly()
+    {
+        if (_customAvatarAssembly != null)
+            return _customAvatarAssembly;
+
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (!string.Equals(asm.GetName().Name, "CustomAvatar", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            _customAvatarAssembly = asm;
+            return asm;
+        }
+
+        return null;
+    }
+
+    private static Type? GetCustomAvatarType(string fullName) =>
+        ResolveCustomAvatarAssembly()?.GetType(fullName, throwOnError: false);
 
     private static bool EnsureReflection()
     {
@@ -132,37 +153,23 @@ internal static class MpCustomAvatarScaleSource
             return _playerAvatarManagerType != null;
 
         _reflectionReady = true;
-        _playerAvatarManagerType = Type.GetType("CustomAvatar.Player.PlayerAvatarManager, CustomAvatar");
+
+        if (ResolveCustomAvatarAssembly() == null)
+            return false;
+
+        _playerAvatarManagerType = GetCustomAvatarType("CustomAvatar.Player.PlayerAvatarManager");
         if (_playerAvatarManagerType == null)
             return false;
 
-        _spawnedAvatarProperty = _playerAvatarManagerType.GetProperty("spawnedAvatar",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        if (_spawnedAvatarProperty == null)
-            _spawnedAvatarProperty = _playerAvatarManagerType.GetProperty("SpawnedAvatar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-        if (_spawnedAvatarProperty == null)
-        {
-            _spawnedAvatarField = _playerAvatarManagerType.GetField("spawnedAvatar",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (_spawnedAvatarField == null)
-                _spawnedAvatarField = _playerAvatarManagerType.GetField("_spawnedAvatar",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
-        }
-
-        _managerScaleProperty = _playerAvatarManagerType.GetProperty("scale",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-        var spawnedType = Type.GetType("CustomAvatar.Avatar.SpawnedAvatar, CustomAvatar");
-        if (spawnedType != null)
-        {
-            _spawnedAvatarScaleProperty = spawnedType.GetProperty("scale",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (_spawnedAvatarScaleProperty == null)
-                _spawnedAvatarScaleProperty = spawnedType.GetProperty("Scale",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        }
+        _managerScaleProperty = _playerAvatarManagerType.GetProperty("scale", flags);
+        _calculateAvatarScaleMethod = _playerAvatarManagerType.GetMethod(
+            "CalculateAvatarScale",
+            flags,
+            null,
+            new[] { typeof(float) },
+            null);
 
         return true;
     }

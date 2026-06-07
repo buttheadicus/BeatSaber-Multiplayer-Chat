@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using CustomAvatar.Avatar;
 using CustomAvatar.Player;
@@ -31,6 +32,12 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
     private bool _eventSubscribed;
     private string? _pendingHash;
 
+    private float _pendingScale = 1f;
+
+    private bool _pendingBypassPedestalDefer;
+
+    private bool _loadBypassesPedestalDefer;
+
     private bool _finalizeComplete;
 
     private bool _loggedMissingArenaDeps;
@@ -47,7 +54,9 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private static int _lobbyAvatarLoadsInFlight;
 
-    private const int MaxConcurrentLobbyAvatarLoads = 2;
+    private const int MaxConcurrentLobbyAvatarLoads = 1;
+
+    private static readonly List<MpChatLobbyCustomAvatarDriver> StaggerRefreshScratch = new(16);
 
     private bool _holdsLobbyLoadSlot;
 
@@ -229,7 +238,16 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
     internal static void NotifyLocalAvatarSettingsChanged()
     {
         MpChatLobbyCustomAvatarDriverRegistry.ForMirrorDrivers(driver =>
-            driver.ForceRefresh(forceRespawn: true));
+            driver.ForceRefresh(forceRespawn: true, bypassPedestalDefer: true));
+    }
+
+    internal static void ApplyLocalScaleToMirrorPedestals()
+    {
+        if (!MpCustomAvatarScaleSource.TryGetLocalAvatarScale(out var scale))
+            return;
+
+        MpChatLobbyCustomAvatarDriverRegistry.ForMirrorDrivers(driver =>
+            driver.ApplyScaleOnly(scale));
     }
 
     internal static void HandlePlayerJoined(string userId) =>
@@ -243,7 +261,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         MpChatLobbyCustomAvatarDriverRegistry.ForUser(userId, driver =>
         {
             driver.ResetJoinSpawnTracking();
-            driver.RefreshFromSyncState();
+            driver.RefreshFromSyncState(bypassPedestalDefer: true);
         }, lobbyPedestalsOnly: true);
     }
 
@@ -292,14 +310,17 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
             if (!MpCustomAvatarSyncManager.TryGetRemoteState(userId, out var row) ||
                 string.IsNullOrEmpty(row.AvatarDescriptorId) ||
                 CustomAvatarInstallListing.IsVanillaDescriptorHash(row.AvatarDescriptorId))
+            {
+                satisfied = false;
                 return;
+            }
 
             satisfied = false;
             driver.ResetJoinSpawnTracking();
-            driver.RefreshFromSyncState();
+            driver.RefreshFromSyncState(bypassPedestalDefer: true);
         }, lobbyPedestalsOnly: true);
 
-        return !foundPedestal || satisfied;
+        return foundPedestal && satisfied;
     }
 
     internal static bool AnyPedestalNeedsSpawn(string userId, string descriptorHash)
@@ -355,7 +376,23 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
     internal static void RefreshAllLobbyAvatarDrivers(bool forceRespawn)
     {
         MpChatLobbyCustomAvatarDriverRegistry.ForAllLobbyPedestals(driver =>
-            driver.ForceRefresh(forceRespawn));
+            driver.ForceRefresh(forceRespawn, bypassPedestalDefer: true));
+    }
+
+    internal static IEnumerator RefreshAllLobbyPedestalsStaggered(bool forceRespawn)
+    {
+        MpChatLobbyCustomAvatarDriverRegistry.CollectLobbyPedestals(StaggerRefreshScratch);
+        for (var i = 0; i < StaggerRefreshScratch.Count; i++)
+        {
+            var driver = StaggerRefreshScratch[i];
+            if (driver == null || !driver.isActiveAndEnabled)
+                continue;
+
+            driver.ForceRefresh(forceRespawn, bypassPedestalDefer: true);
+            yield return null;
+            if ((i & 1) == 1)
+                yield return new WaitForSecondsRealtime(0.08f);
+        }
     }
 
     private bool IsArenaContext() =>
@@ -364,7 +401,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
     private Transform? GetFacadeRoot() =>
         MpChatArenaFacadeRoots.FindFrom(_poseController != null ? _poseController.transform : transform);
 
-    private void ForceRefresh(bool forceRespawn)
+    private void ForceRefresh(bool forceRespawn, bool bypassPedestalDefer = false)
     {
         if (!TryEnsureDependencies())
             return;
@@ -376,9 +413,24 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         }
 
         if (UsesLocalAvatarHash())
-            RefreshFromLocalAvatarSettings();
+            RefreshFromLocalAvatarSettings(bypassPedestalDefer);
         else
-            RefreshFromSyncState();
+            RefreshFromSyncState(bypassPedestalDefer);
+    }
+
+    private void ApplyScaleOnly(float scale)
+    {
+        if (!TryEnsureDependencies())
+            return;
+
+        scale = Mathf.Clamp(scale, 0.25f, 4f);
+        if (_spawnedAvatar != null && _spawnedAvatar.gameObject != null)
+        {
+            TryApplyRemoteScale(scale);
+            return;
+        }
+
+        ForceRefresh(forceRespawn: false, bypassPedestalDefer: true);
     }
 
     private void OnEnable()
@@ -588,7 +640,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         RefreshFromSyncState();
     }
 
-    private void RefreshFromLocalAvatarSettings()
+    private void RefreshFromLocalAvatarSettings(bool bypassPedestalDefer = false)
     {
         if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars || !ShouldUseLocalAvatarSettingsHash())
             return;
@@ -607,10 +659,10 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (!MpCustomAvatarScaleSource.TryGetLocalAvatarScale(out scale))
             scale = 1f;
 
-        BeginLoadForHash(hash, Mathf.Clamp(scale, 0.25f, 4f));
+        BeginLoadForHash(hash, Mathf.Clamp(scale, 0.25f, 4f), bypassPedestalDefer);
     }
 
-    private void RefreshFromSyncState()
+    private void RefreshFromSyncState(bool bypassPedestalDefer = false)
     {
         if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars || ShouldUseLocalAvatarSettingsHash())
             return;
@@ -618,7 +670,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
             return;
 
-        if (!IsArenaContext() && MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
+        if (!IsArenaContext() && !bypassPedestalDefer && MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
             return;
 
         if (!MpCustomAvatarSyncManager.TryGetRemoteState(_connectedPlayer.userId, out var row))
@@ -649,7 +701,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (IsArenaContext() && !CanAttemptArenaSpawn())
             return;
 
-        BeginLoadForHash(hash, Mathf.Clamp(row.AvatarScale, 0.25f, 4f));
+        BeginLoadForHash(hash, Mathf.Clamp(row.AvatarScale, 0.25f, 4f), bypassPedestalDefer);
     }
 
     internal void PromoteArenaAfterIntro()
@@ -713,11 +765,14 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         _arenaIkEnabled = true;
     }
 
-    private void BeginLoadForHash(string hash, float scale)
+    private void BeginLoadForHash(string hash, float scale, bool bypassPedestalDefer = false)
     {
         hash = hash.Trim().ToUpperInvariant();
 
         if (MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
+            return;
+
+        if (!IsArenaContext() && !bypassPedestalDefer && MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
             return;
 
         if (string.Equals(_lastSpawnedHash, hash, StringComparison.OrdinalIgnoreCase) &&
@@ -756,10 +811,24 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (!TryAcquireLobbyLoadSlot())
         {
             _pendingHash = hash;
+            _pendingScale = scale;
+            _pendingBypassPedestalDefer = bypassPedestalDefer;
             return;
         }
 
+        _loadBypassesPedestalDefer = bypassPedestalDefer;
         _loadCoroutine = StartCoroutine(LoadAndSpawnCoroutine(hash, scale));
+    }
+
+    internal void TryResumePendingLoad()
+    {
+        if (string.IsNullOrEmpty(_pendingHash) || _loadCoroutine != null)
+            return;
+
+        if (MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
+            return;
+
+        BeginLoadForHash(_pendingHash, _pendingScale, _pendingBypassPedestalDefer);
     }
 
     private bool TryAcquireLobbyLoadSlot()
@@ -784,6 +853,8 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         _holdsLobbyLoadSlot = false;
         if (_lobbyAvatarLoadsInFlight > 0)
             _lobbyAvatarLoadsInFlight--;
+
+        MpChatLobbyCustomAvatarDriverRegistry.WakePendingLobbyLoads();
     }
 
     private IEnumerator FinishSpawnNextFrame(float scale)
@@ -840,6 +911,12 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
         if (_spawnedAvatar == null)
         {
+            if (!string.IsNullOrEmpty(_pendingHash) && _loadCoroutine == null)
+            {
+                TryResumePendingLoad();
+                return;
+            }
+
             if (!string.IsNullOrEmpty(_lastSpawnedHash) && _loadCoroutine == null &&
                 !MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
             {
@@ -907,7 +984,9 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
             yield break;
         }
 
-        if (!IsArenaContext() && MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
+        if (!IsArenaContext() &&
+            !_loadBypassesPedestalDefer &&
+            MpChatPerformanceGate.ShouldDeferLobbyPedestalAvatarRefresh)
         {
             EndLoadCoroutine();
             yield break;
@@ -1082,6 +1161,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private void EndLoadCoroutine()
     {
+        _loadBypassesPedestalDefer = false;
         ReleaseLobbyLoadSlot();
         _loadCoroutine = null;
     }

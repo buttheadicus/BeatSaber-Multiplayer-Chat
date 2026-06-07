@@ -71,10 +71,43 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             return;
         }
 
+        if (_lobbyScopeInstance != null && _lobbyScopeInstance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         _lobbyScopeInstance = this;
+        DontDestroyOnLoad(gameObject);
 
         if (Instance == null || !MpChatSceneScope.IsGameCoreHost(Instance))
             Instance = this;
+    }
+
+    // Results overlay can disable lobby Zenject hosts; keep lobby PTT polling alive after GameCore tears down.
+    internal static void EnsureActiveLobbyHostAfterArena()
+    {
+        if (!MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive())
+            return;
+        if (MpChatLobbyDiagnostics.BeatmapGameplayLikelyActive())
+            return;
+
+        var lobby = _lobbyScopeInstance;
+        if (lobby == null)
+            return;
+
+        var needHandoff = Instance == null || !Instance
+                          || MpChatSceneScope.IsGameCoreHost(Instance);
+        if (needHandoff)
+        {
+            Instance = lobby;
+            lobby.PreparePushToTalkAfterVoipReload();
+        }
+
+        if (!lobby.isActiveAndEnabled)
+            lobby.enabled = true;
+        if (!lobby.gameObject.activeSelf)
+            lobby.gameObject.SetActive(true);
     }
 
     public void ForceReloadMicrophone()

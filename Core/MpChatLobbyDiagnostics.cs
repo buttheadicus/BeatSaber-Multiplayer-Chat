@@ -158,6 +158,7 @@ public static class MpChatLobbyDiagnostics
         _beatmapGameplayCacheTime = -999f;
         _spectatingCacheTime = -999f;
         _resultsLikeCacheTime = -999f;
+        _inactiveLobbyChromeCacheTime = -999f;
     }
 
     private static float _lobbyHeuristicCacheTime = -999f;
@@ -225,7 +226,12 @@ public static class MpChatLobbyDiagnostics
     private static bool SongGameplayLikelyActiveUncached()
     {
         if (AnyGameCoreLoaded())
+        {
+            // Map ended: MP results on lobby return is not active gameplay even if GameCore is still loaded.
+            if (ResultsLikeUiVisibleUncached() && !BeatmapGameplayLikelyActiveUncached())
+                return false;
             return true;
+        }
         if (ActiveSceneIsMainMenuWithoutGameCore())
             return false;
         // Multiplayer lobby UI: not beatmap gameplay  -  avoids repeated FindObjectOfType scans on policy ticks.
@@ -322,5 +328,64 @@ public static class MpChatLobbyDiagnostics
             return true;
         var host = GameObject.Find("HostSetup");
         return host != null && host.activeInHierarchy;
+    }
+
+    private static float _inactiveLobbyChromeCacheTime = -999f;
+    private static bool _inactiveLobbyChromeCached;
+    private const float InactiveLobbyChromeCacheTtlSec = 0.5f;
+
+    // Lobby chrome can stay inactive under the MP results overlay while the session is still in lobby.
+    public static bool InactiveMultiplayerLobbyChromeExists()
+    {
+        var now = Time.realtimeSinceStartup;
+        if (now - _inactiveLobbyChromeCacheTime < InactiveLobbyChromeCacheTtlSec)
+            return _inactiveLobbyChromeCached;
+        _inactiveLobbyChromeCached = InactiveMultiplayerLobbyChromeExistsUncached();
+        _inactiveLobbyChromeCacheTime = now;
+        return _inactiveLobbyChromeCached;
+    }
+
+    private static bool InactiveMultiplayerLobbyChromeExistsUncached()
+    {
+        for (var i = 0; i < SceneManager.sceneCount; i++)
+        {
+            var scene = SceneManager.GetSceneAt(i);
+            if (!scene.isLoaded)
+                continue;
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                if (DescendantHasInactiveMpLobbyChromeName(root.transform))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool DescendantHasInactiveMpLobbyChromeName(Transform root)
+    {
+        var stack = new System.Collections.Generic.Stack<Transform>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var t = stack.Pop();
+            var n = t.gameObject.name;
+            if (n == "MultiplayerLobbyCenterStage" || n == "LobbySetup" || n == "HostSetup")
+                return true;
+            for (var c = 0; c < t.childCount; c++)
+                stack.Push(t.GetChild(c));
+        }
+
+        return false;
+    }
+
+    // Active lobby UI or arena-return results where inactive lobby chrome still exists underneath.
+    public static bool MultiplayerLobbyReturnContextActive()
+    {
+        if (LobbyHierarchyLooksLikeMultiplayerLobby())
+            return true;
+        if (!ResultsLikeUiVisible())
+            return false;
+        return InactiveMultiplayerLobbyChromeExists();
     }
 }

@@ -2,7 +2,6 @@ using System.Reflection;
 using BeatSaber.AvatarCore;
 using HarmonyLib;
 using MultiplayerChat.Core;
-using MultiplayerChat.Settings;
 
 namespace MultiplayerChat.HarmonyPatches;
 
@@ -14,7 +13,7 @@ internal static class MpChatArenaAvatarPoseConnectedPatch
 
     private static void Postfix(MultiplayerAvatarPoseController __instance)
     {
-        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
+        if (!CustomAvatarDependenciesBootstrap.IsSessionActive())
             return;
         if (!MpChatFeatures.LobbyCustomAvatarsInArena)
             return;

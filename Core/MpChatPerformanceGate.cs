@@ -14,18 +14,33 @@ internal static class MpChatPerformanceGate
 
     public static bool ShouldDeferLobbyPedestalAvatarRefresh =>
         ShouldBlockAvatarHeavyWork ||
+        IsMultiplayerSceneTransitionLikely() ||
         (ModSettings.LimitIncomingAvatarDataDuringSongs &&
          MpChatLobbyDiagnostics.SongGameplayLikelyActive());
 
     public static bool ShouldDeferIncomingAvatarData => ShouldDeferLobbyPedestalAvatarRefresh;
 
-    public static bool CanRunLobbyAvatarFileTransfer =>
-        !ShouldBlockAvatarHeavyWork &&
-        MpChatFeatures.LobbyCustomAvatars &&
-        (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby() ||
-         MpChatLobbyDiagnostics.AnyGameCoreLoaded());
+    // Menu load, GameCore unload, or spectate handoff: avoid avatar storms that hitch networking.
+    public static bool IsMultiplayerSceneTransitionLikely()
+    {
+        if (MpChatLobbyDiagnostics.AnyGameCoreLoaded() &&
+            !MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
+            return true;
 
-    // Buffer incoming chunks in memory during songs; disk cache flush uses PollDeferredCacheWrites.
+        return false;
+    }
+
+    public static bool ShouldThrottleAvatarFileSend => ShouldBlockAvatarHeavyWork;
+
+    // .avatar send/download only in the multiplayer lobby UI (never during arena / GameCore).
+    public static bool IsLobbyAvatarFileTransferAllowed =>
+        MpChatFeatures.LobbyCustomAvatars &&
+        !ShouldBlockAvatarHeavyWork &&
+        MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby();
+
+    public static bool CanRunLobbyAvatarFileTransfer => IsLobbyAvatarFileTransferAllowed;
+
     public static bool CanAcceptLobbyAvatarFileChunks =>
-        MpChatFeatures.LobbyCustomAvatars && ModSettings.EnableLobbyCustomAvatars;
+        CustomAvatarDependenciesBootstrap.IsSessionActive() &&
+        IsLobbyAvatarFileTransferAllowed;
 }
