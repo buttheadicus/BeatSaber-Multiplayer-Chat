@@ -237,13 +237,9 @@ public class ChatManager : IInitializable, IDisposable
 
         if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId))
         {
-            if (ModSettings.EnableLobbyCustomAvatars)
-                MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
             MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(
                 player.userId,
                 broadcastMetadata: ModSettings.EnableLobbyCustomAvatars);
-            if (ModSettings.EnableLobbyCustomAvatars)
-                MpCustomAvatarLobbyTransferManager.TryProactiveShareLocalAvatar(player.userId);
         }
     }
 
@@ -891,7 +887,7 @@ public class ChatManager : IInitializable, IDisposable
                 continue;
             var n = ResolveConnectedDisplayName(id);
             var label = string.IsNullOrEmpty(n) ? id : n;
-            names.Add((label ?? "").Replace("<", "&lt;").Replace(">", "&gt;"));
+            names.Add(ChatRichTextEscape.ForDisplay(label ?? ""));
         }
 
         if (names.Count == 0)
@@ -912,7 +908,7 @@ public class ChatManager : IInitializable, IDisposable
                 continue;
             var n = ResolveConnectedDisplayName(id);
             var label = string.IsNullOrEmpty(n) ? id : n;
-            names.Add((label ?? "").Replace("<", "&lt;").Replace(">", "&gt;"));
+            names.Add(ChatRichTextEscape.ForDisplay(label ?? ""));
         }
 
         if (names.Count == 0)
@@ -952,7 +948,6 @@ public class ChatManager : IInitializable, IDisposable
             return;
         }
 
-        decrypted = decrypted.Replace("<", "&lt;").Replace(">", "&gt;");
         NotifyMessageReceived(new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
     }
 
@@ -961,7 +956,6 @@ public class ChatManager : IInitializable, IDisposable
     public void PostSystemMessage(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
-        message = message.Replace("<", "&lt;").Replace(">", "&gt;");
         MessageReceived?.Invoke(this, new ChatMessageEventArgs("", message, "", false, isSystem: true, nameColor: null));
     }
 
@@ -970,8 +964,7 @@ public class ChatManager : IInitializable, IDisposable
         if (string.IsNullOrEmpty(message))
             return;
 
-        var escaped = message.Replace("<", "&lt;").Replace(">", "&gt;");
-        SystemMessageRemovalRequested?.Invoke(escaped);
+        SystemMessageRemovalRequested?.Invoke(message);
     }
 
     public void PostSystemMessageRich(string message)
@@ -983,29 +976,29 @@ public class ChatManager : IInitializable, IDisposable
     public static string SystemLineWithColoredPlayerName(string playerDisplayName, string tailAfterName, string? nameColorHex)
     {
         var hex = NormalizeHexForPacket(nameColorHex) ?? "87CEEB";
-        var safeName = (playerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
-        var safeTail = (tailAfterName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        var safeName = ChatRichTextEscape.ForDisplay(playerDisplayName ?? "");
+        var safeTail = ChatRichTextEscape.ForDisplay(tailAfterName ?? "");
         return $"<color=#{hex}>{safeName}</color>{safeTail}";
     }
 
     public static string BuildMutualDmLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
-        var safeName = (peerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        var safeName = ChatRichTextEscape.ForDisplay(peerDisplayName ?? "");
         return "You and " + $"<color=#{hex}>{safeName}</color> are now DMing eachother.";
     }
 
     public static string BuildMutualTalkToLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
-        var safeName = (peerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        var safeName = ChatRichTextEscape.ForDisplay(peerDisplayName ?? "");
         return "You and " + $"<color=#{hex}>{safeName}</color> are now talking to each other.";
     }
 
     public static string BuildMutualListenLine(string peerDisplayName, string? peerNameColorHex)
     {
         var hex = NormalizeHexForPacket(peerNameColorHex) ?? "87CEEB";
-        var safeName = (peerDisplayName ?? "").Replace("<", "&lt;").Replace(">", "&gt;");
+        var safeName = ChatRichTextEscape.ForDisplay(peerDisplayName ?? "");
         return "You and " + $"<color=#{hex}>{safeName}</color> are now listening to each other.";
     }
 

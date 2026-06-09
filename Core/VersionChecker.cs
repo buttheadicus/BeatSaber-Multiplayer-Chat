@@ -31,7 +31,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     private IEnumerator CheckForUpdates()
     {
         MpChatLog.DebugLine("[MPChat] Version check starting...");
-        yield return new WaitForSeconds(0.5f);
+        yield return new WaitForSeconds(2.5f);
         if (!ModBuildVersion.TryGetEmbeddedBuildNumber(out var currentBuild))
         {
             UpdateMessage = "Could not read this mod build number.";
@@ -114,11 +114,6 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
         yield break;
     }
-
-    public void PresentUpdateNoticeForDebug() =>
-        StartCoroutine(ShowUpdateNoticeWhenMainMenuReady(
-            openReleasePage: true,
-            message: ChatBubbleManager.UpdateAvailableHeaderMessage));
 
     private IEnumerator ShowUpdateNoticeWhenMainMenuReady(bool openReleasePage, string? message = null)
     {

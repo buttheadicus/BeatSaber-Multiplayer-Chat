@@ -280,7 +280,7 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
                 yield break;
 
             MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
-            MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
+            MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers(rescanMissingRemotes: true);
             MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
             MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
             yield return MpChatLobbyCustomAvatarDriver.RefreshAllLobbyPedestalsStaggered(forceRespawn: true);
@@ -344,12 +344,15 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
             if (local != null && player.userId == local.userId)
                 continue;
 
-            if (!MpCustomAvatarSyncManager.TryGetRemoteState(player.userId, out var row) ||
-                string.IsNullOrEmpty(row.AvatarDescriptorId) ||
-                CustomAvatarInstallListing.IsVanillaDescriptorHash(row.AvatarDescriptorId))
+            if (!MpCustomAvatarSyncManager.TryGetRemoteState(player.userId, out var row))
                 continue;
 
-            if (!MpChatLobbyCustomAvatarDriver.AnyPedestalNeedsSpawn(player.userId, row.AvatarDescriptorId))
+            var descriptorHash = row.AvatarDescriptorId;
+            if (string.IsNullOrEmpty(descriptorHash) ||
+                CustomAvatarInstallListing.IsVanillaDescriptorHash(descriptorHash))
+                continue;
+
+            if (!MpChatLobbyCustomAvatarDriver.AnyPedestalNeedsSpawn(player.userId, descriptorHash!))
                 continue;
 
             anyFollowUp = true;

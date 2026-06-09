@@ -118,7 +118,7 @@ internal static class MpLobbySessionExit
         if (_lobbyFcType == null)
             return false;
 
-        var fc = MpUiReflection.FindBestActiveObject(_lobbyFcType);
+        var fc = MpUiReflection.GetBestFlowCoordinator(_lobbyFcType, "_lobbySetupViewController");
         if (fc == null)
             return false;
 

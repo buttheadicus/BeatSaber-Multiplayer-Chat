@@ -276,8 +276,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         ApplySongVoicePolicy();
         VoiceHotMicManager.EnsureActiveLobbyHostAfterArena();
         MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
-        if (MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
-            MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
         PollLobbyHierarchyForVoipReload();
 
         if (!ModSettings.VoiceDuckingEnabled)

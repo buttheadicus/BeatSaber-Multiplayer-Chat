@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 
 namespace MultiplayerChat.Core.QuickBinds;
 
@@ -18,16 +19,30 @@ internal static class MpLobbyReady
         {
             EnsureReflection();
             if (_lobbyFcType == null)
+            {
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat][QuickBinds] Quick Ready Up failed: GameServerLobbyFlowCoordinator type not found.");
                 return false;
+            }
 
-            var fc = MpUiReflection.FindBestActiveObject(_lobbyFcType);
+            var fc = MpUiReflection.FindFirstActiveObject(_lobbyFcType);
             if (fc == null)
+            {
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat][QuickBinds] Quick Ready Up failed: no active GameServerLobbyFlowCoordinator.");
                 return false;
+            }
 
-            return TryInvokeNamedMethods(fc, _lobbyFcType, ReadyMethodNames);
+            if (!TryInvokeNamedMethods(fc, _lobbyFcType, ReadyMethodNames))
+            {
+                MultiplayerChat.Plugin.Log?.Warn("[MPChat][QuickBinds] Quick Ready Up failed: HandleLobbySetupViewControllerStartGameOrReady did not run.");
+                return false;
+            }
+
+            MultiplayerChat.Plugin.Log?.Info("[MPChat][QuickBinds] Quick Ready Up invoked HandleLobbySetupViewControllerStartGameOrReady.");
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
+            MultiplayerChat.Plugin.Log?.Warn("[MPChat][QuickBinds] Quick Ready Up failed: " + ex.Message);
             return false;
         }
     }

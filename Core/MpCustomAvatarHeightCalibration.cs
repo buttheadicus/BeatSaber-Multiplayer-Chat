@@ -261,7 +261,7 @@ internal static class MpCustomAvatarHeightCalibration
         if (!File.Exists(full))
             return false;
 
-        task = _switchToAvatarAsyncMethod.Invoke(manager, new object[] { full, null }) as Task;
+        task = _switchToAvatarAsyncMethod.Invoke(manager, new object?[] { full, null }) as Task;
         return task != null;
     }
 

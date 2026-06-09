@@ -38,13 +38,23 @@ public static class LobbyUiStartButtonLocator
 
                 foreach (var tmp in btn.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true))
                 {
-                    if (tmp != null && tmp.text.IndexOf("START", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (tmp == null)
+                        continue;
+
+                    var label = tmp.text;
+                    if (!string.IsNullOrEmpty(label) &&
+                        label.IndexOf("START", StringComparison.OrdinalIgnoreCase) >= 0)
                         return btn.transform;
                 }
 
                 foreach (var curved in btn.GetComponentsInChildren<CurvedTextMeshPro>(true))
                 {
-                    if (curved != null && curved.text.IndexOf("START", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (curved == null)
+                        continue;
+
+                    var label = curved.text;
+                    if (!string.IsNullOrEmpty(label) &&
+                        label.IndexOf("START", StringComparison.OrdinalIgnoreCase) >= 0)
                         return btn.transform;
                 }
             }

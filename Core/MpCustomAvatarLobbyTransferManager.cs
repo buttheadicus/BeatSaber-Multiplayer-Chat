@@ -11,24 +11,22 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// Lobby .avatar transfer: owner unicasts to requester; proactive push on connect for small lobbies.
+// Lobby .avatar transfer: on-demand only, short unicast bursts when requested.
 public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitializable
 {
     public static MpCustomAvatarLobbyTransferManager? Instance { get; private set; }
 
     public static event Action<string>? LobbyAvatarFileCached;
 
-    private const float RequestCooldownSeconds = 0.6f;
+    private const float RequestCooldownSeconds = 1.2f;
 
-    private const int SendBytesBudgetSmallLobby = 768 * 1024;
+    // Unicast to one requester: up to this many bytes per frame, then yield one frame.
+    private const int UnicastBytesBudgetPerFrame = 256 * 1024;
 
-    private const int SendBytesBudgetLargeLobby = 384 * 1024;
+    // Legacy/broadcast fan-out stays slower so large lobbies do not spike the relay.
+    private const float MulticastChunkIntervalSeconds = 0.06f;
 
-    private const int FastBurstMaxFileBytes = 1024 * 1024;
-
-    private const int LargeLobbyPlayerThreshold = 10;
-
-    private const int ProactiveShareMaxLobbyPlayers = 12;
+    private const float FlushCooldownSeconds = 1f;
 
     private static readonly object Gate = new();
 
@@ -51,9 +49,9 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
     private static readonly Dictionary<string, string> DeferredFileRequestByHash =
         new(StringComparer.OrdinalIgnoreCase);
 
-    private static readonly HashSet<string> DeferredProactiveShareTargets = new(StringComparer.Ordinal);
-
     private static MpCustomAvatarLobbyTransferManager? _lobbyScopeTransferManager;
+
+    private static float _lastFlushRealtime = -999f;
 
     [Inject] private readonly IMultiplayerSessionManager _sessionManager = null!;
 
@@ -119,7 +117,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         }
     }
 
-    public static void FlushDeferredLobbyAvatarFileTransfers()
+    public static void FlushDeferredLobbyAvatarFileTransfers(bool rescanMissingRemotes = false)
     {
         if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
             return;
@@ -128,16 +126,27 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         if (host == null)
             return;
 
+        var hasDeferredWork = false;
+        lock (Gate)
+        {
+            hasDeferredWork = DeferredFileRequestByHash.Count > 0 ||
+                              DeferredOutboundJobs.Count > 0 ||
+                              DeferredCacheWrites.Count > 0;
+        }
+
+        if (!hasDeferredWork && !rescanMissingRemotes)
+            return;
+
+        var now = Time.realtimeSinceStartup;
+        if (now - _lastFlushRealtime < FlushCooldownSeconds && !hasDeferredWork)
+            return;
+
+        _lastFlushRealtime = now;
         Instance = host;
 
-        string[] proactiveTargets;
         KeyValuePair<string, string>[] fileRequests;
         lock (Gate)
         {
-            proactiveTargets = new string[DeferredProactiveShareTargets.Count];
-            DeferredProactiveShareTargets.CopyTo(proactiveTargets);
-            DeferredProactiveShareTargets.Clear();
-
             fileRequests = new KeyValuePair<string, string>[DeferredFileRequestByHash.Count];
             var i = 0;
             foreach (var kvp in DeferredFileRequestByHash)
@@ -145,20 +154,19 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             DeferredFileRequestByHash.Clear();
         }
 
-        for (var i = 0; i < proactiveTargets.Length; i++)
-            TryProactiveShareLocalAvatar(proactiveTargets[i]);
-
         for (var i = 0; i < fileRequests.Length; i++)
             RequestLobbyAvatarFile(fileRequests[i].Key, fileRequests[i].Value);
 
         PollDeferredOutbound();
         PollDeferredCacheWrites();
-        MpCustomAvatarSyncManager.RequestMissingRemoteAvatarFiles();
+
+        if (rescanMissingRemotes)
+            MpCustomAvatarSyncManager.RequestMissingRemoteAvatarFiles();
     }
 
     private static IEnumerator PollDeferredTransferWorkRoutine()
     {
-        var wait = new WaitForSeconds(0.1f);
+        var wait = new WaitForSeconds(0.35f);
         while (true)
         {
             yield return wait;
@@ -214,39 +222,10 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         host.SendFileRequest(md5HexUpper, ownerUserId);
     }
 
-    // Push our .avatar to a peer before they request it (small lobbies only).
+    // Disabled: proactive .avatar push on connect flooded BeatTogether relays.
     public static void TryProactiveShareLocalAvatar(string targetUserId)
     {
-        if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
-            return;
-        if (string.IsNullOrEmpty(targetUserId))
-            return;
-        var host = _lobbyScopeTransferManager;
-        if (host == null)
-            return;
-        if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
-        {
-            lock (Gate)
-                DeferredProactiveShareTargets.Add(targetUserId);
-            return;
-        }
-
-        var local = host._sessionManager.localPlayer;
-        if (local == null || targetUserId == local.userId)
-            return;
-
-        if (host.GetConnectedPlayerCount() > ProactiveShareMaxLobbyPlayers)
-            return;
-
-        var hash = ModSettings.LobbyCustomAvatarContentHash.Trim().ToUpperInvariant();
-        if (!CustomAvatarHashUtil.LooksLikeMd5Hex(hash))
-            return;
-        if (CustomAvatarInstallListing.IsVanillaDescriptorHash(hash))
-            return;
-        if (!CustomAvatarLobbyHashCache.TryGetPath(hash, out var path) || !File.Exists(path))
-            return;
-
-        host.EnqueueOutbound(hash, path, targetUserId, allowCacheFanOut: false);
+        _ = targetUserId;
     }
 
     private void SendFileRequest(string hash, string ownerUserId)
@@ -533,14 +512,9 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             if (chunkCount == 0)
                 chunkCount = 1;
 
-            var bytesBudget = GetSendBytesBudgetPerFrame();
-            var fastBurst = bytes.Length <= FastBurstMaxFileBytes && !string.IsNullOrEmpty(job.TargetUserId);
-            if (fastBurst)
-                bytesBudget = Math.Max(bytesBudget, bytes.Length);
-
-            var sentThisFrame = 0;
-            var yieldedThisFrame = false;
+            var useFastUnicast = !job.AllowCacheFanOut && !string.IsNullOrEmpty(job.TargetUserId);
             var completedAllChunks = true;
+            var sentThisFrame = 0;
 
             for (ushort i = 0; i < chunkCount; i++)
             {
@@ -575,12 +549,18 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
                     break;
                 }
 
-                sentThisFrame += len;
-                if (!fastBurst && sentThisFrame >= bytesBudget)
+                if (useFastUnicast)
                 {
-                    sentThisFrame = 0;
-                    yieldedThisFrame = true;
-                    yield return null;
+                    sentThisFrame += len;
+                    if (sentThisFrame >= UnicastBytesBudgetPerFrame && i + 1 < chunkCount)
+                    {
+                        sentThisFrame = 0;
+                        yield return null;
+                    }
+                }
+                else if (i + 1 < chunkCount)
+                {
+                    yield return new WaitForSeconds(MulticastChunkIntervalSeconds);
                 }
             }
 
@@ -594,8 +574,8 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             }
             else
             {
-                if (!yieldedThisFrame && !fastBurst)
-                    yield return null;
+                if (!useFastUnicast)
+                    yield return new WaitForSeconds(MulticastChunkIntervalSeconds);
 
                 lock (Gate)
                     OutboundTransferKeysInFlight.Remove(transferKey);
@@ -638,13 +618,6 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             OutboundBytesByHash[job.Hash] = bytes;
 
         return bytes.Length > 0;
-    }
-
-    private int GetSendBytesBudgetPerFrame()
-    {
-        return GetConnectedPlayerCount() >= LargeLobbyPlayerThreshold
-            ? SendBytesBudgetLargeLobby
-            : SendBytesBudgetSmallLobby;
     }
 
     private int GetConnectedPlayerCount()

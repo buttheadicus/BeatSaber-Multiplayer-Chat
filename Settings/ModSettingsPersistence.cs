@@ -38,6 +38,12 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("quickReadyUpCombo")]
         public List<int> QuickReadyUpCombo { get; set; } = new();
+
+        [JsonProperty("quickBindComboExpireSeconds")]
+        public int QuickBindComboExpireSeconds { get; set; } = 3;
+
+        [JsonProperty("allowQuickBindsDuringSong")]
+        public bool AllowQuickBindsDuringSong { get; set; }
     }
 
     internal sealed class PerformanceSettingsSection
@@ -93,8 +99,6 @@ internal static class ModSettingsPersistence
         public float LobbyCustomAvatarSavedEyeHeightMeters { get; set; }
 
         [JsonProperty("enableCau")] public bool EnableCau { get; set; }
-
-        [JsonProperty("debugLogging")] public bool DebugLogging { get; set; }
 
         [JsonProperty("addons")] public AddonsSettingsSection Addons { get; set; } = null!;
 
@@ -271,6 +275,7 @@ internal static class ModSettingsPersistence
         NormalizeQuickBindCombo(d.Addons.QuickJoinQuickPlayCombo);
         NormalizeQuickBindCombo(d.Addons.QuickDisconnectCombo);
         NormalizeQuickBindCombo(d.Addons.QuickReadyUpCombo);
+        d.Addons.QuickBindComboExpireSeconds = Mathf.Clamp(d.Addons.QuickBindComboExpireSeconds, 1, 60);
     }
 
     private static void NormalizeQuickBindCombo(List<int> combo)

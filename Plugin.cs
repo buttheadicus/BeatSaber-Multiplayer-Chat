@@ -47,6 +47,17 @@ public class Plugin
             logger.Warn($"[MPChat] AvatarData multiplayer serialization Harmony init failed: {ex.Message}");
         }
 
+        try
+        {
+            var vrMenuHarmony = new Harmony("com.multiplayerchat.ignorevrsystemmenu");
+            MpChatIgnoreVrSystemMenuPatches.Apply(vrMenuHarmony);
+            logger.Info("[MPChat] VR system menu will not pause or fail gameplay.");
+        }
+        catch (Exception ex)
+        {
+            logger.Warn($"[MPChat] VR system menu ignore patches failed: {ex.Message}");
+        }
+
         if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))
             return;
 
@@ -98,7 +109,8 @@ public class Plugin
 
         // Load local Chat ID from disk early so registry and encryption paths see a stable id during Zenject setup.
         ChatPersistentId.EnsureLoaded();
-        MpChatLog.Apply(ModSettings.DebugLogging);
+        MpChatDebugMode.Refresh();
+        MpChatLog.Apply(MpChatDebugMode.IsEnabled);
 
         var globalAudioHost = new GameObject("MPChatGlobalAudioHost");
         UnityEngine.Object.DontDestroyOnLoad(globalAudioHost);
@@ -107,7 +119,6 @@ public class Plugin
         var quickBindsHost = new GameObject("MPChatQuickBindsHost");
         UnityEngine.Object.DontDestroyOnLoad(quickBindsHost);
         quickBindsHost.AddComponent<Core.QuickBinds.QuickBindsRuntimeManager>();
-        quickBindsHost.AddComponent<Core.MpChatUpdateNoticeTest>();
 
         if (CustomAvatarDependenciesBootstrap.IsSessionActive())
         {
@@ -227,6 +238,8 @@ public class Plugin
             container.Bind<PerformanceSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<QuickBindsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<QuickBindsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<QuickBindsOptionsSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<QuickBindsOptionsSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             if (MpChatFeatures.LobbyCustomAvatars)
             {
                 container.Bind<CustomAvatarsSettingsViewController>().FromNewComponentAsViewController().AsSingle();

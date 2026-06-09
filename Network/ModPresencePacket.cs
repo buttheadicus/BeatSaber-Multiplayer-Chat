@@ -15,6 +15,8 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
 
     public bool IsSlzCompanionClient;
 
+    public bool HasLobbyCustomAvatarsEnabled;
+
     public override void Serialize(NetDataWriter writer)
     {
         writer.Put(TargetUserId ?? "");
@@ -22,6 +24,7 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
         writer.Put(SenderChatId ?? "");
         writer.Put(SenderNameColor ?? "");
         writer.Put((byte)(IsSlzCompanionClient ? 1 : 0));
+        writer.Put((byte)(HasLobbyCustomAvatarsEnabled ? 1 : 0));
     }
 
     public override void Deserialize(NetDataReader reader)
@@ -55,5 +58,7 @@ public class ModPresencePacket : MultiplayerCore.Networking.Abstractions.MpPacke
         }
 
         IsSlzCompanionClient = reader.AvailableBytes > 0 && reader.GetByte() != 0;
+
+        HasLobbyCustomAvatarsEnabled = reader.AvailableBytes > 0 && reader.GetByte() != 0;
     }
 }

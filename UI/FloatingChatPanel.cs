@@ -169,7 +169,7 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
             }
 
             var tmp = row.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (tmp == null || tmp.text != exactMessageText)
+            if (tmp == null || !SystemMessageTextMatches(tmp.text, exactMessageText))
                 continue;
 
             _messageRows.RemoveAt(i);
@@ -255,8 +255,8 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
         var hex = ResolveNameColorHex(nameColorHex);
         tmp.text = string.IsNullOrEmpty(userName)
-            ? (systemMessageRichText ? message : message)
-            : $"<color=#{hex}>{Escape(userName)}:</color> {Escape(message)}";
+            ? (systemMessageRichText ? message : ChatRichTextEscape.ForDisplay(message))
+            : $"<color=#{hex}>{ChatRichTextEscape.ForDisplay(userName)}:</color> {ChatRichTextEscape.ForDisplay(message)}";
         tmp.fontSize = MessageFontSize;
         tmp.color = Color.white;
         tmp.enableWordWrapping = true;
@@ -286,8 +286,8 @@ public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable
         return ColorUtility.ToHtmlStringRGB(UsernameColor);
     }
 
-    private static string Escape(string s) =>
-        s.Replace("<", "&lt;").Replace(">", "&gt;");
+    private static bool SystemMessageTextMatches(string displayed, string plainMessage) =>
+        displayed == plainMessage || displayed == ChatRichTextEscape.ForDisplay(plainMessage);
 
     private static string TrimName(string name, int maxLen)
     {

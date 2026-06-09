@@ -17,6 +17,8 @@ internal static class MpUiReflection
     private static readonly Dictionary<string, MethodInfo?> MethodCache = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, FieldInfo?> FieldCache = new(StringComparer.Ordinal);
     private static readonly UnityEngine.Object[] EmptyObjects = Array.Empty<UnityEngine.Object>();
+    private static int _loadedSceneObjectCacheFrame = -1;
+    private static readonly Dictionary<string, UnityEngine.Object[]> LoadedSceneObjectCache = new(StringComparer.Ordinal);
 
     internal static Type? ResolveType(string typeName)
     {
@@ -62,6 +64,9 @@ internal static class MpUiReflection
         MethodCache[key] = method;
         return method;
     }
+
+    internal static object? FindFirstActiveObject(Type? type) =>
+        FindBestActiveObject(type, requireEnabled: true);
 
     internal static object? FindBestActiveObject(Type? type, bool requireEnabled = false)
     {
@@ -112,6 +117,12 @@ internal static class MpUiReflection
         if (type == null || !typeof(UnityEngine.Object).IsAssignableFrom(type))
             return EmptyObjects;
 
+        var frame = Time.frameCount;
+        var cacheKey = (type.AssemblyQualifiedName ?? type.FullName ?? type.Name) + "|" + requireHierarchy;
+        if (_loadedSceneObjectCacheFrame == frame
+            && LoadedSceneObjectCache.TryGetValue(cacheKey, out var cached))
+            return cached;
+
         var all = Resources.FindObjectsOfTypeAll(type);
         if (all == null || all.Length == 0)
             return EmptyObjects;
@@ -124,7 +135,11 @@ internal static class MpUiReflection
         }
 
         if (count == 0)
+        {
+            LoadedSceneObjectCache[cacheKey] = EmptyObjects;
+            _loadedSceneObjectCacheFrame = frame;
             return EmptyObjects;
+        }
 
         var filtered = new UnityEngine.Object[count];
         var j = 0;
@@ -134,6 +149,8 @@ internal static class MpUiReflection
                 filtered[j++] = obj;
         }
 
+        LoadedSceneObjectCache[cacheKey] = filtered;
+        _loadedSceneObjectCacheFrame = frame;
         return filtered;
     }
 

@@ -37,14 +37,7 @@ internal static class MpChatLobbyCustomAvatarDriverRegistry
         if (string.IsNullOrEmpty(userId))
             return;
 
-        MpCustomAvatarSyncManager.ScheduleJoinRetry(userId);
-
-        if (!MpCustomAvatarSyncManager.TryGetRemoteState(userId, out var row) ||
-            string.IsNullOrEmpty(row.AvatarDescriptorId) ||
-            CustomAvatarInstallListing.IsVanillaDescriptorHash(row.AvatarDescriptorId))
-            return;
-
-        MpChatLobbyCustomAvatarDriver.ProcessPlayerJoinedImmediate(userId);
+        MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(userId);
     }
 
     internal static void Unregister(MpChatLobbyCustomAvatarDriver driver)

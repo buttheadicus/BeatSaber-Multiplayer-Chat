@@ -462,12 +462,22 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             Instance.ClearBroadcastDedupeState();
     }
 
+    private static float _lastMissingRemoteScanRealtime = -999f;
+
+    private const float MissingRemoteScanCooldownSeconds = 2.5f;
+
     public static void RequestMissingRemoteAvatarFiles()
     {
         if (!MpChatFeatures.LobbyCustomAvatars || !ModSettings.EnableLobbyCustomAvatars)
             return;
         if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
             return;
+
+        var now = Time.realtimeSinceStartup;
+        if (now - _lastMissingRemoteScanRealtime < MissingRemoteScanCooldownSeconds)
+            return;
+
+        _lastMissingRemoteScanRealtime = now;
 
         string[] userIds;
         lock (RemoteLock)

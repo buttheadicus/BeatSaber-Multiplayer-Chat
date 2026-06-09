@@ -2,6 +2,7 @@ using System;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components.Settings;
 using BeatSaberMarkupLanguage.ViewControllers;
+using MultiplayerChat.Core;
 using MultiplayerChat.Settings;
 using UnityEngine.UI;
 
@@ -11,7 +12,7 @@ namespace MultiplayerChat.UI;
 public class SettingsViewController : BSMLAutomaticViewController
 {
     private const string LabelEnableCau = "Enable 'Chat Auto Updater' (CAU)";
-    private const string LabelDebugLogging = "Debug mode (very verbose; may lag; no restart)";
+    private const string LabelDebugLogging = "Debug mode (very verbose; will lag; install only)";
 
     public event EventHandler? ApplyClicked;
 
@@ -63,15 +64,19 @@ public class SettingsViewController : BSMLAutomaticViewController
     [UIAction("#post-parse")]
     private void PostParse()
     {
+        MpChatDebugMode.Refresh();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
         ApplyToggleLabels();
+        _debugLoggingToggle?.ReceiveValue();
     }
 
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
+        MpChatDebugMode.Refresh();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
         ApplyToggleLabels();
+        _debugLoggingToggle?.ReceiveValue();
     }
 
     private void ApplyToggleLabels()

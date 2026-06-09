@@ -24,11 +24,13 @@ public class ChatBubbleAnchor : MonoBehaviour
 
     private static readonly BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy;
     private static Sprite? _chatIconSprite;
+    private static Sprite? _customAvatarsIconSprite;
 
     private IConnectedPlayer? _player;
     private ImageView? _bg;
     private CurvedTextMeshPro? _nameText;
     private ImageView? _iconView;
+    private ImageView? _customAvatarsIconView;
     private ModPresenceManager? _subscribedModPresence;
 
     private void Awake()
@@ -83,7 +85,7 @@ public class ChatBubbleAnchor : MonoBehaviour
 
         yield return WaitForNametagLayoutStable();
 
-        CreateNametagIcon();
+        CreateNametagIcons();
         UpdateIconVisibility();
 
         var modPresence = ModPresenceManager.Instance;
@@ -193,17 +195,41 @@ public class ChatBubbleAnchor : MonoBehaviour
 
     private void UpdateIconVisibility()
     {
-        if (_iconView == null || _player == null)
+        if (_player == null)
             return;
 
         var modPresence = ModPresenceManager.Instance;
-        var visible = modPresence != null && modPresence.HasMod(_player.userId);
-        if (_iconView.gameObject.activeSelf == visible)
+        if (modPresence == null)
             return;
 
-        _iconView.gameObject.SetActive(visible);
-        if (visible && _bg != null)
+        var showChat = modPresence.HasMod(_player.userId);
+        var showCustomAvatars = modPresence.HasLobbyCustomAvatars(_player.userId);
+        var layoutDirty = false;
+
+        if (_iconView != null && _iconView.gameObject.activeSelf != showChat)
+        {
+            _iconView.gameObject.SetActive(showChat);
+            layoutDirty = true;
+        }
+
+        if (_customAvatarsIconView != null && _customAvatarsIconView.gameObject.activeSelf != showCustomAvatars)
+        {
+            _customAvatarsIconView.gameObject.SetActive(showCustomAvatars);
+            layoutDirty = true;
+        }
+
+        var customGap = _bg != null ? _bg.transform.Find("MPChatNametagGapCustomToChat") : null;
+        if (customGap != null && customGap.gameObject.activeSelf != showCustomAvatars)
+        {
+            customGap.gameObject.SetActive(showCustomAvatars);
+            layoutDirty = true;
+        }
+
+        if (layoutDirty && _bg != null)
+        {
+            ApplyNametagLayoutOrder();
             LayoutRebuilder.MarkLayoutForRebuild(_bg.rectTransform);
+        }
     }
 
     private void OnPresenceUpdated(object? sender, EventArgs e) => UpdateIconVisibility();
@@ -214,35 +240,58 @@ public class ChatBubbleAnchor : MonoBehaviour
             UpdateIconVisibility();
     }
 
-    private void CreateNametagIcon()
+    private void CreateNametagIcons()
     {
         if (_chatIconSprite == null)
-            _chatIconSprite = LoadChatIconSprite();
+            _chatIconSprite = LoadEmbeddedNametagIconSprite("MultiplayerChat.Assets.playerhaschat.png", "chat");
+        if (_customAvatarsIconSprite == null)
+            _customAvatarsIconSprite = LoadEmbeddedNametagIconSprite("MultiplayerChat.Assets.playerhasavatars.png", "custom avatars");
         if (_chatIconSprite == null || _bg == null || _nameText == null)
-            return;
-
-        if (_bg.transform.Find("MPChatNametagIcon") != null)
             return;
 
         var sharedLayout = UsesSharedHorizontalLayout();
         if (!sharedLayout)
             EnsureStandaloneHorizontalLayout();
 
-        var iconGo = new GameObject("MPChatNametagIcon");
-        iconGo.transform.SetParent(_bg.transform, false);
+        if (_bg.transform.Find("MPChatNametagIcon") == null)
+        {
+            _iconView = CreateNametagIconView("MPChatNametagIcon", _chatIconSprite);
+        }
+        else
+        {
+            _iconView = _bg.transform.Find("MPChatNametagIcon")?.GetComponent<ImageView>();
+        }
+
+        if (_customAvatarsIconSprite != null && _bg.transform.Find("MPChatNametagCustomAvatarsIcon") == null)
+        {
+            _customAvatarsIconView = CreateNametagIconView("MPChatNametagCustomAvatarsIcon", _customAvatarsIconSprite);
+        }
+        else
+        {
+            _customAvatarsIconView = _bg.transform.Find("MPChatNametagCustomAvatarsIcon")?.GetComponent<ImageView>();
+        }
+
+        EnsureCustomToChatGapTransform();
+        ApplyNametagLayoutOrder();
+    }
+
+    private ImageView CreateNametagIconView(string objectName, Sprite sprite)
+    {
+        var iconGo = new GameObject(objectName);
+        iconGo.transform.SetParent(_bg!.transform, false);
         iconGo.layer = 5;
         iconGo.AddComponent<CanvasRenderer>();
 
-        _iconView = iconGo.AddComponent<ImageView>();
-        _iconView.maskable = true;
-        _iconView.fillCenter = true;
-        _iconView.preserveAspect = true;
-        _iconView.raycastTarget = false;
-        _iconView.material = _bg.material;
-        _iconView.sprite = _chatIconSprite;
+        var iconView = iconGo.AddComponent<ImageView>();
+        iconView.maskable = true;
+        iconView.fillCenter = true;
+        iconView.preserveAspect = true;
+        iconView.raycastTarget = false;
+        iconView.material = _bg!.material;
+        iconView.sprite = sprite;
 
-        ApplyNametagIconSizing(iconGo.GetComponent<RectTransform>());
-        ApplyNametagLayoutOrder();
+        ApplyNametagIconSizing(iconGo.GetComponent<RectTransform>(), sprite);
+        return iconView;
     }
 
     private static RectTransform? FindMpexPlayerIconRect(Transform bg)
@@ -257,9 +306,9 @@ public class ChatBubbleAnchor : MonoBehaviour
         return null;
     }
 
-    private void ApplyNametagIconSizing(RectTransform iconRect)
+    private void ApplyNametagIconSizing(RectTransform iconRect, Sprite sprite)
     {
-        if (_bg == null || _chatIconSprite == null)
+        if (_bg == null)
             return;
 
         var reference = FindMpexPlayerIconRect(_bg.transform);
@@ -270,7 +319,7 @@ public class ChatBubbleAnchor : MonoBehaviour
             return;
         }
 
-        var spriteWidth = Mathf.Max(1f, _chatIconSprite.texture.width);
+        var spriteWidth = Mathf.Max(1f, sprite.texture.width);
         var scale = MpexNametagIconLocalScale * (MpexNametagIconPixelSize / spriteWidth);
         iconRect.localScale = new Vector3(scale, scale, scale);
     }
@@ -287,28 +336,62 @@ public class ChatBubbleAnchor : MonoBehaviour
                _nameText.transform.parent == _bg.transform;
     }
 
-    // With MPEX: [chat icon][1px gap][platform icon][name spacing][name]. Without MPEX: [chat icon][name].
+    // With MPEX: [custom avatars][1px][chat icon][1px gap][platform icon][name spacing][name]. Without MPEX: [custom avatars?][chat icon][name].
     private void ApplyNametagLayoutOrder()
     {
         if (_bg == null || _iconView == null || _nameText == null)
             return;
 
         var mpex = FindMpexPlayerIconRect(_bg.transform);
-        var gap = EnsurePlatformIconGapTransform(mpex != null);
+        var platformGap = EnsurePlatformIconGapTransform(mpex != null);
+        var customGap = EnsureCustomToChatGapTransform();
+        var sibling = 0;
 
-        _iconView.transform.SetSiblingIndex(0);
-
-        if (mpex != null && gap != null)
+        if (_customAvatarsIconView != null)
         {
-            gap.SetSiblingIndex(1);
-            mpex.SetSiblingIndex(2);
+            _customAvatarsIconView.transform.SetSiblingIndex(sibling++);
+            if (customGap != null)
+                customGap.SetSiblingIndex(sibling++);
+        }
+
+        _iconView.transform.SetSiblingIndex(sibling++);
+
+        if (mpex != null && platformGap != null)
+        {
+            platformGap.SetSiblingIndex(sibling++);
+            mpex.SetSiblingIndex(sibling++);
         }
         else if (!UsesSharedHorizontalLayout())
-            _nameText.transform.SetSiblingIndex(1);
+            _nameText.transform.SetSiblingIndex(sibling);
 
         _nameText.transform.SetSiblingIndex(999);
-        if (_bg != null)
-            LayoutRebuilder.MarkLayoutForRebuild(_bg.rectTransform);
+        LayoutRebuilder.MarkLayoutForRebuild(_bg.rectTransform);
+    }
+
+    private Transform? EnsureCustomToChatGapTransform()
+    {
+        if (_bg == null)
+            return null;
+
+        var gap = _bg.transform.Find("MPChatNametagGapCustomToChat");
+        if (gap == null)
+        {
+            var gapGo = new GameObject("MPChatNametagGapCustomToChat");
+            gapGo.transform.SetParent(_bg.transform, false);
+            gapGo.layer = 5;
+            gap = gapGo.transform;
+            var le = gapGo.AddComponent<LayoutElement>();
+            le.minWidth = PlatformIconLeftGapPx;
+            le.preferredWidth = PlatformIconLeftGapPx;
+            le.flexibleWidth = 0f;
+        }
+        else if (gap.TryGetComponent<LayoutElement>(out var le))
+        {
+            le.minWidth = PlatformIconLeftGapPx;
+            le.preferredWidth = PlatformIconLeftGapPx;
+        }
+
+        return gap;
     }
 
     private Transform? EnsurePlatformIconGapTransform(bool required)
@@ -368,21 +451,21 @@ public class ChatBubbleAnchor : MonoBehaviour
             _nameText.transform.SetParent(_bg.transform, false);
     }
 
-    private static Sprite? LoadChatIconSprite()
+    private static Sprite? LoadEmbeddedNametagIconSprite(string resourceName, string label)
     {
         try
         {
-            var bytes = ResourceHelpers.GetResource(typeof(ChatBubbleAnchor).Assembly, "MultiplayerChat.Assets.playerhaschat.png");
+            var bytes = ResourceHelpers.GetResource(typeof(ChatBubbleAnchor).Assembly, resourceName);
             if (bytes == null || bytes.Length == 0)
             {
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Could not find embedded sprite: MultiplayerChat.Assets.playerhaschat.png");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Could not find embedded sprite: {resourceName}");
                 return null;
             }
 
             var sprite = Sprites.LoadSpriteRaw(bytes, MpexNametagIconPixelsPerUnit);
             if (sprite == null)
             {
-                MultiplayerChat.Plugin.Log?.Warn("[MPChat] Failed to decode embedded chat icon PNG");
+                MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to decode embedded {label} icon PNG");
                 return null;
             }
 
@@ -391,7 +474,7 @@ public class ChatBubbleAnchor : MonoBehaviour
         }
         catch (Exception ex)
         {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to load chat icon sprite: {ex.Message}");
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Failed to load {label} icon sprite: {ex.Message}");
             return null;
         }
     }

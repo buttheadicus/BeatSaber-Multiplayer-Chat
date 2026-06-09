@@ -173,7 +173,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 return;
             }
 
-            ShowStackedBubble("", systemText);
+            ShowStackedBubble("", systemText, systemMessageRichText: e.SystemMessageRichText);
             return;
         }
         var name = TrimName(e.UserName ?? "", 30);
@@ -237,7 +237,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 RebindToActiveChatManager();
                 ModPresenceManager.Instance?.RefreshAfterLobbyReturn();
                 MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
-                MpCustomAvatarLobbyTransferManager.FlushDeferredLobbyAvatarFileTransfers();
                 MpChatLobbyAvatarLifecycleHost.ScheduleLobbySessionRejoinRefresh();
             }
 
@@ -393,9 +392,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             _timedHeaderNoticeBubble = _stackedBubbles[0];
         _timedHeaderNoticeCoroutine = StartCoroutine(ClearTimedHeaderNoticeAfter(durationSeconds));
     }
-
-    public void ShowUpdateAvailableNoticeTest() =>
-        ShowTimedHeaderSystemMessage(UpdateAvailableHeaderMessage, 30f);
 
     private void StopTimedHeaderNotice()
     {
@@ -1095,7 +1091,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         string userName,
         string message,
         string? nameColorHex = null,
-        float? durationSeconds = null)
+        float? durationSeconds = null,
+        bool systemMessageRichText = false)
     {
         if (!ShouldShowTitleBarChat())
             return false;
@@ -1115,11 +1112,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             return false;
 
         var trimmed = TrimName(userName ?? "", 30);
-        var safeName = string.IsNullOrEmpty(trimmed) ? "" : trimmed.Replace("<", "&lt;").Replace(">", "&gt;");
+        var safeName = string.IsNullOrEmpty(trimmed) ? "" : ChatRichTextEscape.ForDisplay(trimmed);
+        var safeMessage = systemMessageRichText ? message : ChatRichTextEscape.ForDisplay(message);
         string text;
         if (string.IsNullOrEmpty(userName))
         {
-            text = message;
+            text = safeMessage;
         }
         else if (!string.IsNullOrEmpty(nameColorHex))
         {
@@ -1127,11 +1125,11 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             if (hex.StartsWith("#")) hex = hex.Substring(1);
             if (hex.Length > 6) hex = hex.Substring(0, 6);
             if (hex.Length != 6) hex = "87CEEB";
-            text = $"<color=#{hex}>{safeName}</color>: {message}";
+            text = $"<color=#{hex}>{safeName}</color>: {safeMessage}";
         }
         else
         {
-            text = $"{safeName}: {message}";
+            text = $"{safeName}: {safeMessage}";
         }
         bubble.SetText(text);
         bubble.Show(durationSeconds ?? ModSettings.BubbleDuration, isStacked: true);
@@ -1155,8 +1153,12 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return true;
     }
 
-    private void ShowStackedBubble(string userName, string message, string? nameColorHex = null) =>
-        TryShowStackedBubble(userName, message, nameColorHex);
+    private void ShowStackedBubble(
+        string userName,
+        string message,
+        string? nameColorHex = null,
+        bool systemMessageRichText = false) =>
+        TryShowStackedBubble(userName, message, nameColorHex, systemMessageRichText: systemMessageRichText);
 
     private ChatBubble? CreateStackedBubble(Transform parent)
     {

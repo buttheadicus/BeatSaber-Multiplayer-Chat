@@ -282,6 +282,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
         CustomAvatarLobbyHashCache.Invalidate();
         MpCustomAvatarSyncManager.InvalidateOutboundDedupe();
         MpCustomAvatarSyncManager.BroadcastMetadataNow();
+        ModPresenceManager.Instance?.RefreshLobbyCustomAvatarsPresenceAfterSettingsChange();
         MpChatLobbyCustomAvatarDriver.NotifyLocalAvatarSettingsChanged();
     }
 }

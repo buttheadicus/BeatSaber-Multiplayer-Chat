@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
-  <vertical id="player_grid_root" pad="8" spacing="4" horizontal-fit="PreferredSize">
-    <vertical id="MuteDmPanel" spacing="3">
+  <vertical id="player_grid_root" pad="6" spacing="3" child-align="MiddleCenter" horizontal-fit="PreferredSize">
+    <vertical id="MuteDmPanel" spacing="2">
       <text id="GridTitle" text="" font-size="4" align="Center"/>
       <text id="GridHint" text="Tap a name" font-size="3" align="Center"/>
     </vertical>
     <vertical id="HearPanel" spacing="3">
-      <horizontal id="HearModeRow" spacing="3" horizontal-fit="PreferredSize">
-        <button id="TalkToModeButton" text="Talk to" on-click="TalkToModeClicked"/>
-        <button id="ListenModeButton" text="Listen" on-click="ListenModeClicked"/>
+      <vertical id="HearFooterRow" spacing="5">
+        <button id="PlayerVolumeButton" text="Player Volume" on-click="PlayerVolumeClicked"/>
+        <button id="ConfigureDuckButton" text="Lower volume when players speak" pad="2" on-click="ConfigureDuckClicked"/>
+      </vertical>
+      <horizontal id="HearModeRow" spacing="0" child-align="MiddleCenter" horizontal-fit="PreferredSize">
+        <text-segments id="HearModeSegments" contents="HearModeSegmentLabels" select-cell="HearModeSegmentSelected" child-expand-width="false" horizontal-fit="PreferredSize"/>
       </horizontal>
-      <text id="HearGridHint" text="" font-size="3" align="Center"/>
+      <text id="HearGridHint" text="" font-size="3" align="Center" enable-word-wrapping="true"/>
       <vertical id="VolumeAdjustPanel" pad="2" spacing="2">
         <text id="VolumePlayerLabel" text="" font-size="3.5" align="Center"/>
         <horizontal id="VolumeStepRow" spacing="3" horizontal-fit="PreferredSize">
@@ -20,31 +23,30 @@
           <button id="PlayerVolumeUpButton" text="+" pad="2" on-click="PlayerVolumeUpClicked"/>
         </horizontal>
       </vertical>
-      <vertical id="HearFooterRow" spacing="3">
-        <button id="PlayerVolumeButton" text="Player Volume" on-click="PlayerVolumeClicked"/>
-        <button id="ConfigureDuckButton" text="Configure ducking" pad="2" on-click="ConfigureDuckClicked"/>
-      </vertical>
     </vertical>
-    <horizontal spacing="2">
-      <button id="Slot0" on-click="OnSlot0"/>
-      <button id="Slot1" on-click="OnSlot1"/>
-      <button id="Slot2" on-click="OnSlot2"/>
-    </horizontal>
-    <horizontal spacing="2">
-      <button id="Slot3" on-click="OnSlot3"/>
-      <button id="Slot4" on-click="OnSlot4"/>
-      <button id="Slot5" on-click="OnSlot5"/>
-    </horizontal>
-    <horizontal spacing="2">
-      <button id="Slot6" on-click="OnSlot6"/>
-      <button id="Slot7" on-click="OnSlot7"/>
-      <button id="Slot8" on-click="OnSlot8"/>
-    </horizontal>
-    <horizontal spacing="2">
-      <button id="Slot9" on-click="OnSlot9"/>
-      <button id="Slot10" on-click="OnSlot10"/>
-      <button id="Slot11" on-click="OnSlot11"/>
-    </horizontal>
+    <vertical id="PlayerSlotGrid" spacing="2">
+      <horizontal spacing="2">
+        <button id="Slot0" on-click="OnSlot0"/>
+        <button id="Slot1" on-click="OnSlot1"/>
+        <button id="Slot2" on-click="OnSlot2"/>
+      </horizontal>
+      <horizontal spacing="2">
+        <button id="Slot3" on-click="OnSlot3"/>
+        <button id="Slot4" on-click="OnSlot4"/>
+        <button id="Slot5" on-click="OnSlot5"/>
+      </horizontal>
+      <horizontal spacing="2">
+        <button id="Slot6" on-click="OnSlot6"/>
+        <button id="Slot7" on-click="OnSlot7"/>
+        <button id="Slot8" on-click="OnSlot8"/>
+      </horizontal>
+      <horizontal spacing="2">
+        <button id="Slot9" on-click="OnSlot9"/>
+        <button id="Slot10" on-click="OnSlot10"/>
+        <button id="Slot11" on-click="OnSlot11"/>
+      </horizontal>
+    </vertical>
+    <button id="HearApplyButton" text="Apply" pad="2" on-click="HearApplyClicked"/>
     <button id="SaveVolumesButton" text="Save volumes and close" on-click="SaveVolumesAndCloseClicked"/>
     <button id="ClearAllMutesButton" text="Unmute all players" on-click="ClearAllMutesClicked"/>
   </vertical>

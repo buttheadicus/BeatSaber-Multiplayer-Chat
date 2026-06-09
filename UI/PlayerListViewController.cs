@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
+using HMUI;
 using MultiplayerChat.Core;
 using MultiplayerCore.Models;
 using TMPro;
@@ -21,6 +22,13 @@ public class PlayerListViewController : BSMLAutomaticViewController
     private const int SlotCount = 12;
     private const int MaxNameLen = 30;
     private const int VolumeStepPercent = 10;
+    private const string ConfigureDuckButtonLabel = "Lower volume when players speak";
+    private const string ListenModeHint =
+        "Tap names to add or remove (listening). If nobody is selected, you hear everyone.";
+    private const string TalkToModeHint =
+        "Listen and talk to a player (you can select as many people as you'd like, doesn't have to be one person; good for groups!).";
+    private const string VolumeModeHint =
+        "Tap a player, then use - / + to adjust their volume. There is no cap, so you can adjust it as high as you want.";
 
     [Inject] private readonly ChatMuteManager _muteManager = null!;
     [Inject] private readonly ChatIdConfigStore _chatIdConfigStore = null!;
@@ -34,9 +42,8 @@ public class PlayerListViewController : BSMLAutomaticViewController
     [UIComponent("GridTitle")] private TMP_Text? _gridTitle;
     [UIComponent("GridHint")] private TMP_Text? _gridHint;
     [UIComponent("HearGridHint")] private TMP_Text? _hearGridHint;
-    [UIComponent("HearModeRow")] private GameObject? _hearModeRow;
-    [UIComponent("TalkToModeButton")] private Button? _talkToModeButton;
-    [UIComponent("ListenModeButton")] private Button? _listenModeButton;
+    [UIComponent("HearModeSegments")] private MonoBehaviour? _hearModeSegments;
+    private SegmentedControl? _hearSegmentedControl;
     [UIComponent("HearFooterRow")] private GameObject? _hearFooterRow;
     [UIComponent("PlayerVolumeButton")] private Button? _playerVolumeButton;
     [UIComponent("ConfigureDuckButton")] private Button? _configureDuckButton;
@@ -46,6 +53,8 @@ public class PlayerListViewController : BSMLAutomaticViewController
     [UIComponent("VolumePlayerLabel")] private TMP_Text? _volumePlayerLabel;
     [UIComponent("PlayerVolumeStepLabel")] private TMP_Text? _playerVolumeStepLabel;
     [UIComponent("SaveVolumesButton")] private Button? _saveVolumesButton;
+    [UIComponent("HearApplyButton")] private Button? _hearApplyButton;
+    [UIComponent("PlayerSlotGrid")] private RectTransform? _playerSlotGrid;
 
     [UIComponent("Slot0")] private Button? _slot0;
     [UIComponent("Slot1")] private Button? _slot1;
@@ -65,10 +74,12 @@ public class PlayerListViewController : BSMLAutomaticViewController
     private Action? _onDismiss;
     private List<IConnectedPlayer> _players = new();
     private string? _selectedVolumeUserId;
+    private int _lastSeenHearSegmentIndex = -1;
 
-    private static readonly Color AccentBlue = new(0.32f, 0.58f, 1f, 1f);
-    private ColorBlock _hearModeDefaultColors;
-    private bool _hearModeDefaultColorsCached;
+    private readonly List<string> _hearModeSegmentLabels = new(2) { "Talk to", "Listen" };
+
+    [UIValue("HearModeSegmentLabels")]
+    public List<string> HearModeSegmentLabels => _hearModeSegmentLabels;
 
     public event Action<Mode>? RequestSubMode;
 
@@ -95,6 +106,8 @@ public class PlayerListViewController : BSMLAutomaticViewController
         if (_mode == Mode.Volume)
             ResetVolumeAdjustPanel();
         ApplyTitle();
+        ApplyHearGridHint();
+        ApplyConfigureDuckButtonLabel();
         UpdateVoiceChrome();
         ReloadGrid();
     }
@@ -114,7 +127,10 @@ public class PlayerListViewController : BSMLAutomaticViewController
         if (_mode == Mode.Volume)
             ResetVolumeAdjustPanel();
 
+        StabilizeHearLayout();
         ApplyTitle();
+        ApplyHearGridHint();
+        ApplyConfigureDuckButtonLabel();
         UpdateVoiceChrome();
         ReloadGrid();
     }
@@ -122,26 +138,44 @@ public class PlayerListViewController : BSMLAutomaticViewController
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
     {
         base.DidActivate(firstActivation, addedToHierarchy, screenSystemEnabling);
+        StabilizeHearLayout();
         RefreshUi();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
+        ApplyHearGridHint();
+        ApplyConfigureDuckButtonLabel();
     }
 
-    [UIAction("TalkToModeClicked")]
-    private void TalkToModeClicked()
+    private void Update()
     {
         if (_mode != Mode.Listen && _mode != Mode.TalkTo)
             return;
-        _mode = Mode.TalkTo;
-        RefreshUi();
+
+        EnsureHearSegmentedControl();
+        if (_hearSegmentedControl == null)
+            return;
+
+        var index = _hearSegmentedControl.selectedCellNumber;
+        if (index == _lastSeenHearSegmentIndex)
+            return;
+
+        OnHearSegmentIndexChanged(index);
     }
 
-    [UIAction("ListenModeClicked")]
-    private void ListenModeClicked()
+    // BSML select-cell passes the SegmentedControl and cell index.
+    [UIAction("HearModeSegmentSelected")]
+    private void HearModeSegmentSelected(SegmentedControl control, int index)
+    {
+        _hearSegmentedControl = control;
+        OnHearSegmentIndexChanged(index);
+    }
+
+    [UIAction("HearApplyClicked")]
+    private void HearApplyClicked()
     {
         if (_mode != Mode.Listen && _mode != Mode.TalkTo)
             return;
-        _mode = Mode.Listen;
-        RefreshUi();
+
+        _onDismiss?.Invoke();
     }
 
     [UIAction("PlayerVolumeClicked")]
@@ -199,23 +233,149 @@ public class PlayerListViewController : BSMLAutomaticViewController
         if (_gridHint != null)
             _gridHint.gameObject.SetActive(_mode == Mode.Mute || _mode == Mode.DM);
 
-        if (_hearGridHint != null)
+    }
+
+    private void ApplyHearGridHint()
+    {
+        EnsureHearGridHintResolved();
+        if (_hearGridHint == null)
+            return;
+
+        if (_mode == Mode.Volume)
         {
-            var hearHint = _mode == Mode.Listen || _mode == Mode.TalkTo || _mode == Mode.Volume;
-            _hearGridHint.gameObject.SetActive(hearHint);
-            _hearGridHint.text = _mode switch
-            {
-                Mode.Listen =>
-                    "Tap names to add or remove (listening). If nobody is selected, you hear everyone.",
-                Mode.TalkTo =>
-                    "Listen and talk to a player (you can select as many people as you'd like, doesn't have to be one person; good for groups!).",
-                Mode.Volume => "Tap a player, then use - / + to adjust their volume. There is no cap, so you can adjust it as high as you want.",
-                _ => ""
-            };
+            _hearGridHint.gameObject.SetActive(true);
+            _hearGridHint.text = VolumeModeHint;
+            return;
+        }
+
+        if (_mode == Mode.Listen || _mode == Mode.TalkTo)
+        {
+            _hearGridHint.gameObject.SetActive(true);
+            _hearGridHint.text = _mode == Mode.TalkTo ? TalkToModeHint : ListenModeHint;
+            return;
+        }
+
+        _hearGridHint.gameObject.SetActive(false);
+    }
+
+    private void EnsureHearGridHintResolved()
+    {
+        if (_hearGridHint != null)
+            return;
+
+        var hintGo = BsmlUiRefs.FindChildGameObject(transform, "HearGridHint");
+        if (hintGo != null)
+            _hearGridHint = hintGo.GetComponent<TMP_Text>();
+    }
+
+    private void EnsureHearSegmentedControl()
+    {
+        if (_hearSegmentedControl != null)
+            return;
+
+        if (_hearModeSegments == null)
+        {
+            var segGo = BsmlUiRefs.FindChildGameObject(transform, "HearModeSegments");
+            if (segGo != null)
+                _hearModeSegments = segGo.GetComponent<MonoBehaviour>();
+        }
+
+        if (_hearModeSegments != null)
+            _hearSegmentedControl = _hearModeSegments.GetComponentInChildren<SegmentedControl>(true);
+    }
+
+    private void StabilizeHearLayout()
+    {
+        var root = BsmlUiRefs.FindChildGameObject(transform, "player_grid_root");
+        BsmlLayoutGroups.ConfigureVertical(root, 3f, middleCenter: true);
+        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "HearPanel"), 3f, middleCenter: true);
+        BsmlLayoutGroups.ConfigureVertical(BsmlUiRefs.FindChildGameObject(transform, "HearFooterRow"), 5f, middleCenter: true);
+        BsmlLayoutGroups.ConfigureHorizontal(BsmlUiRefs.FindChildGameObject(transform, "HearModeRow"), 0f, middleCenter: true);
+        BsmlLayoutGroups.SetTextPreferredWidth(_hearGridHint, 360f);
+        ConfigureHearModeSegments();
+
+        if (_playerSlotGrid == null)
+        {
+            var slotGo = BsmlUiRefs.FindChildGameObject(transform, "PlayerSlotGrid");
+            if (slotGo != null)
+                _playerSlotGrid = slotGo.GetComponent<RectTransform>();
+        }
+
+        if (_playerSlotGrid != null)
+        {
+            var le = _playerSlotGrid.GetComponent<LayoutElement>();
+            if (le == null)
+                le = _playerSlotGrid.gameObject.AddComponent<LayoutElement>();
+            le.flexibleHeight = 0.35f;
+            le.minHeight = 115f;
         }
     }
 
-    private Color _hearModeDefaultLabelColor = Color.white;
+    private const float HearModeSegmentCellWidth = 50f;
+    private const float HearModeSegmentSpacing = 2f;
+
+    private void ConfigureHearModeSegments()
+    {
+        if (_hearModeSegments == null)
+        {
+            var segGo = BsmlUiRefs.FindChildGameObject(transform, "HearModeSegments");
+            if (segGo != null)
+                _hearModeSegments = segGo.GetComponent<MonoBehaviour>();
+        }
+
+        if (_hearModeSegments == null)
+            return;
+
+        var go = _hearModeSegments.gameObject;
+        var le = go.GetComponent<LayoutElement>();
+        if (le == null)
+            le = go.AddComponent<LayoutElement>();
+        le.preferredWidth = HearModeSegmentCellWidth * 2f + HearModeSegmentSpacing;
+        le.flexibleWidth = 0f;
+        le.minHeight = 10f;
+
+        foreach (var tmp in go.GetComponentsInChildren<TMP_Text>(true))
+        {
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.alignment = TextAlignmentOptions.Center;
+        }
+
+        foreach (var hlg in go.GetComponentsInChildren<HorizontalLayoutGroup>(true))
+        {
+            hlg.spacing = HearModeSegmentSpacing;
+            hlg.childForceExpandWidth = false;
+            hlg.childControlWidth = true;
+
+            for (var i = 0; i < hlg.transform.childCount; i++)
+            {
+                var child = hlg.transform.GetChild(i);
+                var cellLe = child.GetComponent<LayoutElement>();
+                if (cellLe == null)
+                    cellLe = child.gameObject.AddComponent<LayoutElement>();
+                cellLe.preferredWidth = HearModeSegmentCellWidth;
+                cellLe.minWidth = HearModeSegmentCellWidth;
+                cellLe.flexibleWidth = 0f;
+            }
+        }
+    }
+
+    private void OnHearSegmentIndexChanged(int index)
+    {
+        if (_mode != Mode.Listen && _mode != Mode.TalkTo)
+            return;
+
+        _lastSeenHearSegmentIndex = index;
+        var next = index == 0 ? Mode.TalkTo : Mode.Listen;
+        if (_mode != next)
+        {
+            _mode = next;
+            ReloadGrid();
+        }
+
+        ApplyHearGridHint();
+    }
+
     private bool _uiRefsResolved;
 
     private void EnsureUiRefsResolved()
@@ -226,8 +386,14 @@ public class PlayerListViewController : BSMLAutomaticViewController
         var root = transform;
         _muteDmPanel ??= BsmlUiRefs.FindChildGameObject(root, "MuteDmPanel");
         _hearPanel ??= BsmlUiRefs.FindChildGameObject(root, "HearPanel");
-        _hearModeRow ??= BsmlUiRefs.FindChildGameObject(root, "HearModeRow");
         _hearFooterRow ??= BsmlUiRefs.FindChildGameObject(root, "HearFooterRow");
+        if (_hearModeSegments == null)
+        {
+            var segGo = BsmlUiRefs.FindChildGameObject(root, "HearModeSegments");
+            if (segGo != null)
+                _hearModeSegments = segGo.GetComponent<MonoBehaviour>();
+        }
+
         if (_volumeAdjustPanel == null)
         {
             var volGo = BsmlUiRefs.FindChildGameObject(root, "VolumeAdjustPanel");
@@ -247,11 +413,12 @@ public class PlayerListViewController : BSMLAutomaticViewController
         BsmlUiRefs.SetActive(_muteDmPanel, muteOrDm);
         BsmlUiRefs.SetActive(_hearPanel, hearPanelVisible);
 
-        BsmlUiRefs.SetActive(_hearModeRow, hearMode);
         BsmlUiRefs.SetActive(_hearFooterRow, hearMode);
 
-        if (_hearGridHint != null)
-            _hearGridHint.gameObject.SetActive(hearPanelVisible);
+        ApplyHearGridHint();
+
+        if (_hearModeSegments != null)
+            _hearModeSegments.gameObject.SetActive(hearMode);
 
         if (_volumeAdjustPanel != null)
             _volumeAdjustPanel.gameObject.SetActive(_mode == Mode.Volume && !string.IsNullOrEmpty(_selectedVolumeUserId));
@@ -259,42 +426,25 @@ public class PlayerListViewController : BSMLAutomaticViewController
         if (_saveVolumesButton != null)
             _saveVolumesButton.gameObject.SetActive(_mode == Mode.Volume);
 
+        if (_hearApplyButton != null)
+            _hearApplyButton.gameObject.SetActive(hearMode);
+
         if (_clearAllMutesButton != null)
             _clearAllMutesButton.gameObject.SetActive(_mode == Mode.Mute);
 
-        SetButtonVisible(_talkToModeButton, hearMode);
-        SetButtonVisible(_listenModeButton, hearMode);
         SetButtonVisible(_playerVolumeButton, hearMode);
         SetButtonVisible(_configureDuckButton, hearMode);
-
-        if (muteOrDm)
-        {
-            if (_hearModeDefaultColorsCached)
-            {
-                RestoreHearModeButtonDefaultLook(_talkToModeButton);
-                RestoreHearModeButtonDefaultLook(_listenModeButton);
-            }
-
-            _hearModeDefaultColorsCached = false;
-            return;
-        }
-
         if (hearMode)
         {
-            if (!_hearModeDefaultColorsCached)
-                CacheHearModeDefaultColorsOnce();
-            ApplyHearModeHighlight(_talkToModeButton, _mode == Mode.TalkTo);
-            ApplyHearModeHighlight(_listenModeButton, _mode == Mode.Listen);
-            return;
+            ApplyConfigureDuckButtonLabel();
+            SyncHearModeSegmentSelection();
+            _lastSeenHearSegmentIndex = _mode == Mode.TalkTo ? 0 : 1;
+            ApplyHearGridHint();
         }
-
-        if (_hearModeDefaultColorsCached)
+        else
         {
-            RestoreHearModeButtonDefaultLook(_talkToModeButton);
-            RestoreHearModeButtonDefaultLook(_listenModeButton);
+            _lastSeenHearSegmentIndex = -1;
         }
-
-        _hearModeDefaultColorsCached = false;
     }
 
     private static void SetButtonVisible(Button? btn, bool visible)
@@ -303,57 +453,18 @@ public class PlayerListViewController : BSMLAutomaticViewController
             btn.gameObject.SetActive(visible);
     }
 
-    private void RestoreHearModeButtonDefaultLook(Button? btn)
+    private void SyncHearModeSegmentSelection()
     {
-        if (btn == null)
-            return;
-        btn.colors = _hearModeDefaultColors;
-        var label = btn.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-            label.color = _hearModeDefaultLabelColor;
-    }
-
-    private void CacheHearModeDefaultColorsOnce()
-    {
-        if (_hearModeDefaultColorsCached)
-            return;
-        var src = _listenModeButton ?? _talkToModeButton;
-        if (src == null)
-            return;
-        _hearModeDefaultColors = src.colors;
-        var label = src.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-            _hearModeDefaultLabelColor = label.color;
-        _hearModeDefaultColorsCached = true;
-    }
-
-    private void ApplyHearModeHighlight(Button? btn, bool active)
-    {
-        if (btn == null)
+        EnsureHearSegmentedControl();
+        if (_hearSegmentedControl == null)
             return;
 
-        var c = btn.colors;
-        if (active)
-        {
-            c.normalColor = AccentBlue;
-            c.highlightedColor = AccentBlue;
-            c.selectedColor = AccentBlue;
-            c.pressedColor = AccentBlue;
-        }
-        else if (_hearModeDefaultColorsCached)
-        {
-            c.normalColor = _hearModeDefaultColors.normalColor;
-            c.highlightedColor = _hearModeDefaultColors.highlightedColor;
-            c.selectedColor = _hearModeDefaultColors.selectedColor;
-            c.pressedColor = _hearModeDefaultColors.pressedColor;
-            c.disabledColor = _hearModeDefaultColors.disabledColor;
-        }
+        var index = _mode == Mode.TalkTo ? 0 : 1;
+        if (_hearSegmentedControl.selectedCellNumber == index)
+            return;
 
-        btn.colors = c;
-
-        var label = btn.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-            label.color = active ? Color.white : _hearModeDefaultLabelColor;
+        _hearSegmentedControl.SelectCellWithNumber(index);
+        _lastSeenHearSegmentIndex = index;
     }
 
     [UIAction("OnSlot0")] private void OnSlot0() => OnSlotClicked(0);
@@ -442,6 +553,12 @@ public class PlayerListViewController : BSMLAutomaticViewController
         }
 
         return TrimName(raw, MaxNameLen);
+    }
+
+    private void ApplyConfigureDuckButtonLabel()
+    {
+        if (_configureDuckButton != null)
+            SetButtonLabel(_configureDuckButton, ConfigureDuckButtonLabel);
     }
 
     private static void SetButtonLabel(Button btn, string text)

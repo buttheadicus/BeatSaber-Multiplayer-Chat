@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Text;
+using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
 using MultiplayerCore.Models;
 using UnityEngine;
@@ -80,6 +81,8 @@ public static class MpChatLobbyDiagnostics
     public static bool QuickBindsAllowedDuringGameplay()
     {
         if (!SongGameplayLikelyActive())
+            return true;
+        if (ModSettings.AllowQuickBindsDuringSong)
             return true;
         return IsSpectatingInActiveMultiplayerSong();
     }
@@ -258,7 +261,7 @@ public static class MpChatLobbyDiagnostics
 
     private static float _resultsLikeCacheTime = -999f;
     private static bool _resultsLikeCached;
-    private const float ResultsLikeCacheTtlSec = 1.25f;
+    private const float ResultsLikeCacheTtlSec = 2.5f;
 
     public static bool ResultsLikeUiVisible()
     {
@@ -272,6 +275,12 @@ public static class MpChatLobbyDiagnostics
 
     private static bool ResultsLikeUiVisibleUncached()
     {
+        if (ActiveSceneIsMainMenuWithoutGameCore())
+            return false;
+
+        if (!AnyGameCoreLoaded() && !LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
+            return false;
+
         try
         {
             foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
@@ -332,7 +341,7 @@ public static class MpChatLobbyDiagnostics
 
     private static float _inactiveLobbyChromeCacheTime = -999f;
     private static bool _inactiveLobbyChromeCached;
-    private const float InactiveLobbyChromeCacheTtlSec = 0.5f;
+    private const float InactiveLobbyChromeCacheTtlSec = 1.0f;
 
     // Lobby chrome can stay inactive under the MP results overlay while the session is still in lobby.
     public static bool InactiveMultiplayerLobbyChromeExists()

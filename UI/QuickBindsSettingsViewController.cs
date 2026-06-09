@@ -42,8 +42,6 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
         None,
 
-        QuickJoinQuickPlay,
-
         QuickDisconnect,
 
         QuickReadyUp
@@ -53,6 +51,8 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
 
     public event Action? QuickBindsSettingsApplied;
+
+    public event Action? OptionsSettingsClicked;
 
     private const string LabelEnableQuickBinds = "Enable Quick Binds";
 
@@ -290,26 +290,6 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
 
 
-    [UIAction("ConfigureQuickJoinClicked")]
-
-    private void OnConfigureQuickJoinClicked()
-
-    {
-
-        StopRecording(resetCombo: false);
-
-        _recordTarget = RecordTarget.QuickJoinQuickPlay;
-
-        LoadExistingComboIntoPreview(ModSettings.QuickJoinQuickPlayCombo);
-
-        RefreshStatusText();
-
-        RefreshDeleteBindingButton();
-
-    }
-
-
-
     [UIAction("ConfigureQuickDisconnectClicked")]
 
     private void OnConfigureQuickDisconnectClicked()
@@ -375,12 +355,6 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
         switch (_recordTarget)
 
         {
-
-            case RecordTarget.QuickJoinQuickPlay:
-
-                ModSettings.SetQuickJoinQuickPlayCombo(Array.Empty<int>());
-
-                break;
 
             case RecordTarget.QuickDisconnect:
 
@@ -458,6 +432,9 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
 
 
 
+    [UIAction("SettingsClicked")]
+    private void OnSettingsClicked() => OptionsSettingsClicked?.Invoke();
+
     [UIAction("ApplyClicked")]
 
     private void OnApplyClicked()
@@ -507,12 +484,6 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
         switch (_recordTarget)
 
         {
-
-            case RecordTarget.QuickJoinQuickPlay:
-
-                ModSettings.SetQuickJoinQuickPlayCombo(stored);
-
-                break;
 
             case RecordTarget.QuickDisconnect:
 
@@ -629,8 +600,6 @@ public sealed class QuickBindsSettingsViewController : BSMLAutomaticViewControll
         _recordingStatusText.text = _recordTarget switch
 
         {
-
-            RecordTarget.QuickJoinQuickPlay => "Configuring Quick Join QuickPlay. Tap RECORD to capture a combo.",
 
             RecordTarget.QuickDisconnect => "Configuring Quick Disconnect. Tap RECORD to capture a combo.",
 

@@ -1,5 +1,6 @@
 using System;
 using HMUI;
+using MultiplayerChat.Core;
 using Zenject;
 
 namespace MultiplayerChat.UI;
@@ -7,6 +8,8 @@ namespace MultiplayerChat.UI;
 public sealed class QuickBindsSettingsFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly QuickBindsSettingsViewController _quickBindsView = null!;
+
+    [Inject] private readonly QuickBindsOptionsSettingsFlowCoordinator _optionsFlow = null!;
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
 
@@ -20,13 +23,29 @@ public sealed class QuickBindsSettingsFlowCoordinator : FlowCoordinator
         }
 
         if (addedToHierarchy)
+        {
             _quickBindsView.QuickBindsSettingsApplied += OnApplied;
+            _quickBindsView.OptionsSettingsClicked += OnOptionsSettingsClicked;
+        }
     }
 
     protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
     {
         if (removedFromHierarchy)
+        {
             _quickBindsView.QuickBindsSettingsApplied -= OnApplied;
+            _quickBindsView.OptionsSettingsClicked -= OnOptionsSettingsClicked;
+        }
+    }
+
+    private void OnOptionsSettingsClicked()
+    {
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _optionsFlow)
+            return;
+
+        _optionsFlow.ParentFlow = this;
+        PresentFlowCoordinator(_optionsFlow);
     }
 
     private void OnApplied() => Dismiss();

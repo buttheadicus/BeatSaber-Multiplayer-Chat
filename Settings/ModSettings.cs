@@ -188,12 +188,21 @@ public static class ModSettings
 
     public static bool DebugLogging
     {
-        get => D.DebugLogging;
+        get => MpChatDebugMode.IsEnabled;
         set
         {
-            D.DebugLogging = value;
-            ModSettingsPersistence.Save();
+            MpChatDebugMode.SetEnabled(value);
             MpChatLog.Apply(value);
+        }
+    }
+
+    public static bool AllowQuickBindsDuringSong
+    {
+        get => D.Addons.AllowQuickBindsDuringSong;
+        set
+        {
+            D.Addons.AllowQuickBindsDuringSong = value;
+            ModSettingsPersistence.Save();
         }
     }
 
@@ -271,6 +280,16 @@ public static class ModSettings
     {
         D.Addons.QuickReadyUpCombo = NormalizeQuickBindComboCopy(combo);
         ModSettingsPersistence.Save();
+    }
+
+    public static int QuickBindComboExpireSeconds
+    {
+        get => Mathf.Clamp(D.Addons.QuickBindComboExpireSeconds, 1, 60);
+        set
+        {
+            D.Addons.QuickBindComboExpireSeconds = Mathf.Clamp(value, 1, 60);
+            ModSettingsPersistence.Save();
+        }
     }
 
     public static bool LimitIncomingAvatarDataDuringSongs

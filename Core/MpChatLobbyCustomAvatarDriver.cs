@@ -828,7 +828,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         if (MpChatPerformanceGate.ShouldBlockAvatarHeavyWorkForDriver(IsArenaContext()))
             return;
 
-        BeginLoadForHash(_pendingHash, _pendingScale, _pendingBypassPedestalDefer);
+        BeginLoadForHash(_pendingHash!, _pendingScale, _pendingBypassPedestalDefer);
     }
 
     private bool TryAcquireLobbyLoadSlot()

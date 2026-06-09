@@ -14,21 +14,35 @@ internal static class VrQuickBindInput
     private static bool _secWas;
     private static bool _trigWas;
     private static bool _gripWas;
-    private static bool _debugGripWas;
 
     private static bool _recPriWas;
     private static bool _recSecWas;
     private static bool _recTrigWas;
     private static bool _recGripWas;
 
+    private static int _inputFrame = -1;
+    private static InputDevice _frameLeft;
+    private static InputDevice _frameRight;
+
     internal static bool IsSettingsRecordingCaptureActive { get; private set; }
+
+    internal static void BeginInputFrame()
+    {
+        var frame = Time.frameCount;
+        if (_inputFrame == frame)
+            return;
+
+        _inputFrame = frame;
+        _frameLeft = PrimaryDeviceAt(XRNode.LeftHand);
+        _frameRight = PrimaryDeviceAt(XRNode.RightHand);
+    }
 
     internal static void SetSettingsRecordingCaptureActive(bool active) =>
         IsSettingsRecordingCaptureActive = active;
 
     internal static void ResetEdgeState()
     {
-        _priWas = _secWas = _trigWas = _gripWas = _debugGripWas = false;
+        _priWas = _secWas = _trigWas = _gripWas = false;
     }
 
     internal static void ResetRecordingEdgeState()
@@ -45,13 +59,6 @@ internal static class VrQuickBindInput
         _recSecWas = Get(left, CommonUsages.secondaryButton) || Get(right, CommonUsages.secondaryButton);
         _recTrigWas = TriggerHeld(left) || TriggerHeld(right);
         _recGripWas = Get(left, CommonUsages.gripButton) || Get(right, CommonUsages.gripButton);
-    }
-
-    internal static bool TryConsumeDebugGripEdge()
-    {
-        var left = PrimaryDeviceAt(XRNode.LeftHand);
-        var right = PrimaryDeviceAt(XRNode.RightHand);
-        return TryConsumeEdge(left, right, QuickBindButton.Grip, ref _debugGripWas, CommonUsages.gripButton);
     }
 
     internal static bool TryConsumeRecordingEdge(out QuickBindButton button)
@@ -90,8 +97,8 @@ internal static class VrQuickBindInput
     internal static bool TryConsumeAnyEdge(out QuickBindButton button)
     {
         button = default;
-        var left = PrimaryDeviceAt(XRNode.LeftHand);
-        var right = PrimaryDeviceAt(XRNode.RightHand);
+        var left = _frameLeft;
+        var right = _frameRight;
 
         if (TryConsumeEdge(left, right, QuickBindButton.Primary, ref _priWas, CommonUsages.primaryButton))
         {

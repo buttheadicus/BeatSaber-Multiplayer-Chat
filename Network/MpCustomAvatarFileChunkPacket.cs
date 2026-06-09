@@ -9,7 +9,7 @@ public class MpCustomAvatarFileChunkPacket : MultiplayerCore.Networking.Abstract
 
     public const byte LegacyWireVersion = 1;
 
-    public const int MaxChunkPayloadBytes = 61440;
+    public const int MaxChunkPayloadBytes = 32768;
 
     public const int MaxTotalFileBytes = 15 * 1024 * 1024;
 

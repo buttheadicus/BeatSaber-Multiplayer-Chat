@@ -15,8 +15,7 @@ internal static class BsmlLayoutGroups
         vlg.spacing = spacing;
         vlg.childForceExpandWidth = false;
         vlg.childForceExpandHeight = false;
-        if (middleCenter)
-            vlg.childAlignment = TextAnchor.MiddleCenter;
+        vlg.childAlignment = middleCenter ? TextAnchor.MiddleCenter : TextAnchor.UpperCenter;
     }
 
     internal static void ConfigureHorizontal(GameObject? go, float spacing, bool middleCenter = true)
@@ -42,6 +41,48 @@ internal static class BsmlLayoutGroups
             le = tmp.gameObject.AddComponent<LayoutElement>();
         le.preferredWidth = widthPx;
         le.flexibleWidth = 0f;
+    }
+
+    internal static void CompactSliderSetting(SliderSetting? slider, float preferredHeight = 10f)
+    {
+        if (slider == null)
+            return;
+
+        var rootLe = slider.GetComponent<LayoutElement>();
+        if (rootLe == null)
+            rootLe = slider.gameObject.AddComponent<LayoutElement>();
+        rootLe.preferredHeight = preferredHeight;
+        rootLe.minHeight = preferredHeight;
+        rootLe.flexibleHeight = 0f;
+
+        var row = slider.GetComponent<HorizontalLayoutGroup>()
+                    ?? slider.GetComponentInChildren<HorizontalLayoutGroup>(true);
+        if (row != null)
+        {
+            row.childForceExpandHeight = false;
+            row.childControlHeight = true;
+        }
+
+        foreach (var childSlider in slider.GetComponentsInChildren<Slider>(true))
+        {
+            var rt = childSlider.transform as RectTransform;
+            if (rt == null)
+                continue;
+            rt.sizeDelta = new Vector2(rt.sizeDelta.x, preferredHeight);
+        }
+
+        foreach (var le in slider.GetComponentsInChildren<LayoutElement>(true))
+        {
+            if (le.gameObject == slider.gameObject)
+                continue;
+            if (le.preferredHeight <= 0f || le.preferredHeight > preferredHeight + 1f)
+                le.preferredHeight = preferredHeight;
+            le.flexibleHeight = 0f;
+        }
+
+        var parentVertical = slider.GetComponentInParent<VerticalLayoutGroup>();
+        if (parentVertical != null)
+            parentVertical.childForceExpandHeight = false;
     }
 
     internal static void MirrorSettingRowLayoutFromReference(Component? reference, Component? target)
