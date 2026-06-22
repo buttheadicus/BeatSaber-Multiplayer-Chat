@@ -116,6 +116,7 @@ internal static class MpMenuUiAutomation
 
         if (IsDisconnectComplete())
         {
+            MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeave();
             MultiplayerChat.Plugin.Log?.Info("[MPChat][QuickBinds] Quick Disconnect complete.");
             return;
         }
@@ -136,6 +137,7 @@ internal static class MpMenuUiAutomation
 
         if (IsDisconnectComplete())
         {
+            MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeave();
             MultiplayerChat.Plugin.Log?.Info("[MPChat][QuickBinds] Quick Disconnect complete.");
             return;
         }

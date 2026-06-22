@@ -120,7 +120,7 @@ public class ChatManager : IInitializable, IDisposable
         {
             _lobbyScopeChatManager = null;
             if (MpChatFeatures.LobbyCustomAvatars)
-                MpCustomAvatarSyncManager.ClearAllRemotes();
+                MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected();
         }
 
         if (Instance == this)

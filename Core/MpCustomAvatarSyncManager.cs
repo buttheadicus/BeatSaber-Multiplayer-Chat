@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using MultiplayerChat.Core.QuickBinds;
 using MultiplayerChat.Network;
 using MultiplayerChat.Settings;
 using MultiplayerCore.Models;
@@ -46,7 +47,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
 
     private static float _lastJoinRetryPollRealtime;
 
-    private const float MetadataKeepaliveSeconds = 8f;
+    private const float MetadataKeepaliveSeconds = 25f;
 
     private const float ScaleEpsilon = 0.002f;
 
@@ -231,6 +232,8 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
         var descriptor = hasDescriptor ? packet.AvatarDescriptorId : null;
         var scale = hasScale ? Mathf.Clamp(packet.AvatarScale, 0.25f, 4f) : 1f;
         var changed = false;
+        var descriptorChanged = false;
+        var newRemoteRow = false;
 
         lock (RemoteLock)
         {
@@ -238,6 +241,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             {
                 row = new MpCustomAvatarRemoteState();
                 RemoteByUserId[userId] = row;
+                newRemoteRow = true;
                 changed = true;
             }
 
@@ -245,6 +249,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
                 !string.Equals(row.AvatarDescriptorId, descriptor, StringComparison.OrdinalIgnoreCase))
             {
                 row.AvatarDescriptorId = descriptor?.Trim().ToUpperInvariant();
+                descriptorChanged = true;
                 changed = true;
             }
 
@@ -281,11 +286,14 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
 
             ClearJoinRetry(userId);
 
-            var hash = descriptor?.Trim().ToUpperInvariant() ?? "";
-            if (CustomAvatarHashUtil.LooksLikeMd5Hex(hash) &&
-                !CustomAvatarInstallListing.IsVanillaDescriptorHash(hash) &&
-                !CustomAvatarLobbyHashCache.TryGetPath(hash, out _))
-                MpCustomAvatarLobbyTransferManager.RequestLobbyAvatarFile(hash, userId);
+            if (descriptorChanged || newRemoteRow)
+            {
+                var hash = descriptor?.Trim().ToUpperInvariant() ?? "";
+                if (CustomAvatarHashUtil.LooksLikeMd5Hex(hash) &&
+                    !CustomAvatarInstallListing.IsVanillaDescriptorHash(hash) &&
+                    !CustomAvatarLobbyHashCache.TryGetPath(hash, out _))
+                    MpCustomAvatarLobbyTransferManager.RequestLobbyAvatarFile(hash, userId);
+            }
         }
     }
 
@@ -453,6 +461,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
 
         _wasDeferringIncomingAvatarData = false;
         _lastForcedMetadataRealtime = -999f;
+        MpCustomAvatarLobbyTransferManager.ClearLobbyAvatarTransferMemoryCaches();
     }
 
     public static void ResetSessionAvatarSyncState()
@@ -460,6 +469,51 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
         ClearAllRemotes();
         if (Instance != null)
             Instance.ClearBroadcastDedupeState();
+    }
+
+    // Full teardown when the multiplayer session is no longer connected.
+    public static void FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected()
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars)
+            return;
+
+        try
+        {
+            if (MpLobbySessionExit.IsSessionConnected())
+                return;
+        }
+        catch
+        {
+            /* fall through to flush */
+        }
+
+        FlushLobbyCustomAvatarsOnServerLeave();
+    }
+
+    public static void FlushLobbyCustomAvatarsOnServerLeave()
+    {
+        if (!MpChatFeatures.LobbyCustomAvatars)
+            return;
+
+        MpCustomAvatarLobbyTransferManager.SuspendLobbyAvatarFileTransfer(discardInFlightSendQueue: true);
+        MpChatLobbyAvatarLifecycleHost.CancelPendingAvatarWork();
+        MpChatLobbyCustomAvatarDriver.FlushAllOnServerLeave();
+        MpChatLobbyPosePoll.ClearAll();
+        MpChatArenaAvatarAttach.DestroyOrphanedArenaObjects();
+        CustomAvatarLobbyHashCache.Invalidate();
+        StopLobbyScopeBroadcastIfActive();
+        ResetSessionAvatarSyncState();
+        MpCustomAvatarScaleSource.InvalidateCachedManager();
+    }
+
+    private static void StopLobbyScopeBroadcastIfActive()
+    {
+        var lobby = _lobbyScopeSyncManager;
+        if (lobby == null || lobby._broadcastRoutine == null)
+            return;
+
+        lobby.StopCoroutine(lobby._broadcastRoutine);
+        lobby._broadcastRoutine = null;
     }
 
     private static float _lastMissingRemoteScanRealtime = -999f;
@@ -626,7 +680,8 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
                 continue;
 
             TryBroadcastMetadata();
-            if (!MpChatPerformanceGate.ShouldBlockAvatarHeavyWork)
+            if (!MpChatPerformanceGate.ShouldBlockAvatarHeavyWork &&
+                MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
             {
                 PollDeferredAvatarUpdates();
                 PollJoinRetries();
@@ -654,6 +709,12 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             return;
 
         if (!forceSend && MpChatPerformanceGate.IsMultiplayerSceneTransitionLikely())
+            return;
+
+        // Arena/GameCore: metadata is learned in lobby; no periodic relay while in song or between rounds.
+        if (!forceSend &&
+            MpChatLobbyDiagnostics.AnyGameCoreLoaded() &&
+            !MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())
             return;
 
         if (!ReferenceEquals(Instance, this))

@@ -99,6 +99,47 @@ public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
         _pendingJoinBatch = null;
     }
 
+    public static void CancelPendingAvatarWork()
+    {
+        lock (PendingJoinLock)
+        {
+            PendingJoinUserIds.Clear();
+            _pendingJoinBroadcastMetadata = false;
+        }
+
+        lock (PendingLeaveLock)
+            PendingLeaveUserIds.Clear();
+
+        if (Instance == null)
+            return;
+
+        if (Instance._pendingJoinBatch != null)
+        {
+            Instance.StopCoroutine(Instance._pendingJoinBatch);
+            Instance._pendingJoinBatch = null;
+        }
+
+        if (Instance._pendingLeaveBatch != null)
+        {
+            Instance.StopCoroutine(Instance._pendingLeaveBatch);
+            Instance._pendingLeaveBatch = null;
+        }
+
+        if (Instance._pendingRefresh != null)
+        {
+            Instance.StopCoroutine(Instance._pendingRefresh);
+            Instance._pendingRefresh = null;
+        }
+
+        _lobbyReturnRefreshInProgress = false;
+
+        if (Instance._pendingArenaScan != null)
+        {
+            Instance.StopCoroutine(Instance._pendingArenaScan);
+            Instance._pendingArenaScan = null;
+        }
+    }
+
     public static void QueuePlayerLeaveAvatarWork(string userId)
     {
         if (string.IsNullOrEmpty(userId))

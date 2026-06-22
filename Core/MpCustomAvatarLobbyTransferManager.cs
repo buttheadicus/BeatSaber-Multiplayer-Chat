@@ -40,7 +40,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     private static readonly HashSet<string> DownloadNotifiedHashes = new(StringComparer.Ordinal);
 
-    private static readonly Dictionary<string, byte[]> OutboundBytesByHash = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> RequestedHashes = new(StringComparer.Ordinal);
 
     private static readonly Queue<PendingCacheWrite> DeferredCacheWrites = new();
 
@@ -89,8 +89,8 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             Instance = null;
     }
 
-    // Stop arena/transition transfers; queued work runs on FlushDeferredLobbyAvatarFileTransfers.
-    public static void SuspendLobbyAvatarFileTransfer()
+    // Stop arena/transition transfers; queued work runs on FlushDeferredLobbyAvatarFileTransfers unless discarded.
+    public static void SuspendLobbyAvatarFileTransfer(bool discardInFlightSendQueue = false)
     {
         var host = _lobbyScopeTransferManager;
         if (host != null)
@@ -101,19 +101,33 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
                 host._sendRoutine = null;
             }
 
-            while (host._sendQueue.Count > 0)
+            if (discardInFlightSendQueue)
+                host._sendQueue.Clear();
+            else
             {
-                lock (Gate)
-                    DeferredOutboundJobs.Enqueue(host._sendQueue.Dequeue());
+                while (host._sendQueue.Count > 0)
+                {
+                    lock (Gate)
+                        DeferredOutboundJobs.Enqueue(host._sendQueue.Dequeue());
+                }
             }
         }
 
+        ClearLobbyAvatarTransferMemoryCaches();
+    }
+
+    public static void ClearLobbyAvatarTransferMemoryCaches()
+    {
         lock (Gate)
         {
             IncomingByHash.Clear();
             DownloadNotifiedHashes.Clear();
             OutboundTransferKeysInFlight.Clear();
             RequestSentAt.Clear();
+            RequestedHashes.Clear();
+            DeferredCacheWrites.Clear();
+            DeferredOutboundJobs.Clear();
+            DeferredFileRequestByHash.Clear();
         }
     }
 
@@ -193,6 +207,8 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         {
             if (IncomingByHash.ContainsKey(md5HexUpper))
                 return;
+            if (RequestedHashes.Contains(md5HexUpper))
+                return;
         }
 
         if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
@@ -217,6 +233,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
                 return;
 
             RequestSentAt[md5HexUpper] = now;
+            RequestedHashes.Add(md5HexUpper);
         }
 
         host.SendFileRequest(md5HexUpper, ownerUserId);
@@ -256,11 +273,13 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         if (!ShouldRespondToFileRequest(packet.TargetUserId, hash))
             return;
 
+        if (string.IsNullOrEmpty(packet.TargetUserId))
+            return;
+
         if (!CustomAvatarLobbyHashCache.TryGetPath(hash, out var path) || !File.Exists(path))
             return;
 
-        var allowFanOut = string.IsNullOrEmpty(packet.TargetUserId);
-        var job = new OutboundJob(path, hash, sender.userId, allowFanOut);
+        var job = new OutboundJob(path, hash, sender.userId, allowCacheFanOut: false);
         if (!MpChatPerformanceGate.CanRunLobbyAvatarFileTransfer)
         {
             lock (Gate)
@@ -286,7 +305,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             string.Equals(localHash, hash, StringComparison.OrdinalIgnoreCase))
             return true;
 
-        return string.IsNullOrEmpty(routedOwnerUserId);
+        return false;
     }
 
     private void EnqueueOutbound(string hash, string path, string? targetUserId, bool allowCacheFanOut)
@@ -439,12 +458,9 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         }
 
         lock (Gate)
-        {
-            OutboundBytesByHash[hash] = fileBytes;
             RequestSentAt.Remove(hash);
-        }
 
-        CustomAvatarLobbyHashCache.Invalidate();
+        CustomAvatarLobbyHashCache.RegisterLobbyCacheFile(hash);
         MultiplayerChat.Plugin.Log?.Info($"[MPChat][LobbyAvatar] Cached remote .avatar {hash} ({fileBytes.Length} bytes)");
         LobbyAvatarFileCached?.Invoke(hash);
         MpCustomAvatarSyncManager.NotifyAllRemotesWithHash(hash);
@@ -592,17 +608,8 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         return slice;
     }
 
-    private bool TryGetOutboundBytes(OutboundJob job, out byte[] bytes)
+    private static bool TryGetOutboundBytes(OutboundJob job, out byte[] bytes)
     {
-        lock (Gate)
-        {
-            if (OutboundBytesByHash.TryGetValue(job.Hash, out var cached) && cached.Length > 0)
-            {
-                bytes = cached;
-                return true;
-            }
-        }
-
         try
         {
             bytes = File.ReadAllBytes(job.Path);
@@ -613,9 +620,6 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             bytes = Array.Empty<byte>();
             return false;
         }
-
-        lock (Gate)
-            OutboundBytesByHash[job.Hash] = bytes;
 
         return bytes.Length > 0;
     }

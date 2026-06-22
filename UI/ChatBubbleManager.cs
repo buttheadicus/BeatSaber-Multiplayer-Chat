@@ -228,8 +228,15 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
             _wasResultsLike = resultsLike;
 
-            if (_wasInLobby && !inLobby && !showTitleBarChat)
-                ClearChat();
+            if (_wasInLobby && !inLobby)
+            {
+                if (showTitleBarChat)
+                    ForceClearChat();
+                else
+                    ClearChat();
+
+                MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected();
+            }
 
             if (inLobby && !_wasInLobby)
             {

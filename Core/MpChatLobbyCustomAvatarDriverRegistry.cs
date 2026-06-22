@@ -77,6 +77,16 @@ internal static class MpChatLobbyCustomAvatarDriverRegistry
         }
     }
 
+    internal static void ForAll(Action<MpChatLobbyCustomAvatarDriver> action)
+    {
+        for (var i = 0; i < AllDrivers.Count; i++)
+        {
+            var driver = AllDrivers[i];
+            if (driver != null)
+                action(driver);
+        }
+    }
+
     internal static void ForAllLobbyPedestals(Action<MpChatLobbyCustomAvatarDriver> action)
     {
         for (var i = 0; i < AllDrivers.Count; i++)

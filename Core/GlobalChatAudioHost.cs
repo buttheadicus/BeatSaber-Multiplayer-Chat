@@ -24,7 +24,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     private const float VoiceActivityHoldoverSec = 0.22f;
     private const float SilenceBeforeUnduckSec = 0.85f;
     private const float DuckSmoothTimeSec = 0.12f;
-    private const float SourceRefreshIntervalSec = 0.35f;
+    private const float SourceRefreshIntervalSec = 2f;
 
     private float _smoothDuckMul = 1f;
     private float _duckSmoothVel;
