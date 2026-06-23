@@ -1,5 +1,6 @@
 using System;
 using MultiplayerChat.Core;
+using MultiplayerChat.Settings;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -93,6 +94,8 @@ public class FloatingHotMicMuteButton : MonoBehaviour
     private void OnClicked()
     {
         VoiceChatRuntimeState.SetHotMicMuted(!VoiceChatRuntimeState.IsHotMicMuted);
+        ModSettings.SaveVoiceSelfStateFromRuntime();
+        ChatManager.Instance?.SendVoiceHotMicMuteStateNotify(VoiceChatRuntimeState.IsHotMicMuted);
         UpdateLabel();
     }
 

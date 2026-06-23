@@ -314,6 +314,9 @@ public static class MpChatLobbyDiagnostics
         return LobbyHierarchyLooksLikeMultiplayerLobby();
     }
 
+    // Voice nametag sync, presence voice flags, and icon ticks only while MP lobby UI is up (never during arena GameCore).
+    public static bool NametagVoiceLobbySyncActive() => LobbyHierarchyLooksLikeMultiplayerLobby();
+
     public static bool LobbyHierarchyLooksLikeMultiplayerLobby()
     {
         var now = Time.realtimeSinceStartup;

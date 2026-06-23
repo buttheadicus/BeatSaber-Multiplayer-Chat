@@ -5,7 +5,7 @@
     <Version>0.3.6</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
-    <BeatSaberDir>F:\bsmanager\BSManager\BSInstances\1.40.8 (test)</BeatSaberDir>
+    <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\MPCHAT developm</BeatSaberDir>
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
@@ -197,6 +197,27 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Assets\playerhasavatars.png">
       <LogicalName>MultiplayerChat.Assets.playerhasavatars.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\unmuted.png">
+      <LogicalName>MultiplayerChat.Assets.unmuted.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\muted.png">
+      <LogicalName>MultiplayerChat.Assets.muted.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\talking.png">
+      <LogicalName>MultiplayerChat.Assets.talking.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\playermuted.png">
+      <LogicalName>MultiplayerChat.Assets.playermuted.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\undeafened.png">
+      <LogicalName>MultiplayerChat.Assets.undeafened.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\deafened.png">
+      <LogicalName>MultiplayerChat.Assets.deafened.png</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Assets\cannothearyou.png">
+      <LogicalName>MultiplayerChat.Assets.cannothearyou.png</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="Sounds\Chat.ogg">
       <LogicalName>MultiplayerChat.Assets.Sounds.Chat.ogg</LogicalName>

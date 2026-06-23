@@ -109,6 +109,7 @@ public class Plugin
 
         // Load local Chat ID from disk early so registry and encryption paths see a stable id during Zenject setup.
         ChatPersistentId.EnsureLoaded();
+        ModSettings.ApplyPersistedVoiceSelfState();
         MpChatDebugMode.Refresh();
         MpChatLog.Apply(MpChatDebugMode.IsEnabled);
 

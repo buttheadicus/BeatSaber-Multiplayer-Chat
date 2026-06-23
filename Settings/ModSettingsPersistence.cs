@@ -86,6 +86,11 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("deafDuringSongPlaying")] public bool DeafDuringSongPlaying { get; set; }
 
+        [JsonProperty("voiceSelfDeafened")] public bool VoiceSelfDeafened { get; set; }
+
+        [JsonProperty("voiceSelfHotMicMutedWhenUndeafened")]
+        public bool VoiceSelfHotMicMutedWhenUndeafened { get; set; }
+
         [JsonProperty("enableAvatarExtensions")] public bool EnableAvatarExtensions { get; set; }
 
         [JsonProperty("enableLobbyCustomAvatars")] public bool EnableLobbyCustomAvatars { get; set; }

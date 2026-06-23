@@ -26,6 +26,35 @@ public static class VoiceChatRuntimeState
 
     public static void NotifyChanged() => Changed?.Invoke();
 
+    public static (bool Deafened, bool HotMicMutedWhenUndeafened) CapturePersistenceSnapshot()
+    {
+        if (IsDeaf)
+            return (true, _hotMicMutedBeforeDeaf ?? IsHotMicMuted);
+        return (false, IsHotMicMuted);
+    }
+
+    // Reapply saved lobby self-mute/deaf state (game launch or settings reload).
+    public static void RestoreFromPersistence(bool deafened, bool hotMicMutedWhenUndeafened)
+    {
+        _hotMicMutedBeforeDeaf = null;
+        IsDeaf = false;
+        IsHotMicMuted = false;
+
+        if (deafened)
+        {
+            _hotMicMutedBeforeDeaf = hotMicMutedWhenUndeafened;
+            IsHotMicMuted = true;
+            IsDeaf = true;
+            NotifyChanged();
+            return;
+        }
+
+        if (hotMicMutedWhenUndeafened)
+            SetHotMicMuted(true);
+        else
+            NotifyChanged();
+    }
+
     public static void SetDeaf(bool value)
     {
         if (IsDeaf == value) return;

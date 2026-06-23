@@ -179,7 +179,9 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     private void DeafClicked()
     {
         VoiceChatRuntimeState.SetDeaf(!VoiceChatRuntimeState.IsDeaf);
+        ModSettings.SaveVoiceSelfStateFromRuntime();
         _chatManager.SendVoiceDeafenStateNotify(VoiceChatRuntimeState.IsDeaf);
+        _chatManager.SendVoiceHotMicMuteStateNotify(VoiceChatRuntimeState.IsHotMicMuted);
         if (VoiceChatRuntimeState.IsDeaf)
             _chatManager.PostSystemMessageRich(
                 "<color=#CCCCCC>You have went deaf, you cannot hear anybody, not even voice messages.</color>");
@@ -192,6 +194,8 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     private void VoiceHotMicMuteClicked()
     {
         VoiceChatRuntimeState.SetHotMicMuted(!VoiceChatRuntimeState.IsHotMicMuted);
+        ModSettings.SaveVoiceSelfStateFromRuntime();
+        _chatManager.SendVoiceHotMicMuteStateNotify(VoiceChatRuntimeState.IsHotMicMuted);
         if (VoiceChatRuntimeState.IsHotMicMuted)
             _chatManager.PostSystemMessageRich("<color=#CCCCCC>You have muted your microphone.</color>");
         else

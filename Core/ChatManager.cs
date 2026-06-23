@@ -65,9 +65,8 @@ public class ChatManager : IInitializable, IDisposable
     private float? _lastOutgoingMutePlayerNotifyAt;
     private float? _lastOutgoingUnmutePlayerNotifyAt;
 
-    private const float VoiceDeafenBroadcastCooldownSeconds = 20f;
-    private readonly Dictionary<string, float> _lastDeafenNotifyAtByUser = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, float> _lastUndeafenNotifyAtByUser = new(StringComparer.Ordinal);
+    private bool? _lastBroadcastDeafened;
+    private bool? _lastBroadcastHotMicMuted;
 
     private readonly Dictionary<string, Queue<byte[]>> _hotMicIncoming = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Coroutine> _hotMicUserCoroutines = new(StringComparer.Ordinal);
@@ -103,6 +102,12 @@ public class ChatManager : IInitializable, IDisposable
         if (VoiceBareStreamMode.Enabled)
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] VoiceBareStreamMode.Enabled: throttled recv diagnostic lines suppressed until disabled.");
         RegisterPacketCallbacks();
+        if (ShouldRunLobbyNametagVoiceSync())
+        {
+            BroadcastLocalNametagVoiceStatus(force: true);
+            _coroutineHost.StartCoroutine(RetryBroadcastVoiceStatusAfterJoin());
+        }
+
         _sessionManager.playerConnectedEvent += OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent += OnPlayerDisconnected;
         UpdateEncryptionKey();
@@ -161,6 +166,9 @@ public class ChatManager : IInitializable, IDisposable
     private bool IsGameCoreSceneContext() =>
         _coroutineHost != null && MpChatSceneScope.IsGameCoreHost(_coroutineHost);
 
+    private bool ShouldRunLobbyNametagVoiceSync() =>
+        !IsGameCoreSceneContext() && MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive();
+
     public void ReloadVoiceHotMicPipeline()
     {
         LogVoipReloadContext("ReloadVoiceHotMicPipeline enter");
@@ -207,6 +215,7 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.RegisterCallback<MpCustomAvatarPosePacket>(OnMpCustomAvatarPoseReceived);
         _packetSerializer.RegisterCallback<MpCustomAvatarFileRequestPacket>(OnMpCustomAvatarFileRequestReceived);
         _packetSerializer.RegisterCallback<MpCustomAvatarFileChunkPacket>(OnMpCustomAvatarFileChunkReceived);
+        _packetSerializer.RegisterCallback<VoiceHotMicMuteStatePacket>(OnVoiceHotMicMuteStateReceived);
     }
 
     private void UnregisterPacketCallbacks()
@@ -223,6 +232,7 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.UnregisterCallback<MpCustomAvatarPosePacket>();
         _packetSerializer.UnregisterCallback<MpCustomAvatarFileRequestPacket>();
         _packetSerializer.UnregisterCallback<MpCustomAvatarFileChunkPacket>();
+        _packetSerializer.UnregisterCallback<VoiceHotMicMuteStatePacket>();
     }
 
     private Coroutine? _pendingSessionEncryptionRefresh;
@@ -241,10 +251,18 @@ public class ChatManager : IInitializable, IDisposable
                 player.userId,
                 broadcastMetadata: ModSettings.EnableLobbyCustomAvatars);
         }
+
+        if (ShouldRunLobbyNametagVoiceSync())
+        {
+            BroadcastLocalNametagVoiceStatus(force: true);
+            _coroutineHost.StartCoroutine(RetryBroadcastVoiceStatusAfterJoin());
+        }
     }
 
     private void OnPlayerDisconnected(IConnectedPlayer player)
     {
+        if (player != null && !string.IsNullOrEmpty(player.userId))
+            NametagVoiceStatusRegistry.ClearUser(player.userId);
         if (player != null && !string.IsNullOrEmpty(player.userId))
         {
             ClearHotMicForUser(player.userId);
@@ -589,12 +607,64 @@ public class ChatManager : IInitializable, IDisposable
     {
         if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
             return;
+        _lastBroadcastDeafened = isDeaf;
         _sessionManager.Send(new VoiceDeafenStatePacket
         {
             IsDeaf = isDeaf,
             SenderChatId = ChatPersistentId.Current,
             SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor)
         });
+    }
+
+    public string? LocalUserId => _sessionManager.localPlayer?.userId;
+
+    public bool IsUserMutedByLocal(string userId) => _muteManager.IsMuted(userId);
+
+    public void SendVoiceHotMicMuteStateNotify(bool isHotMicMuted)
+    {
+        if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            return;
+        _lastBroadcastHotMicMuted = isHotMicMuted;
+        _sessionManager.Send(new VoiceHotMicMuteStatePacket
+        {
+            IsHotMicMuted = isHotMicMuted,
+            SenderChatId = ChatPersistentId.Current,
+            SenderNameColor = NormalizeHexForPacket(ModSettings.NameColor)
+        });
+    }
+
+    public void BroadcastLocalNametagVoiceStatus(bool force = false)
+    {
+        if (!ShouldRunLobbyNametagVoiceSync())
+            return;
+
+        var deaf = VoiceChatRuntimeState.IsDeaf;
+        var micMuted = VoiceChatRuntimeState.IsHotMicMuted;
+        if (force || _lastBroadcastDeafened != deaf)
+            SendVoiceDeafenStateNotify(deaf);
+        if (force || _lastBroadcastHotMicMuted != micMuted)
+            SendVoiceHotMicMuteStateNotify(micMuted);
+    }
+
+    private IEnumerator RetryBroadcastVoiceStatusAfterJoin()
+    {
+        for (var i = 0; i < 90; i++)
+        {
+            if (!ShouldRunLobbyNametagVoiceSync())
+            {
+                yield return null;
+                continue;
+            }
+
+            if (ChatPersistentId.IsValidFormat(ChatPersistentId.Current))
+            {
+                BroadcastLocalNametagVoiceStatus(force: true);
+                ModPresenceManager.Instance?.BroadcastPresence();
+                yield break;
+            }
+
+            yield return null;
+        }
     }
 
     public void BroadcastChatActivity(byte activityKind)
@@ -654,18 +724,23 @@ public class ChatManager : IInitializable, IDisposable
         if (local != null && sender.userId == local.userId)
             return;
 
-        var now = Time.realtimeSinceStartup;
-        var dict = packet.IsDeaf ? _lastDeafenNotifyAtByUser : _lastUndeafenNotifyAtByUser;
-        if (dict.TryGetValue(sender.userId, out var last) &&
-            now - last < VoiceDeafenBroadcastCooldownSeconds)
-            return;
-        dict[sender.userId] = now;
+        NametagVoiceStatusRegistry.SetRemoteDeafened(sender.userId, packet.IsDeaf);
+        if (MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            ChatBubbleAnchor.TickAllStatusIcons();
+    }
 
-        var name = string.IsNullOrEmpty(sender.userName) ? "Player" : sender.userName;
-        var line = packet.IsDeaf
-            ? SystemLineWithColoredPlayerName(name, " has deafened.", packet.SenderNameColor)
-            : SystemLineWithColoredPlayerName(name, " has undeafened.", packet.SenderNameColor);
-        PostSystemMessageRich(line);
+    private void OnVoiceHotMicMuteStateReceived(VoiceHotMicMuteStatePacket packet, IConnectedPlayer sender)
+    {
+        if (!ChatPacketIdValidation.TryAcceptSenderChatId(packet.SenderChatId, sender, _chatPlayerIdRegistry))
+            return;
+
+        var local = _sessionManager.localPlayer;
+        if (local != null && sender.userId == local.userId)
+            return;
+
+        NametagVoiceStatusRegistry.SetRemoteHotMicMuted(sender.userId, packet.IsHotMicMuted);
+        if (MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            ChatBubbleAnchor.TickAllStatusIcons();
     }
 
     private static string? NormalizeHexForPacket(string? hex)
@@ -707,6 +782,8 @@ public class ChatManager : IInitializable, IDisposable
             return;
         if (!ChatPersistentId.IsValidFormat(packet.TargetChatId) || ChatPersistentId.Current != packet.TargetChatId)
             return;
+
+        NametagVoiceStatusRegistry.SetPeerMutedLocalViewer(sender.userId, packet.IsMuted);
 
         var now = Time.realtimeSinceStartup;
         var name = string.IsNullOrEmpty(sender.userName) ? "Someone" : sender.userName;
@@ -1455,6 +1532,7 @@ public class ChatManager : IInitializable, IDisposable
     private void EnqueueVoicePlayback(string userId, byte[] decodedBlob)
     {
         _voicePlaybackQueue.Enqueue((userId, decodedBlob));
+        NametagVoiceStatusRegistry.NotifyTalking(userId);
         TrimVoiceMessageQueueToTargetLatency();
         if (!_voicePlaybackRunning)
             _voicePlaybackCoroutine = _coroutineHost.StartCoroutine(VoicePlaybackQueueRunner());
@@ -1640,6 +1718,7 @@ public class ChatManager : IInitializable, IDisposable
         }
 
         q.Enqueue(decryptedBlob);
+        NametagVoiceStatusRegistry.NotifyTalking(senderUserId);
         VoipPipelineTrace.RxEnqueue(senderUserId, q.Count, decryptedBlob.Length);
         if (!_hotMicUserCoroutines.ContainsKey(senderUserId))
         {

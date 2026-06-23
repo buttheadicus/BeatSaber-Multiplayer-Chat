@@ -176,6 +176,21 @@ public static class ModSettings
         }
     }
 
+    public static void ApplyPersistedVoiceSelfState()
+    {
+        VoiceChatRuntimeState.RestoreFromPersistence(
+            D.VoiceSelfDeafened,
+            D.VoiceSelfHotMicMutedWhenUndeafened);
+    }
+
+    public static void SaveVoiceSelfStateFromRuntime()
+    {
+        var (deafened, hotMicWhenUndeafened) = VoiceChatRuntimeState.CapturePersistenceSnapshot();
+        D.VoiceSelfDeafened = deafened;
+        D.VoiceSelfHotMicMutedWhenUndeafened = hotMicWhenUndeafened;
+        ModSettingsPersistence.Save();
+    }
+
     public static bool EnableCau
     {
         get => D.EnableCau;

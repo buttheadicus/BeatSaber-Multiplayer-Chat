@@ -260,6 +260,7 @@ public class ModPresenceManager : IInitializable, IDisposable
                 packet.SenderNameColor,
                 packet.IsSlzCompanionClient);
             ApplyRemoteLobbyCustomAvatarsFlag(sender.userId, packet.HasLobbyCustomAvatarsEnabled);
+            ApplyRemoteVoiceStatusFromPresence(sender.userId, packet);
             return;
         }
 
@@ -282,8 +283,19 @@ public class ModPresenceManager : IInitializable, IDisposable
             packet.SenderNameColor,
             packet.IsSlzCompanionClient);
         ApplyRemoteLobbyCustomAvatarsFlag(sender.userId, packet.HasLobbyCustomAvatarsEnabled);
+        ApplyRemoteVoiceStatusFromPresence(sender.userId, packet);
 
         SendPresenceTo(sender.userId);
+    }
+
+    private void ApplyRemoteVoiceStatusFromPresence(string userId, ModPresencePacket packet)
+    {
+        if (string.IsNullOrEmpty(userId) || !MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            return;
+
+        NametagVoiceStatusRegistry.SetRemoteDeafened(userId, packet.VoiceIsDeafened);
+        NametagVoiceStatusRegistry.SetRemoteHotMicMuted(userId, packet.VoiceIsHotMicMuted);
+        PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplyRemoteLobbyCustomAvatarsFlag(string userId, bool enabled)
@@ -384,7 +396,9 @@ public class ModPresenceManager : IInitializable, IDisposable
             SenderChatId = ChatPersistentId.Current,
             SenderNameColor = NormalizeNameColorForPacket(ModSettings.NameColor),
             IsSlzCompanionClient = SlzMode.IsEnabled,
-            HasLobbyCustomAvatarsEnabled = CustomAvatarDependenciesBootstrap.IsSessionActive()
+            HasLobbyCustomAvatarsEnabled = CustomAvatarDependenciesBootstrap.IsSessionActive(),
+            VoiceIsDeafened = VoiceChatRuntimeState.IsDeaf,
+            VoiceIsHotMicMuted = VoiceChatRuntimeState.IsHotMicMuted
         };
     }
 
@@ -424,7 +438,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         MultiplayerChat.Plugin.Log?.Info($"[MPChat] Sent presence reply to {targetUserId}");
     }
 
-    private void BroadcastPresence()
+    public void BroadcastPresence()
     {
         if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current)) return;
         _sessionManager.Send(BuildPresencePacket());

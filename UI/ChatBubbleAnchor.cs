@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using HMUI;
 using MultiplayerChat.AvatarExtras.Assets;
@@ -12,7 +13,7 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-// Chat icon on AvatarCaption/BG, left of the MPEX platform icon without changing MPEX name spacing.
+// Nametag row: [custom avatars?][chat][MPEX][name]. Mod users also get mic/headphone icons centered above the row.
 public class ChatBubbleAnchor : MonoBehaviour
 {
     // MPEX platform icons: 64px assets, 10 PPU, localScale 3.2 on the RectTransform.
@@ -20,9 +21,12 @@ public class ChatBubbleAnchor : MonoBehaviour
     private const float MpexNametagIconPixelsPerUnit = 10f;
     private const float MpexNametagIconLocalScale = 3.2f;
     private const float PlatformIconLeftGapPx = 1f;
+    private const float StatusIconGapPx = 2f;
+    private const float StatusIconExtraLiftLocal = 0.24f;
     private const int NametagSetupWaitFrames = 45;
 
     private static readonly BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy;
+    private static readonly List<ChatBubbleAnchor> ActiveAnchors = new(16);
     private static Sprite? _chatIconSprite;
     private static Sprite? _customAvatarsIconSprite;
 
@@ -31,6 +35,13 @@ public class ChatBubbleAnchor : MonoBehaviour
     private CurvedTextMeshPro? _nameText;
     private ImageView? _iconView;
     private ImageView? _customAvatarsIconView;
+    private Transform? _statusRow;
+    private ImageView? _micStatusView;
+    private ImageView? _headphoneStatusView;
+    private bool _registeredForStatusTick;
+    private bool _subscribedLocalVoiceState;
+    private NametagMicIconState _lastMicState = (NametagMicIconState)(-1);
+    private NametagHeadphoneIconState _lastHeadphoneState = (NametagHeadphoneIconState)(-1);
     private ModPresenceManager? _subscribedModPresence;
 
     private void Awake()
@@ -49,13 +60,41 @@ public class ChatBubbleAnchor : MonoBehaviour
         StartCoroutine(SetupWhenReady());
     }
 
+    internal static int ActiveStatusAnchorCount => ActiveAnchors.Count;
+
     private void OnDestroy()
     {
+        if (_registeredForStatusTick)
+            ActiveAnchors.Remove(this);
         if (_subscribedModPresence != null)
         {
             _subscribedModPresence.PresenceUpdated -= OnPresenceUpdated;
             _subscribedModPresence.PlayerWithModAdded -= OnPlayerWithModAdded;
             _subscribedModPresence = null;
+        }
+
+        if (_subscribedLocalVoiceState)
+        {
+            VoiceChatRuntimeState.Changed -= OnLocalVoiceRuntimeStateChanged;
+            _subscribedLocalVoiceState = false;
+        }
+    }
+
+    internal static void TickAllStatusIcons()
+    {
+        if (!MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            return;
+
+        for (var i = ActiveAnchors.Count - 1; i >= 0; i--)
+        {
+            var anchor = ActiveAnchors[i];
+            if (!anchor)
+            {
+                ActiveAnchors.RemoveAt(i);
+                continue;
+            }
+
+            anchor.RefreshStatusIconsIfNeeded();
         }
     }
 
@@ -95,6 +134,8 @@ public class ChatBubbleAnchor : MonoBehaviour
             _subscribedModPresence.PresenceUpdated += OnPresenceUpdated;
             _subscribedModPresence.PlayerWithModAdded += OnPlayerWithModAdded;
         }
+
+        EnsureLocalVoiceStateSubscription();
 
         // MPEX re-parents its platform icon to sibling 0 when platform data arrives; keep order stable (lightweight retries).
         for (var i = 0; i < 4; i++)
@@ -225,12 +266,108 @@ public class ChatBubbleAnchor : MonoBehaviour
             layoutDirty = true;
         }
 
+        var showVoiceStatusIcons = showChat && MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive();
+        if (showVoiceStatusIcons)
+            EnsureStatusIconsRowIfNeeded();
+
+        if (_statusRow != null)
+        {
+            if (_statusRow.gameObject.activeSelf != showVoiceStatusIcons)
+                _statusRow.gameObject.SetActive(showVoiceStatusIcons);
+            if (showVoiceStatusIcons)
+                PositionStatusIconsAboveBg();
+        }
+
         if (layoutDirty && _bg != null)
         {
             ApplyNametagLayoutOrder();
             LayoutRebuilder.MarkLayoutForRebuild(_bg.rectTransform);
         }
+
+        if (showVoiceStatusIcons && _statusRow != null)
+        {
+            EnsureRegisteredForStatusTick();
+            RefreshStatusIconsIfNeeded(force: true);
+        }
     }
+
+    private void EnsureRegisteredForStatusTick()
+    {
+        if (!MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            return;
+        if (_registeredForStatusTick)
+            return;
+        ActiveAnchors.Add(this);
+        _registeredForStatusTick = true;
+        EnsureLocalVoiceStateSubscription();
+        NametagVoiceStatusTicker.EnsureRunning();
+    }
+
+    private void EnsureStatusIconsRowIfNeeded()
+    {
+        if (!MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            return;
+        if (_statusRow != null || _bg == null || _player == null)
+            return;
+
+        var modPresence = ModPresenceManager.Instance;
+        if (modPresence == null || !modPresence.HasMod(_player.userId))
+            return;
+
+        CreateStatusIconsRow();
+    }
+
+    private void RefreshStatusIconsIfNeeded(bool force = false)
+    {
+        if (!MpChatLobbyDiagnostics.NametagVoiceLobbySyncActive())
+            return;
+        if (!this || _player == null || _micStatusView == null || _headphoneStatusView == null)
+            return;
+        if (_statusRow == null || !_statusRow.gameObject.activeInHierarchy)
+            return;
+
+        var modPresence = ModPresenceManager.Instance;
+        if (modPresence == null || !modPresence.HasMod(_player.userId))
+            return;
+
+        var localUserId = ChatManager.Instance?.LocalUserId;
+        var mutedByLocal = ChatManager.Instance?.IsUserMutedByLocal(_player.userId) == true;
+        NametagVoiceStatusRegistry.ResolveIconStates(
+            _player.userId,
+            localUserId,
+            mutedByLocal,
+            out var mic,
+            out var headphone);
+
+        if (!force && mic == _lastMicState && headphone == _lastHeadphoneState)
+            return;
+
+        _lastMicState = mic;
+        _lastHeadphoneState = headphone;
+
+        var micSprite = NametagStatusSprites.ForMic(mic);
+        if (micSprite != null && _micStatusView.sprite != micSprite)
+            _micStatusView.sprite = micSprite;
+
+        var hpSprite = NametagStatusSprites.ForHeadphone(headphone);
+        if (hpSprite != null && _headphoneStatusView.sprite != hpSprite)
+            _headphoneStatusView.sprite = hpSprite;
+    }
+
+    private void EnsureLocalVoiceStateSubscription()
+    {
+        if (_subscribedLocalVoiceState || _player == null || string.IsNullOrEmpty(_player.userId))
+            return;
+
+        var localId = ChatManager.Instance?.LocalUserId;
+        if (string.IsNullOrEmpty(localId) || !string.Equals(_player.userId, localId, StringComparison.Ordinal))
+            return;
+
+        VoiceChatRuntimeState.Changed += OnLocalVoiceRuntimeStateChanged;
+        _subscribedLocalVoiceState = true;
+    }
+
+    private void OnLocalVoiceRuntimeStateChanged() => RefreshStatusIconsIfNeeded(force: true);
 
     private void OnPresenceUpdated(object? sender, EventArgs e) => UpdateIconVisibility();
 
@@ -273,6 +410,105 @@ public class ChatBubbleAnchor : MonoBehaviour
 
         EnsureCustomToChatGapTransform();
         ApplyNametagLayoutOrder();
+    }
+
+    private void CreateStatusIconsRow()
+    {
+        if (_bg == null || !NametagStatusSprites.EnsureLoaded())
+            return;
+
+        var existing = transform.Find("MPChatNametagStatusRow");
+        if (existing != null)
+        {
+            _statusRow = existing;
+            _micStatusView = existing.Find("MPChatNametagMicStatus")?.GetComponent<ImageView>();
+            _headphoneStatusView = existing.Find("MPChatNametagHeadphoneStatus")?.GetComponent<ImageView>();
+            PositionStatusIconsAboveBg();
+            return;
+        }
+
+        var rowGo = new GameObject("MPChatNametagStatusRow");
+        rowGo.layer = 5;
+        rowGo.transform.SetParent(transform, false);
+        _statusRow = rowGo.transform;
+
+        _micStatusView = CreateStatusIconView(rowGo.transform, "MPChatNametagMicStatus",
+            NametagStatusSprites.ForMic(NametagMicIconState.Unmuted));
+        _headphoneStatusView = CreateStatusIconView(rowGo.transform, "MPChatNametagHeadphoneStatus",
+            NametagStatusSprites.ForHeadphone(NametagHeadphoneIconState.Undeafened));
+
+        PositionStatusIconsAboveBg();
+        rowGo.SetActive(false);
+    }
+
+    private ImageView CreateStatusIconView(Transform parent, string objectName, Sprite? sprite)
+    {
+        var iconGo = new GameObject(objectName);
+        iconGo.transform.SetParent(parent, false);
+        iconGo.layer = 5;
+        iconGo.AddComponent<CanvasRenderer>();
+
+        var iconView = iconGo.AddComponent<ImageView>();
+        iconView.maskable = true;
+        iconView.fillCenter = true;
+        iconView.preserveAspect = true;
+        iconView.raycastTarget = false;
+        if (_bg != null && _bg.material != null)
+            iconView.material = _bg.material;
+        if (sprite != null)
+        {
+            iconView.sprite = sprite;
+            ApplyNametagIconSizing(iconGo.GetComponent<RectTransform>(), sprite);
+        }
+
+        return iconView;
+    }
+
+    private float ResolveStatusIconXOffset()
+    {
+        var scale = MpexNametagIconLocalScale;
+        if (_bg != null)
+        {
+            var reference = FindMpexPlayerIconRect(_bg.transform);
+            if (reference != null)
+                scale = reference.localScale.x;
+        }
+
+        var iconWidth = MpexNametagIconPixelSize / MpexNametagIconPixelsPerUnit * scale;
+        var gap = StatusIconGapPx / MpexNametagIconPixelsPerUnit * scale;
+        return iconWidth * 0.5f + gap * 0.5f;
+    }
+
+    private void PositionStatusIconsAboveBg()
+    {
+        if (_statusRow == null || _bg == null)
+            return;
+
+        var bgTransform = _bg.transform;
+        var y = bgTransform.localPosition.y;
+        var bgRect = _bg.rectTransform;
+        if (bgRect != null)
+        {
+            var h = bgRect.rect.height;
+            if (h <= 1f)
+                h = bgRect.sizeDelta.y;
+            if (h > 1f)
+                y += h * 0.5f * Mathf.Abs(bgTransform.localScale.y);
+        }
+
+        var scale = MpexNametagIconLocalScale;
+        var reference = FindMpexPlayerIconRect(_bg.transform);
+        if (reference != null)
+            scale = reference.localScale.x;
+        var iconHeight = MpexNametagIconPixelSize / MpexNametagIconPixelsPerUnit * scale;
+        y += StatusIconExtraLiftLocal + iconHeight * 0.35f;
+        _statusRow.localPosition = new Vector3(0f, y, bgTransform.localPosition.z);
+
+        var xOffset = ResolveStatusIconXOffset();
+        if (_micStatusView != null)
+            _micStatusView.transform.localPosition = new Vector3(-xOffset, 0f, 0f);
+        if (_headphoneStatusView != null)
+            _headphoneStatusView.transform.localPosition = new Vector3(xOffset, 0f, 0f);
     }
 
     private ImageView CreateNametagIconView(string objectName, Sprite sprite)
@@ -366,6 +602,8 @@ public class ChatBubbleAnchor : MonoBehaviour
 
         _nameText.transform.SetSiblingIndex(999);
         LayoutRebuilder.MarkLayoutForRebuild(_bg.rectTransform);
+        if (_statusRow != null && _statusRow.gameObject.activeSelf)
+            PositionStatusIconsAboveBg();
     }
 
     private Transform? EnsureCustomToChatGapTransform()
@@ -480,18 +718,28 @@ public class ChatBubbleAnchor : MonoBehaviour
     }
 
     // playerhaschat.png ships with an opaque black matte; clear it so only the white glyph shows.
-    private static void MakeNearBlackTransparent(Texture2D tex)
+    internal static void MakeNearBlackTransparent(Texture2D tex)
     {
-        var pixels = tex.GetPixels32();
-        for (var i = 0; i < pixels.Length; i++)
+        try
         {
-            var p = pixels[i];
-            if (p.r < 12 && p.g < 12 && p.b < 12)
-                pixels[i] = new Color32(0, 0, 0, 0);
-        }
+            if (!tex.isReadable)
+                return;
 
-        tex.SetPixels32(pixels);
-        tex.Apply();
+            var pixels = tex.GetPixels32();
+            for (var i = 0; i < pixels.Length; i++)
+            {
+                var p = pixels[i];
+                if (p.r < 12 && p.g < 12 && p.b < 12)
+                    pixels[i] = new Color32(0, 0, 0, 0);
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply();
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Nametag sprite matte clear failed: {ex.Message}");
+        }
     }
 
     private IConnectedPlayer? ResolvePlayerFallback()
