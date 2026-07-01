@@ -28,7 +28,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 
 ## Dependency auto installs
 
--
+yeah, it does. soo it will close beatsaber a few times after the first install, please know that its normal. its not crashing, its installing everything you need.
 
 ## Requirements
 
@@ -44,8 +44,8 @@ _BSIPA `dependsOn` omits Multiplayer Extensions on purpose - use the **Multiplay
 
 ## Installation
 
-1. Install the dependencies above (Mod Assistant recommended). Multiplayer Extensions is handled automatically when missing (bootstrap then quit; relaunch once) or installed manually beside `MultiplayerChat.dll`.
-2. Download the latest release or build from source.
+1. Install the dependencies above (or, just install the DLL to your game and it will install the dependencies).
+2. Download the latest release or build from source (why would you build from source, you do you).
 3. Place `MultiplayerChat.dll` in your Beat Saber `Plugins` folder. [YOUR BEATSABER INSTALL FOLDER]\Plugins
 
 ## Building
@@ -54,6 +54,8 @@ _BSIPA `dependsOn` omits Multiplayer Extensions on purpose - use the **Multiplay
 2. Edit `MultiplayerChat.csproj` and set `BeatSaberDir` to your Beat Saber install path.
 3. Run: `dotnet build -c Release`
 4. Copy `bin/Release/MultiplayerChat.dll` to `Beat Saber/Plugins/`
+5. Piss yourself when build fails
+6. Restart step 1
 
 ## How It Works
 
