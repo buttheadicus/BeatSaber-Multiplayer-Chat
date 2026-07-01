@@ -12,7 +12,7 @@ Encrypted text/voice chat for BeatTogether (or other supported server (in theory
 - **Custom avatars**: (THIS IS AN OPTIONAL ADDON, GO TO THE SETTINGS TO ENABLE THIS FEATURE) use custom unity avatars in multiplayer rather then the default Beat Saber avatars!
 
 ## Fused mods
-- [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras)
+- [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras) 
 
 ## Addons [GO TO SETTINGS TO ENABLE THESE FEATURES]
 - **Custom Multiplayer Avatars**
@@ -40,8 +40,6 @@ yeah, it does. soo it will close beatsaber a few times after the first install, 
 - [MultiplayerCore](https://github.com/Goobwabber/MultiplayerCore) 1.6.0+
 - [BeatTogether](https://github.com/BeatTogether/BeatTogether) (or compatible server)
 
-_BSIPA `dependsOn` omits Multiplayer Extensions on purpose - use the **Multiplayer Extensions** section above for auto or manual install._
-
 ## Installation
 
 1. Install the dependencies above (or, just install the DLL to your game and it will install the dependencies).
@@ -56,15 +54,3 @@ _BSIPA `dependsOn` omits Multiplayer Extensions on purpose - use the **Multiplay
 4. Copy `bin/Release/MultiplayerChat.dll` to `Beat Saber/Plugins/`
 5. Piss yourself when build fails
 6. Restart step 1
-
-## How It Works
-
-**Text:** Messages are encrypted before sending; the server forwards ciphertext only.
-
-**Voice:** Voice messages and hot-mic chunks use the same session key material as chat where applicable; clips are built and played through Unity `AudioSource` scheduling for hot mic to avoid gaps between chunks.
-
-**UI:** Chat appears in the mod’s lobby tab with stacked bubbles; settings and player actions live alongside the multiplayer flow.
-
-## License
-
-MIT
