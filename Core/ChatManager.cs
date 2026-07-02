@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using MultiplayerChat.Core.Addons;
 using MultiplayerChat.Network;
 using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
@@ -16,6 +17,8 @@ namespace MultiplayerChat.Core;
 public class ChatManager : IInitializable, IDisposable
 {
     public static ChatManager? Instance { get; private set; }
+
+    internal MpPacketSerializer PacketSerializer => _packetSerializer;
 
     private static ChatManager? _lobbyScopeChatManager;
 
@@ -102,6 +105,7 @@ public class ChatManager : IInitializable, IDisposable
         if (VoiceBareStreamMode.Enabled)
             MultiplayerChat.Plugin.Log?.Warn("[MPChat] VoiceBareStreamMode.Enabled: throttled recv diagnostic lines suppressed until disabled.");
         RegisterPacketCallbacks();
+        AddonPacketSerializerBridge.Attach(_packetSerializer);
         if (ShouldRunLobbyNametagVoiceSync())
         {
             BroadcastLocalNametagVoiceStatus(force: true);
@@ -125,7 +129,7 @@ public class ChatManager : IInitializable, IDisposable
         {
             _lobbyScopeChatManager = null;
             if (MpChatFeatures.LobbyCustomAvatars)
-                MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected();
+                AddonCustomAvatarsBridge.FlushLobbyOnServerLeaveIfDisconnected();
         }
 
         if (Instance == this)
@@ -137,6 +141,7 @@ public class ChatManager : IInitializable, IDisposable
         }
 
         UnregisterPacketCallbacks();
+        AddonPacketSerializerBridge.Detach(_packetSerializer);
         VoiceChatRuntimeState.ClearListenFilterOnly();
         _talkToMutualPendingFrom.Clear();
         _listenToMutualPendingFrom.Clear();
@@ -212,9 +217,6 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.RegisterCallback<ChatActivityPacket>(OnChatActivityReceived);
         // New packet types must be registered last so existing packet IDs stay stable across mod updates.
         _packetSerializer.RegisterCallback<ListenToNotifyPacket>(OnListenToNotifyReceived);
-        _packetSerializer.RegisterCallback<MpCustomAvatarPosePacket>(OnMpCustomAvatarPoseReceived);
-        _packetSerializer.RegisterCallback<MpCustomAvatarFileRequestPacket>(OnMpCustomAvatarFileRequestReceived);
-        _packetSerializer.RegisterCallback<MpCustomAvatarFileChunkPacket>(OnMpCustomAvatarFileChunkReceived);
         _packetSerializer.RegisterCallback<VoiceHotMicMuteStatePacket>(OnVoiceHotMicMuteStateReceived);
     }
 
@@ -229,9 +231,6 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.UnregisterCallback<VoiceDeafenStatePacket>();
         _packetSerializer.UnregisterCallback<ChatActivityPacket>();
         _packetSerializer.UnregisterCallback<ListenToNotifyPacket>();
-        _packetSerializer.UnregisterCallback<MpCustomAvatarPosePacket>();
-        _packetSerializer.UnregisterCallback<MpCustomAvatarFileRequestPacket>();
-        _packetSerializer.UnregisterCallback<MpCustomAvatarFileChunkPacket>();
         _packetSerializer.UnregisterCallback<VoiceHotMicMuteStatePacket>();
     }
 
@@ -247,7 +246,7 @@ public class ChatManager : IInitializable, IDisposable
 
         if (MpChatFeatures.LobbyCustomAvatars && player != null && !string.IsNullOrEmpty(player.userId))
         {
-            MpCustomAvatarSyncManager.NotifyRemoteAvatarMayBeReady(
+            AddonCustomAvatarsBridge.NotifyRemoteAvatarMayBeReady(
                 player.userId,
                 broadcastMetadata: ModSettings.EnableLobbyCustomAvatars);
         }
@@ -268,7 +267,7 @@ public class ChatManager : IInitializable, IDisposable
             ClearHotMicForUser(player.userId);
             VoiceChatRuntimeState.RemoveListenUserId(player.userId);
             if (MpChatFeatures.LobbyCustomAvatars)
-                MpCustomAvatarSyncManager.ClearRemote(player.userId);
+                AddonCustomAvatarsBridge.ClearRemote(player.userId);
         }
 
         ScheduleSessionEncryptionRefresh();
@@ -910,36 +909,6 @@ public class ChatManager : IInitializable, IDisposable
             " has started listening to you.";
         var alsoOthers = BuildListenToAlsoOthersSuffix(packet.AlsoListeningToOthersCsv);
         PostSystemMessageRich(SystemLineWithColoredPlayerName(name, introTail + alsoOthers, packet.SenderNameColor));
-    }
-
-    private void OnMpCustomAvatarPoseReceived(MpCustomAvatarPosePacket packet, IConnectedPlayer sender)
-    {
-        if (!MpChatFeatures.LobbyCustomAvatars)
-            return;
-        if (sender == null || string.IsNullOrEmpty(sender.userId))
-            return;
-        var localPlayer = _sessionManager.localPlayer;
-        if (localPlayer != null && sender.userId == localPlayer.userId)
-            return;
-        MpCustomAvatarSyncManager.ApplyReceived(sender.userId, packet);
-    }
-
-    private void OnMpCustomAvatarFileRequestReceived(MpCustomAvatarFileRequestPacket packet, IConnectedPlayer sender)
-    {
-        if (!MpChatFeatures.LobbyCustomAvatars)
-            return;
-        if (sender == null)
-            return;
-        MpCustomAvatarLobbyTransferManager.Instance?.HandleFileRequest(packet, sender);
-    }
-
-    private void OnMpCustomAvatarFileChunkReceived(MpCustomAvatarFileChunkPacket packet, IConnectedPlayer sender)
-    {
-        if (!MpChatFeatures.LobbyCustomAvatars)
-            return;
-        if (sender == null)
-            return;
-        MpCustomAvatarLobbyTransferManager.Instance?.HandleFileChunk(packet, sender);
     }
 
     private static string BuildOxfordAmpersandList(IReadOnlyList<string> escapedDisplayNames)

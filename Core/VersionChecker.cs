@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using MultiplayerChat.Core.Addons;
 using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
 using UnityEngine;
@@ -32,6 +34,35 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
     {
         MpChatLog.DebugLine("[MPChat] Version check starting...");
         yield return new WaitForSeconds(2.5f);
+
+        var updatedAddons = new List<string>();
+        yield return AddonStartupUpdater.CheckInstallCustomAvatars(updatedAddons);
+
+        var showModUpdateNotice = false;
+        var openModReleasePage = false;
+        string? cauLaunchPath = null;
+        yield return CheckCoreModUpdate(
+            (showNotice, openPage, cauPath) =>
+            {
+                showModUpdateNotice = showNotice;
+                openModReleasePage = openPage;
+                cauLaunchPath = cauPath;
+            });
+
+        foreach (var displayName in updatedAddons)
+            yield return ShowAddonUpdateNoticeWhenMainMenuReady(displayName);
+
+        if (showModUpdateNotice)
+            yield return ShowUpdateNoticeWhenMainMenuReady(openModReleasePage);
+
+        if (!string.IsNullOrEmpty(cauLaunchPath))
+            LaunchCauAndQuit(cauLaunchPath);
+    }
+
+    private IEnumerator CheckCoreModUpdate(Action<bool, bool, string?> setResult)
+    {
+        setResult(false, false, null);
+
         if (!ModBuildVersion.TryGetEmbeddedBuildNumber(out var currentBuild))
         {
             UpdateMessage = "Could not read this mod build number.";
@@ -66,7 +97,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
         if (!ModSettings.EnableCau)
         {
-            yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: true);
+            setResult(true, true, null);
             yield break;
         }
 
@@ -79,7 +110,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             {
                 UpdateMessage =
                     "An update is available. Enable CAU is on, but the CAU updater release could not be reached.";
-                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
+                setResult(true, false, null);
                 yield break;
             }
 
@@ -88,14 +119,14 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             {
                 UpdateMessage =
                     $"An update is available. Enable CAU is on, but {GitHubReleaseVersion.CauExeAssetFileName} was not found on the CAU repo's latest release.";
-                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
+                setResult(true, false, null);
                 yield break;
             }
 
             var maybeDest = CauBootstrap.GetCauExePath();
             if (string.IsNullOrEmpty(maybeDest))
             {
-                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
+                setResult(true, false, null);
                 yield break;
             }
 
@@ -105,14 +136,23 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             if (!File.Exists(destPath))
             {
                 UpdateMessage = "An update is available. CAU download failed.";
-                yield return ShowUpdateNoticeWhenMainMenuReady(openReleasePage: false);
+                setResult(true, false, null);
                 yield break;
             }
 
-            LaunchCauAndQuit(destPath);
+            setResult(false, false, destPath);
         }
+    }
 
-        yield break;
+    private IEnumerator ShowAddonUpdateNoticeWhenMainMenuReady(string displayName)
+    {
+        yield return WaitForMainMenuReadyThenDelay(MainMenuUpdateNoticeDelaySec);
+        if (!IsMainMenuSceneActive())
+            yield break;
+
+        var message =
+            $"Addon {displayName} has just been updated. please restart your game to apply new addon update.";
+        yield return PresentTitleBarNoticeRoutine(openReleasePage: false, message);
     }
 
     private IEnumerator ShowUpdateNoticeWhenMainMenuReady(bool openReleasePage, string? message = null)
@@ -132,7 +172,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
 
         if (!IsMainMenuSceneActive())
         {
-            MpChatLog.Warn("[MPChat] Update notice skipped: main menu scene not active.");
+            MpChatLog.UpdaterWarn("[MPChat] Update notice skipped: main menu scene not active.");
             yield break;
         }
 
@@ -151,17 +191,24 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         if (openReleasePage || text == ChatBubbleManager.UpdateAvailableHeaderMessage)
             OpenReleasePage();
 
-        for (var i = 0; i < 48 && ChatBubbleManager.Instance == null; i++)
+        for (var i = 0; i < 160 && ChatBubbleManager.Instance == null; i++)
             yield return new WaitForSeconds(0.25f);
 
         if (ChatBubbleManager.Instance == null)
         {
-            MpChatLog.Warn("[MPChat] Update notice skipped: title-bar chat host not ready.");
+            MpChatLog.UpdaterWarn("[MPChat] Update notice skipped: title-bar chat host not ready.");
             yield break;
         }
 
-        ChatBubbleManager.Instance.ShowTimedHeaderSystemMessage(text, 30f);
-        MpChatLog.DebugLine("[MPChat] Update notice shown on main menu title bar.");
+        yield return ChatBubbleManager.Instance.PresentTimedHeaderSystemMessageWhenReady(text, 30f);
+
+        if (ChatBubbleManager.Instance.HasPendingTimedHeaderNotice)
+        {
+            MpChatLog.UpdaterWarn("[MPChat] Update notice skipped: title-bar chat anchor not ready.");
+            yield break;
+        }
+
+        MpChatLog.UpdaterInfo($"[MPChat] Update notice shown on title bar: {text}");
     }
 
     private static void OpenReleasePage()

@@ -83,4 +83,9 @@ internal static class MpChatLog
             return;
         _logger?.Debug(message);
     }
+
+    // Addon updater messages are always visible in the IPA log (not gated on debug settings).
+    internal static void UpdaterInfo(string message) => _logger?.Info(message);
+
+    internal static void UpdaterWarn(string message) => _logger?.Warn(message);
 }

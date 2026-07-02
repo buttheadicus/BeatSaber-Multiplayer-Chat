@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using MultiplayerChat;
+using MultiplayerChat.Core.Addons;
 using MultiplayerChat.Settings;
 using MultiplayerChat.UI;
 using UnityEngine;
@@ -187,7 +188,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         cm?.ForceFullVoipReset();
         vm?.ForceReloadMicrophone();
         VoiceHotMicManager.OnVoipPipelineReloaded();
-        MpCustomAvatarSyncManager.OnVoipPipelineReloaded();
+        AddonCustomAvatarsBridge.OnVoipPipelineReloaded();
         ChatBubbleManager.Instance?.RebindToActiveChatManager();
         cm?.LogVoipReloadContext("TryRunVoipReload (after pipeline)");
         MpChatLobbyDiagnostics.LogVoipTransition("TryRunVoipReload:after", logLine);
@@ -275,7 +276,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     {
         ApplySongVoicePolicy();
         VoiceHotMicManager.EnsureActiveLobbyHostAfterArena();
-        MpCustomAvatarSyncManager.EnsureActiveLobbyHostAfterArena();
+        AddonCustomAvatarsBridge.EnsureActiveLobbyHostAfterArena();
         PollLobbyHierarchyForVoipReload();
 
         if (!ModSettings.VoiceDuckingEnabled)

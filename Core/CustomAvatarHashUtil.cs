@@ -4,28 +4,9 @@ using System.Security.Cryptography;
 
 namespace MultiplayerChat.Core;
 
+// Shared MD5 helpers for lobby custom avatar settings validation (core-owned).
 internal static class CustomAvatarHashUtil
 {
-    internal static string Md5HexFile(string fullPath)
-    {
-        using var fs = File.OpenRead(fullPath);
-        return Md5HexStream(fs);
-    }
-
-    internal static string Md5HexBytes(byte[] bytes)
-    {
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(bytes);
-        return BitConverter.ToString(hash).Replace("-", "");
-    }
-
-    private static string Md5HexStream(Stream stream)
-    {
-        using var md5 = MD5.Create();
-        var hash = md5.ComputeHash(stream);
-        return BitConverter.ToString(hash).Replace("-", "");
-    }
-
     internal static bool LooksLikeMd5Hex(string? s)
     {
         if (s is null || s.Length != 32)
@@ -42,5 +23,20 @@ internal static class CustomAvatarHashUtil
         }
 
         return true;
+    }
+
+    internal static string Md5HexFile(string fullPath)
+    {
+        using var fs = File.OpenRead(fullPath);
+        using var md5 = MD5.Create();
+        var hash = md5.ComputeHash(fs);
+        return BitConverter.ToString(hash).Replace("-", "");
+    }
+
+    internal static string Md5HexBytes(byte[] bytes)
+    {
+        using var md5 = MD5.Create();
+        var hash = md5.ComputeHash(bytes);
+        return BitConverter.ToString(hash).Replace("-", "");
     }
 }

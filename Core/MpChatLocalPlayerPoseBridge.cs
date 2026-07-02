@@ -1,4 +1,5 @@
 using BeatSaber.AvatarCore;
+using MultiplayerChat.Core.Addons;
 using System.Reflection;
 using UnityEngine;
 
@@ -30,7 +31,7 @@ internal static class MpChatLocalPlayerPoseBridge
         if (pose == null || !pose.gameObject.activeInHierarchy)
             return;
 
-        if (!MpChatLocalCaPoseSampler.TryGetWorldDevicePoses(
+        if (!AddonCustomAvatarsBridge.TryGetLocalCaWorldDevicePoses(
                 out var headWorld,
                 out var headWorldRot,
                 out var rightWorld,

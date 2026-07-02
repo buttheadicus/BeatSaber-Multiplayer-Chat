@@ -1,17 +1,14 @@
 using System;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.ViewControllers;
+using MultiplayerChat.Contracts;
 
 namespace MultiplayerChat.UI;
 
 [ViewDefinition("MultiplayerChat.UI.AddonsSettingsView.bsml")]
 public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
 {
-    public event Action? CustomAvatarsClicked;
-
-    public event Action? QuickBindsClicked;
-
-    public event Action? AvatarColoringClicked;
+    public event Action<string>? AddonClicked;
 
     [UIAction("#post-parse")]
     private void PostParse() => BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
@@ -22,12 +19,12 @@ public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
+    [UIAction("QuickBindsClicked")]
+    private void OnQuickBindsClicked() => AddonClicked?.Invoke(AddonIds.QuickBinds);
+
     [UIAction("AvatarColoringClicked")]
-    private void OnAvatarColoringClicked() => AvatarColoringClicked?.Invoke();
+    private void OnAvatarColoringClicked() => AddonClicked?.Invoke(AddonIds.AvatarColoring);
 
     [UIAction("CustomAvatarsClicked")]
-    private void OnCustomAvatarsClicked() => CustomAvatarsClicked?.Invoke();
-
-    [UIAction("QuickBindsClicked")]
-    private void OnQuickBindsClicked() => QuickBindsClicked?.Invoke();
+    private void OnCustomAvatarsClicked() => AddonClicked?.Invoke(AddonIds.CustomAvatars);
 }

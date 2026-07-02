@@ -2,7 +2,7 @@
   <PropertyGroup>
     <AssemblyName>MultiplayerChat</AssemblyName>
     <RootNamespace>MultiplayerChat</RootNamespace>
-    <Version>0.3.6</Version>
+    <Version>0.3.7</Version>
     <LangVersion>latest</LangVersion>
     <TargetFramework>net472</TargetFramework>
     <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\MPCHAT developm</BeatSaberDir>
@@ -26,6 +26,62 @@
   <ItemGroup>
     <Compile Remove="SlzMarkerTool\**" />
     <Compile Remove="_reflect\**" />
+    <Compile Remove="Contracts\**" />
+    <Compile Remove="Addons\**" />
+    <Compile Remove="Loader\**" />
+    <Compile Remove="Runtime\**" />
+    <Compile Remove="AvatarColoring\**" />
+    <Compile Remove="MultiplayerChat.Addons\**" />
+    <Compile Remove="Core\QuickBinds\**" />
+    <Compile Remove="Core\Addons\AddonAffinityForwarder.cs" />
+    <Compile Remove="Core\Addons\AddonCatalog.cs" />
+    <Compile Remove="Core\Addons\AddonEnablement.cs" />
+    <Compile Remove="Core\Addons\AddonHost.cs" />
+    <Compile Remove="Core\Addons\AddonLifecycleHost.cs" />
+    <Compile Remove="Core\Addons\AddonLoadContext.cs" />
+    <Compile Remove="Core\Addons\AddonLobbyAvatarBridge.cs" />
+    <Compile Remove="Core\Addons\AddonPatcherRegistry.cs" />
+    <Compile Remove="Core\Addons\AddonReloadService.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsBindingFactory.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsBridge.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsCatalog.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsFlowInstantiator.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsFlowRegistry.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsNavigator.cs" />
+    <Compile Remove="Core\Addons\AddonSettingsPresenter.cs" />
+    <Compile Remove="Core\Addons\AddonZenjectPreloader.cs" />
+    <Compile Remove="Core\Addons\AddonZenjectSettingsBinder.cs" />
+    <Compile Remove="Core\Addons\AffinityHarmonyForwarder.cs" />
+    <Compile Remove="Core\Addons\LoadedAddonInstance.cs" />
+    <Compile Remove="Core\Addons\MpChatAddonHost.cs" />
+    <Compile Remove="UI\AddonsSettingsFlowCoordinator.cs" />
+    <Compile Remove="UI\AddonsSettingsViewController.cs" />
+    <Compile Remove="Core\MpChatLobbyCustomAvatarDriver.cs" />
+    <Compile Remove="Core\MpCustomAvatar*.cs" />
+    <Compile Remove="Core\MpChatLobbyCustomAvatarDriverRegistry.cs" />
+    <Compile Remove="Core\MpChatLobbyPedestalScaleGuard.cs" />
+    <Compile Remove="Core\MpChatLobbyAvatarLifecycleHost.cs" />
+    <Compile Remove="Core\MpChatLobbyPosePoll.cs" />
+    <Compile Remove="Core\MpChatLobbyLivePoseInput.cs" />
+    <Compile Remove="Core\MpChatLobbyPedestalVisual.cs" />
+    <Compile Remove="Core\MpChatArenaAvatarAttach.cs" />
+    <Compile Remove="Core\MpChatArenaDependencyResolver.cs" />
+    <Compile Remove="Core\MpChatArenaAnchorRegistry.cs" />
+    <Compile Remove="Core\MpChatLocalCaPoseSampler.cs" />
+    <Compile Remove="Core\MpChatArenaFacadeRoots.cs" />
+    <Compile Remove="Core\CustomAvatarLobbyCachePaths.cs" />
+    <Compile Remove="Core\CustomAvatarLobbyHashCache.cs" />
+    <Compile Remove="HarmonyPatches\MpChatMultiplayerLobbyScaleAnimatorPatches.cs" />
+    <Compile Remove="HarmonyPatches\MpChatArenaAvatarHarmony.cs" />
+    <Compile Remove="HarmonyPatches\MpChatArenaAvatarPoseConnectedPatch.cs" />
+    <Compile Remove="HarmonyPatches\MpChatArenaAvatarPoseStartPatch.cs" />
+    <Compile Remove="HarmonyPatches\MpChatArenaFacadeHideBigAvatarPatch.cs" />
+    <Compile Remove="Network\MpCustomAvatar*.cs" />
+    <Compile Remove="UI\QuickBinds*.cs" />
+    <Compile Remove="UI\AvatarColoring*.cs" />
+    <Compile Remove="UI\AvatarNameEntry*.cs" />
+    <Compile Remove="UI\AvatarLoadList*.cs" />
+    <Compile Remove="UI\CustomAvatarsSettings*.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all" />
@@ -190,6 +246,9 @@
     <Reference Include="UnityEngine.XRModule">
       <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.XRModule.dll</HintPath>
     </Reference>
+    <Reference Include="VRUI">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\VRUI.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\playerhaschat.png">
@@ -264,33 +323,19 @@
     <EmbeddedResource Include="UI\FusedModsSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.FusedModsSettingsView.bsml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\CustomAvatarsSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.CustomAvatarsSettingsView.bsml</LogicalName>
-    </EmbeddedResource>
     <EmbeddedResource Include="UI\VoiceDuckSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.VoiceDuckSettingsView.bsml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\AvatarNameEntryView.bsml">
-      <LogicalName>MultiplayerChat.UI.AvatarNameEntryView.bsml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="UI\AvatarLoadListView.bsml">
-      <LogicalName>MultiplayerChat.UI.AvatarLoadListView.bsml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="UI\AddonsSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.AddonsSettingsView.bsml</LogicalName>
-    </EmbeddedResource>
+    <EmbeddedResource Remove="UI\AddonsSettingsView.bsml" />
     <EmbeddedResource Include="UI\PerformanceSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.PerformanceSettingsView.bsml</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="UI\QuickBindsSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.QuickBindsSettingsView.bsml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="UI\QuickBindsOptionsSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.QuickBindsOptionsSettingsView.bsml</LogicalName>
-    </EmbeddedResource>
-    <EmbeddedResource Include="UI\AvatarColoringExtensionsSettingsView.bsml">
-      <LogicalName>MultiplayerChat.UI.AvatarColoringExtensionsSettingsView.bsml</LogicalName>
-    </EmbeddedResource>
+    <EmbeddedResource Remove="UI\QuickBindsSettingsView.bsml" />
+    <EmbeddedResource Remove="UI\QuickBindsOptionsSettingsView.bsml" />
+    <EmbeddedResource Remove="UI\AvatarColoringExtensionsSettingsView.bsml" />
+    <EmbeddedResource Remove="UI\AvatarNameEntryView.bsml" />
+    <EmbeddedResource Remove="UI\AvatarLoadListView.bsml" />
+    <EmbeddedResource Remove="UI\CustomAvatarsSettingsView.bsml" />
     <EmbeddedResource Include="AvatarExtras\Assets\Sprites\Glasses.png">
       <LogicalName>MultiplayerChat.AvatarExtras.Assets.Sprites.Glasses.png</LogicalName>
     </EmbeddedResource>
@@ -304,13 +349,24 @@
       <LogicalName>MultiplayerChat.AvatarExtras.Assets.Bundles.extras.unitypackage</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
-  <!-- Install into Beat Saber for testing (only if BeatSaberDir exists). -->
-  <Target Name="CopyToBeatSaber" AfterTargets="Build">
+  <Target Name="BuildAddonsRuntime" AfterTargets="Build">
+    <MSBuild Projects="$(ProjectDir)MultiplayerChat.Addons\MultiplayerChat.Addons.csproj" Properties="Configuration=$(Configuration)" />
+    <MakeDir Directories="$(ProjectDir)Embedded" />
+    <Copy SourceFiles="$(ProjectDir)MultiplayerChat.Addons\bin\$(Configuration)\MultiplayerChat.Addons.dll" DestinationFolder="$(ProjectDir)Embedded\" SkipUnchangedFiles="true" Condition="Exists('$(ProjectDir)MultiplayerChat.Addons\bin\$(Configuration)\MultiplayerChat.Addons.dll')" />
+  </Target>
+  <ItemGroup>
+    <EmbeddedResource Include="Embedded\MultiplayerChat.Addons.dll" Condition="Exists('Embedded\MultiplayerChat.Addons.dll')">
+      <LogicalName>MultiplayerChat.Embedded.MultiplayerChat.Addons.dll</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Target Name="CopyToBeatSaber" AfterTargets="BuildAddonsRuntime">
     <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
+    <Copy SourceFiles="$(ProjectDir)MultiplayerChat.Addons\bin\$(Configuration)\MultiplayerChat.Addons.dll" DestinationFolder="$(BeatSaberDir)\Plugins\MultiplayerChat\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)') and Exists('$(ProjectDir)MultiplayerChat.Addons\bin\$(Configuration)\MultiplayerChat.Addons.dll')" />
+    <MakeDir Directories="$(BeatSaberDir)\Plugins\MultiplayerChat\Addons" Condition="Exists('$(BeatSaberDir)')" />
   </Target>
 
   <!-- Release layout: manifest at root, Plugins/ dll (matches manifest files[]). -->
-  <Target Name="CopyToReleasesFolder" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+  <Target Name="CopyToReleasesFolder" AfterTargets="BuildAddonsRuntime" Condition="'$(Configuration)' == 'Release'">
     <PropertyGroup>
       <ReleasesDir>$(ProjectDir)releases</ReleasesDir>
     </PropertyGroup>

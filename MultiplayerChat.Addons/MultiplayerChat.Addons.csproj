@@ -1,0 +1,88 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>MultiplayerChat.Addons</AssemblyName>
+    <RootNamespace>MultiplayerChat.Addons</RootNamespace>
+    <Version>0.3.7</Version>
+    <LangVersion>latest</LangVersion>
+    <TargetFramework>net472</TargetFramework>
+    <BeatSaberDir>D:\bsmanager\BSManager\BSInstances\MPCHAT developm</BeatSaberDir>
+    <OutputPath>bin\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Nullable>enable</Nullable>
+    <NoWarn>CS0618;CS1591;CS0649;CS0436</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <CustomAvatarHintPath Condition="Exists('$(BeatSaberDir)\Plugins\CustomAvatar.dll')">$(BeatSaberDir)\Plugins\CustomAvatar.dll</CustomAvatarHintPath>
+    <CustomAvatarHintPath Condition="'$(CustomAvatarHintPath)' == '' and Exists('$(BeatSaberDir)\Plugins\CustomAvatars.dll')">$(BeatSaberDir)\Plugins\CustomAvatars.dll</CustomAvatarHintPath>
+    <CustomAvatarHintPath Condition="'$(CustomAvatarHintPath)' == ''">$(BeatSaberDir)\Plugins\CustomAvatar.dll</CustomAvatarHintPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Contracts\MultiplayerChat.Contracts\MultiplayerChat.Contracts.csproj" />
+    <Reference Include="MultiplayerChat">
+      <HintPath>..\bin\$(Configuration)\MultiplayerChat.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Properties\IsExternalInit.cs" />
+    <Compile Include="AddonRuntimeEntry.cs" />
+    <Compile Include="AddonUiBridgeRegistrar.cs" />
+    <Compile Include="..\Core\Addons\AddonAffinityForwarder.cs" Link="Core\Addons\AddonAffinityForwarder.cs" />
+    <Compile Include="..\Core\Addons\AddonCatalog.cs" Link="Core\Addons\AddonCatalog.cs" />
+    <Compile Include="..\Core\Addons\AddonEnablement.cs" Link="Core\Addons\AddonEnablement.cs" />
+    <Compile Include="..\Core\Addons\AddonHost.cs" Link="Core\Addons\AddonHost.cs" />
+    <Compile Include="..\Core\Addons\AddonLifecycleHost.cs" Link="Core\Addons\AddonLifecycleHost.cs" />
+    <Compile Include="..\Core\Addons\AddonLoadContext.cs" Link="Core\Addons\AddonLoadContext.cs" />
+    <Compile Include="..\Core\Addons\AddonLobbyAvatarBridge.cs" Link="Core\Addons\AddonLobbyAvatarBridge.cs" />
+    <Compile Include="..\Core\Addons\AddonPatcherRegistry.cs" Link="Core\Addons\AddonPatcherRegistry.cs" />
+    <Compile Include="..\Core\Addons\AddonReloadService.cs" Link="Core\Addons\AddonReloadService.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsBindingFactory.cs" Link="Core\Addons\AddonSettingsBindingFactory.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsBridge.cs" Link="Core\Addons\AddonSettingsBridge.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsCatalog.cs" Link="Core\Addons\AddonSettingsCatalog.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsFlowInstantiator.cs" Link="Core\Addons\AddonSettingsFlowInstantiator.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsFlowRegistry.cs" Link="Core\Addons\AddonSettingsFlowRegistry.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsNavigator.cs" Link="Core\Addons\AddonSettingsNavigator.cs" />
+    <Compile Include="..\Core\Addons\AddonSettingsPresenter.cs" Link="Core\Addons\AddonSettingsPresenter.cs" />
+    <Compile Include="..\Core\Addons\AddonZenjectPreloader.cs" Link="Core\Addons\AddonZenjectPreloader.cs" />
+    <Compile Include="..\Core\Addons\AddonZenjectSettingsBinder.cs" Link="Core\Addons\AddonZenjectSettingsBinder.cs" />
+    <Compile Include="..\Core\Addons\AffinityHarmonyForwarder.cs" Link="Core\Addons\AffinityHarmonyForwarder.cs" />
+    <Compile Include="..\Core\Addons\LoadedAddonInstance.cs" Link="Core\Addons\LoadedAddonInstance.cs" />
+    <Compile Include="..\Core\Addons\MpChatAddonHost.cs" Link="Core\Addons\MpChatAddonHost.cs" />
+    <Compile Include="..\UI\AddonsSettingsFlowCoordinator.cs" Link="UI\AddonsSettingsFlowCoordinator.cs" />
+    <Compile Include="..\UI\AddonsSettingsViewController.cs" Link="UI\AddonsSettingsViewController.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all" />
+  </ItemGroup>
+  <Import Project="..\Addons\BeatSaber.Mod.References.props" />
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(BeatSaberDir)\Libs\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="CustomAvatar">
+      <HintPath>$(CustomAvatarHintPath)</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="VRUI">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\VRUI.dll</HintPath>
+    </Reference>
+    <Reference Include="Interactable">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\Interactable.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="BeatSaber.AvatarCore">
+      <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\BeatSaber.AvatarCore.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\UI\AddonsSettingsView.bsml" Link="UI\AddonsSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.AddonsSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <Target Name="CopyAddonsRuntimeToBeatSaber" AfterTargets="Build">
+    <MakeDir Directories="$(BeatSaberDir)\Plugins\MultiplayerChat" Condition="Exists('$(BeatSaberDir)')" />
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="$(BeatSaberDir)\Plugins\MultiplayerChat\" SkipUnchangedFiles="true" Condition="Exists('$(BeatSaberDir)')" />
+  </Target>
+</Project>

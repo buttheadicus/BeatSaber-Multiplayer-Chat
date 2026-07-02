@@ -1,6 +1,7 @@
 using System;
 using HMUI;
 using MultiplayerChat.Core;
+using MultiplayerChat.Core.Addons;
 using Zenject;
 
 namespace MultiplayerChat.UI;
@@ -11,7 +12,6 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
     [Inject] private readonly PlayerSettingsFlowCoordinator _playerSettingsFlowCoordinator = null!;
     [Inject] private readonly MicSettingsFlowCoordinator _micSettingsFlowCoordinator = null!;
     [Inject] private readonly FusedModsSettingsFlowCoordinator _fusedModsSettingsFlowCoordinator = null!;
-    [Inject] private readonly AddonsSettingsFlowCoordinator _addonsSettingsFlowCoordinator = null!;
     [Inject] private readonly PerformanceSettingsFlowCoordinator _performanceSettingsFlowCoordinator = null!;
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
@@ -83,12 +83,19 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
 
     private void OnAddonsClicked()
     {
+        var addonsFlow = AddonUiBridge.AddonsSettingsFlow;
+        if (addonsFlow == null)
+        {
+            Plugin.Log?.Warn("[MPChat][Addons] Addons settings are not ready yet.");
+            return;
+        }
+
         var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
-        if (child == _addonsSettingsFlowCoordinator)
+        if (child == addonsFlow)
             return;
 
-        _addonsSettingsFlowCoordinator.ParentFlow = this;
-        PresentFlowCoordinator(_addonsSettingsFlowCoordinator);
+        addonsFlow.GetType().GetProperty("ParentFlow")?.SetValue(addonsFlow, this);
+        PresentFlowCoordinator(addonsFlow);
     }
 
     private void OnPerformanceClicked()

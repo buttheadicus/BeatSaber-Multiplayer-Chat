@@ -57,7 +57,7 @@ internal static class MpChatIgnoreVrSystemMenuPatches
             AccessTools.Method(typeof(PauseController), "OnApplicationPause")!;
 
         // Block pause-on-background only; allow resume when focus returns.
-        private static bool Prefix(bool pause) => !pause;
+        private static bool Prefix(bool pauseStatus) => !pauseStatus;
     }
 
     [HarmonyPatch]
@@ -102,6 +102,6 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         private static MethodBase TargetMethod() =>
             AccessTools.Method(typeof(MultiplayerLocalActivePlayerInGameMenuController), "OnApplicationPause")!;
 
-        private static bool Prefix(bool pause) => !pause;
+        private static bool Prefix(bool pauseStatus) => !pauseStatus;
     }
 }

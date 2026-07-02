@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using MultiplayerChat.Core;
+using MultiplayerChat.Core.Addons;
 using MultiplayerChat.Settings;
 using HMUI;
 using TMPro;
@@ -45,6 +46,48 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private ChatBubble? _timedHeaderNoticeBubble;
     private Coroutine? _timedHeaderNoticeCoroutine;
+
+    private string? _pendingTimedHeaderNotice;
+    private float _pendingTimedHeaderNoticeDuration = 30f;
+    private bool _hasPendingTimedHeaderNotice;
+
+    public bool HasPendingTimedHeaderNotice => _hasPendingTimedHeaderNotice;
+
+    private static bool IsMainMenuSceneActive()
+    {
+        var scene = SceneManager.GetActiveScene();
+        return scene.IsValid() && scene.name == "MainMenu";
+    }
+
+    private bool TryEnsureTitleBarChatRoot()
+    {
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() == null)
+            TryUpgradeLobbyHeaderRootToTitleBarPreferred();
+
+        if (_lobbyHeaderRoot == null || _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() == null)
+        {
+            InvalidateTitleViewChatAnchorCache();
+            var titleRoot = CreateLobbyChatRootAboveTitleBar();
+            if (titleRoot != null)
+                _lobbyHeaderRoot = titleRoot;
+            else if (!IsInLobby())
+            {
+                var startRoot = CreateLobbyChatRootAboveStartButtonRow();
+                if (startRoot != null)
+                {
+                    if (startRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() == null)
+                        startRoot.gameObject.AddComponent<MpChatTitleBarAnchoredChatRoot>();
+                    _lobbyHeaderRoot = startRoot;
+                }
+            }
+        }
+
+        if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.gameObject != null && !_lobbyHeaderRoot.gameObject.activeSelf)
+            _lobbyHeaderRoot.gameObject.SetActive(true);
+
+        return _lobbyHeaderRoot != null
+               && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() != null;
+    }
 
     public const string UpdateAvailableHeaderMessage =
         "There is an update for MultiplayerChat! I've already opened a link in your browser to download and install it!";
@@ -235,7 +278,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 else
                     ClearChat();
 
-                MpCustomAvatarSyncManager.FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected();
+                AddonCustomAvatarsBridge.FlushLobbyOnServerLeaveIfDisconnected();
             }
 
             if (inLobby && !_wasInLobby)
@@ -243,8 +286,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                 _nextNametagEnsureRealtime = -999f;
                 RebindToActiveChatManager();
                 ModPresenceManager.Instance?.RefreshAfterLobbyReturn();
-                MpCustomAvatarSyncManager.PollDeferredAvatarUpdates();
-                MpChatLobbyAvatarLifecycleHost.ScheduleLobbySessionRejoinRefresh();
+                AddonCustomAvatarsBridge.PollDeferredAvatarUpdates();
+                AddonCustomAvatarsBridge.ScheduleLobbySessionRejoinRefresh();
             }
 
             _wasInLobby = inLobby;
@@ -270,6 +313,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     else
                         _lobbyBannerMissStreak++;
                 }
+                else if (_lobbyHeaderRoot != null && _lobbyHeaderRoot.GetComponent<MpChatTitleBarAnchoredChatRoot>() == null)
+                {
+                    TryUpgradeLobbyHeaderRootToTitleBarPreferred();
+                }
                 else if (!IsMainMenuTitleBarPollContext(inLobby))
                     TryUpgradeLobbyHeaderRootToTitleBarPreferred();
 
@@ -278,6 +325,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                     if (inLobby && Time.realtimeSinceStartup >= _nextNametagEnsureRealtime)
                         EnsureNametagIcons();
                     ApplyPlacementMode();
+                    TryFlushPendingTimedHeaderNotice();
                 }
             }
             else
@@ -386,19 +434,64 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    public void ShowTimedHeaderSystemMessage(string message, float durationSeconds = 30f)
+    public void QueueTimedHeaderSystemMessage(string message, float durationSeconds = 30f)
     {
         if (string.IsNullOrEmpty(message))
             return;
 
+        _pendingTimedHeaderNotice = message;
+        _pendingTimedHeaderNoticeDuration = durationSeconds;
+        _hasPendingTimedHeaderNotice = true;
+        TryFlushPendingTimedHeaderNotice();
+    }
+
+    public bool TryFlushPendingTimedHeaderNotice()
+    {
+        if (!_hasPendingTimedHeaderNotice || string.IsNullOrEmpty(_pendingTimedHeaderNotice))
+            return true;
+
+        InvalidateTitleViewChatAnchorCache();
+        var message = _pendingTimedHeaderNotice;
+        if (!ShowTimedHeaderSystemMessage(message, _pendingTimedHeaderNoticeDuration))
+            return false;
+
+        _hasPendingTimedHeaderNotice = false;
+        _pendingTimedHeaderNotice = null;
+        return true;
+    }
+
+    public IEnumerator PresentTimedHeaderSystemMessageWhenReady(string message, float durationSeconds = 30f)
+    {
+        QueueTimedHeaderSystemMessage(message, durationSeconds);
+        for (var i = 0; i < 240; i++)
+        {
+            InvalidateTitleViewChatAnchorCache();
+            if (TryFlushPendingTimedHeaderNotice())
+                yield break;
+
+            yield return new WaitForSeconds(0.25f);
+        }
+    }
+
+    public bool ShowTimedHeaderSystemMessage(string message, float durationSeconds = 30f)
+    {
+        if (string.IsNullOrEmpty(message))
+            return false;
+
+        if (!TryEnsureTitleBarChatRoot())
+            return false;
+
         StopTimedHeaderNotice();
         if (!TryShowStackedBubble("", message))
-            return;
+            return false;
 
         if (_stackedBubbles.Count > 0)
             _timedHeaderNoticeBubble = _stackedBubbles[0];
         _timedHeaderNoticeCoroutine = StartCoroutine(ClearTimedHeaderNoticeAfter(durationSeconds));
+        return true;
     }
+
+    private void EnsureTitleBarReadyForSystemMessage() => TryEnsureTitleBarChatRoot();
 
     private void StopTimedHeaderNotice()
     {
@@ -625,6 +718,9 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         if (startAnchored != null)
             return startAnchored;
 
+        if (!IsInLobby())
+            return null;
+
         var banner = FindHostSetupBannerInLobby(allowOverlay: false) ?? FindHostSetupBannerInLobby(allowOverlay: true);
         if (banner != null)
         {
@@ -683,7 +779,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         var titleView = TryGetCachedTitleViewForChatAnchor();
         if (titleView == null)
             return null;
-        if (!titleView.gameObject.activeInHierarchy)
+        if (!titleView.gameObject.activeInHierarchy && !IsMainMenuSceneActive())
             return null;
         var parent = titleView.parent;
         if (parent == null)
@@ -831,10 +927,6 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
                         return tmp.transform;
                 }
             }
-
-            var titleCanvas = titleView.GetComponentInParent<Canvas>();
-            if (AcceptCanvas(titleCanvas))
-                return titleView.transform;
         }
 
         foreach (var tmp in UnityEngine.Object.FindObjectsOfType<TMPro.TMP_Text>())
@@ -1113,6 +1205,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             if (_isMoveMode)
                 EnsureMoveHandle();
         }
+        else if (_lobbyHeaderRoot.gameObject != null && !_lobbyHeaderRoot.gameObject.activeSelf)
+        {
+            _lobbyHeaderRoot.gameObject.SetActive(true);
+        }
 
         var bubble = CreateStackedBubble(_lobbyHeaderRoot);
         if (bubble == null)
@@ -1199,16 +1295,30 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         textRect.offsetMax = new Vector2(-8, -4);
 
         var tmp = textObj.AddComponent<TextMeshProUGUI>();
+        ApplyStackedBubbleTextStyle(tmp);
+
+        if (_container == null)
+            return null;
+
+        try
+        {
+            return _container.InstantiateComponent<ChatBubble>(panelObj);
+        }
+        catch (Exception ex)
+        {
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat] Chat bubble create failed: {ex.Message}");
+            UnityEngine.Object.Destroy(panelObj);
+            return null;
+        }
+    }
+
+    private static void ApplyStackedBubbleTextStyle(TextMeshProUGUI tmp)
+    {
         if (TMP_Settings.defaultFontAsset != null)
             tmp.font = TMP_Settings.defaultFontAsset;
         tmp.fontSize = 14;
         tmp.color = Color.white;
         tmp.richText = true;
-        if (tmp.font != null)
-        {
-            tmp.outlineWidth = 0.2f;
-            tmp.outlineColor = new Color32(0, 0, 0, 200);
-        }
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.enableWordWrapping = true;
         tmp.overflowMode = TextOverflowModes.Overflow;
@@ -1216,7 +1326,19 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         tmp.raycastTarget = false;
         tmp.isOverlay = false;
 
-        return _container.InstantiateComponent<ChatBubble>(panelObj);
+        try
+        {
+            if (tmp.font == null)
+                return;
+
+            tmp.ForceMeshUpdate();
+            tmp.outlineWidth = 0.2f;
+            tmp.outlineColor = new Color32(0, 0, 0, 200);
+        }
+        catch (Exception ex)
+        {
+            MpChatLog.DebugLine($"[MPChat] Chat bubble outline skipped: {ex.Message}");
+        }
     }
 
     private static Transform? _cachedTitleViewForChatAnchor;

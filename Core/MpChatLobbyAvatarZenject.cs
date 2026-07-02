@@ -1,3 +1,4 @@
+using SiraUtil.Objects.Multiplayer;
 using UnityEngine;
 using Zenject;
 
@@ -17,7 +18,7 @@ internal static class MpChatLobbyAvatarZenject
         {
             try
             {
-                var playerContext = MpChatArenaFacadeRoots.FindPlayerContext(facadeRoot);
+                var playerContext = FindPlayerContext(facadeRoot);
                 if (playerContext != null)
                 {
                     playerContext.Container.Inject(target);
@@ -30,6 +31,15 @@ internal static class MpChatLobbyAvatarZenject
         }
 
         TryInject(target);
+    }
+
+    private static GameObjectContext? FindPlayerContext(Transform from)
+    {
+        var local = from.GetComponentInParent<MultiplayerLocalActivePlayerFacade>();
+        var root = local != null
+            ? local.transform
+            : from.GetComponentInParent<MultiplayerConnectedPlayerFacade>()?.transform;
+        return root != null ? root.GetComponent<GameObjectContext>() : null;
     }
 
     internal static void TryInject(MonoBehaviour target)

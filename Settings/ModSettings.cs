@@ -238,8 +238,6 @@ public static class ModSettings
         {
             D.Addons.EnableAvatarColoringExtensions = value;
             ModSettingsPersistence.Save();
-            if (value)
-                AvatarColoring.AvatarDatOperations.EnsureAvatarStorageExists();
         }
     }
 

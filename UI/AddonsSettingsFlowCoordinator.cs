@@ -1,6 +1,7 @@
-using System;
 using HMUI;
+using MultiplayerChat.Contracts;
 using MultiplayerChat.Core;
+using MultiplayerChat.Core.Addons;
 using Zenject;
 
 namespace MultiplayerChat.UI;
@@ -8,12 +9,7 @@ namespace MultiplayerChat.UI;
 public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly AddonsSettingsViewController _addonsView = null!;
-
-    [InjectOptional] private readonly CustomAvatarsSettingsFlowCoordinator? _customAvatarsFlow;
-
-    [InjectOptional] private readonly QuickBindsSettingsFlowCoordinator? _quickBindsFlow;
-
-    [InjectOptional] private readonly AvatarColoringExtensionsSettingsFlowCoordinator? _avatarColoringFlow;
+    [Inject] private readonly DiContainer _container = null!;
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
 
@@ -27,60 +23,35 @@ public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
         }
 
         if (addedToHierarchy)
-        {
-            _addonsView.CustomAvatarsClicked += OnCustomAvatarsClicked;
-            _addonsView.QuickBindsClicked += OnQuickBindsClicked;
-            _addonsView.AvatarColoringClicked += OnAvatarColoringClicked;
-        }
+            _addonsView.AddonClicked += OnAddonClicked;
     }
 
     protected override void DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
     {
         if (removedFromHierarchy)
+            _addonsView.AddonClicked -= OnAddonClicked;
+    }
+
+    private void OnAddonClicked(string addonId)
+    {
+        if (!AddonEnablement.IsEnabled(addonId))
         {
-            _addonsView.CustomAvatarsClicked -= OnCustomAvatarsClicked;
-            _addonsView.QuickBindsClicked -= OnQuickBindsClicked;
-            _addonsView.AvatarColoringClicked -= OnAvatarColoringClicked;
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][Addons] {addonId} is disabled in settings.");
+            return;
         }
-    }
 
-    private void OnAvatarColoringClicked()
-    {
-        if (_avatarColoringFlow == null)
+        if (!AddonSettingsBridge.TryGetPresenter(addonId, out _))
+        {
+            var reloadHint = MpChatDebugMode.IsEnabled
+                ? " Press J to reload addons after copying DLLs."
+                : " Restart the game after copying addon DLLs.";
+            MultiplayerChat.Plugin.Log?.Warn(
+                $"[MPChat][Addons] {AddonEnablement.DisplayNameFor(addonId)} is not loaded.{reloadHint}");
             return;
+        }
 
-        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
-        if (child == _avatarColoringFlow)
-            return;
-
-        _avatarColoringFlow.ParentFlow = this;
-        PresentFlowCoordinator(_avatarColoringFlow);
-    }
-
-    private void OnCustomAvatarsClicked()
-    {
-        if (_customAvatarsFlow == null)
-            return;
-
-        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
-        if (child == _customAvatarsFlow)
-            return;
-
-        _customAvatarsFlow.ParentFlow = this;
-        PresentFlowCoordinator(_customAvatarsFlow);
-    }
-
-    private void OnQuickBindsClicked()
-    {
-        if (_quickBindsFlow == null)
-            return;
-
-        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
-        if (child == _quickBindsFlow)
-            return;
-
-        _quickBindsFlow.ParentFlow = this;
-        PresentFlowCoordinator(_quickBindsFlow);
+        if (!AddonSettingsNavigator.TryPresent(this, addonId, _container))
+            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][Addons] Could not open settings for {addonId}.");
     }
 
     protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();
