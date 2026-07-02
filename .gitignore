@@ -1,5 +1,8 @@
 SlzPrivate/
 
+# Addon sources live in sibling MPC-addon-* repos (not vendored here)
+/Addons/
+
 SlzMarkerTool/bin/
 SlzMarkerTool/obj/
 bin/

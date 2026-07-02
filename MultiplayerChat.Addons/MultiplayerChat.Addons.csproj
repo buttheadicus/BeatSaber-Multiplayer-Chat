@@ -53,7 +53,7 @@
   <ItemGroup>
     <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.1" PrivateAssets="all" />
   </ItemGroup>
-  <Import Project="..\Addons\BeatSaber.Mod.References.props" />
+  <Import Project="..\build\BeatSaber.Mod.References.props" />
   <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>$(BeatSaberDir)\Libs\0Harmony.dll</HintPath>
