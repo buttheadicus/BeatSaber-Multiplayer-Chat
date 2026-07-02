@@ -44,10 +44,10 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     private float _nextNametagEnsureRealtime = -999f;
     private const float NametagEnsureMinIntervalSec = 4.5f;
 
-    private ChatBubble? _timedHeaderNoticeBubble;
+    private readonly List<ChatBubble> _timedHeaderNoticeBubbles = new();
     private Coroutine? _timedHeaderNoticeCoroutine;
 
-    private string? _pendingTimedHeaderNotice;
+    private readonly List<string> _pendingTimedHeaderNotices = new();
     private float _pendingTimedHeaderNoticeDuration = 30f;
     private bool _hasPendingTimedHeaderNotice;
 
@@ -439,7 +439,28 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         if (string.IsNullOrEmpty(message))
             return;
 
-        _pendingTimedHeaderNotice = message;
+        _pendingTimedHeaderNotices.Clear();
+        _pendingTimedHeaderNotices.Add(message);
+        _pendingTimedHeaderNoticeDuration = durationSeconds;
+        _hasPendingTimedHeaderNotice = true;
+        TryFlushPendingTimedHeaderNotice();
+    }
+
+    public void QueueTimedHeaderSystemMessages(IReadOnlyList<string> messages, float durationSeconds = 30f)
+    {
+        _pendingTimedHeaderNotices.Clear();
+        if (messages != null)
+        {
+            foreach (var message in messages)
+            {
+                if (!string.IsNullOrEmpty(message))
+                    _pendingTimedHeaderNotices.Add(message);
+            }
+        }
+
+        if (_pendingTimedHeaderNotices.Count == 0)
+            return;
+
         _pendingTimedHeaderNoticeDuration = durationSeconds;
         _hasPendingTimedHeaderNotice = true;
         TryFlushPendingTimedHeaderNotice();
@@ -447,22 +468,34 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     public bool TryFlushPendingTimedHeaderNotice()
     {
-        if (!_hasPendingTimedHeaderNotice || string.IsNullOrEmpty(_pendingTimedHeaderNotice))
+        if (!_hasPendingTimedHeaderNotice || _pendingTimedHeaderNotices.Count == 0)
             return true;
 
         InvalidateTitleViewChatAnchorCache();
-        var message = _pendingTimedHeaderNotice;
-        if (!ShowTimedHeaderSystemMessage(message, _pendingTimedHeaderNoticeDuration))
+        if (!ShowTimedHeaderSystemMessages(_pendingTimedHeaderNotices, _pendingTimedHeaderNoticeDuration))
             return false;
 
         _hasPendingTimedHeaderNotice = false;
-        _pendingTimedHeaderNotice = null;
+        _pendingTimedHeaderNotices.Clear();
         return true;
     }
 
     public IEnumerator PresentTimedHeaderSystemMessageWhenReady(string message, float durationSeconds = 30f)
     {
         QueueTimedHeaderSystemMessage(message, durationSeconds);
+        yield return PresentPendingTimedHeaderNoticesWhenReady();
+    }
+
+    public IEnumerator PresentTimedHeaderSystemMessagesWhenReady(
+        IReadOnlyList<string> messages,
+        float durationSeconds = 30f)
+    {
+        QueueTimedHeaderSystemMessages(messages, durationSeconds);
+        yield return PresentPendingTimedHeaderNoticesWhenReady();
+    }
+
+    private IEnumerator PresentPendingTimedHeaderNoticesWhenReady()
+    {
         for (var i = 0; i < 240; i++)
         {
             InvalidateTitleViewChatAnchorCache();
@@ -473,20 +506,38 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    public bool ShowTimedHeaderSystemMessage(string message, float durationSeconds = 30f)
+    public bool ShowTimedHeaderSystemMessage(string message, float durationSeconds = 30f) =>
+        ShowTimedHeaderSystemMessages(new[] { message }, durationSeconds);
+
+    public bool ShowTimedHeaderSystemMessages(IReadOnlyList<string> messages, float durationSeconds = 30f)
     {
-        if (string.IsNullOrEmpty(message))
+        if (messages == null || messages.Count == 0)
             return false;
 
         if (!TryEnsureTitleBarChatRoot())
             return false;
 
         StopTimedHeaderNotice();
-        if (!TryShowStackedBubble("", message))
+
+        var shownAny = false;
+        foreach (var message in messages)
+        {
+            if (string.IsNullOrEmpty(message))
+                continue;
+
+            var stackCountBefore = _stackedBubbles.Count;
+            if (!TryShowStackedBubble("", message, durationSeconds: durationSeconds))
+                continue;
+
+            if (_stackedBubbles.Count > stackCountBefore)
+                _timedHeaderNoticeBubbles.Add(_stackedBubbles[0]);
+
+            shownAny = true;
+        }
+
+        if (!shownAny)
             return false;
 
-        if (_stackedBubbles.Count > 0)
-            _timedHeaderNoticeBubble = _stackedBubbles[0];
         _timedHeaderNoticeCoroutine = StartCoroutine(ClearTimedHeaderNoticeAfter(durationSeconds));
         return true;
     }
@@ -501,13 +552,17 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             _timedHeaderNoticeCoroutine = null;
         }
 
-        if (_timedHeaderNoticeBubble != null)
+        foreach (var bubble in _timedHeaderNoticeBubbles)
         {
-            RemoveBubbleFromStack(_timedHeaderNoticeBubble);
-            if (_timedHeaderNoticeBubble.gameObject != null)
-                UnityEngine.Object.Destroy(_timedHeaderNoticeBubble.gameObject);
-            _timedHeaderNoticeBubble = null;
+            if (bubble == null)
+                continue;
+
+            RemoveBubbleFromStack(bubble);
+            if (bubble.gameObject != null)
+                UnityEngine.Object.Destroy(bubble.gameObject);
         }
+
+        _timedHeaderNoticeBubbles.Clear();
     }
 
     private IEnumerator ClearTimedHeaderNoticeAfter(float durationSeconds)

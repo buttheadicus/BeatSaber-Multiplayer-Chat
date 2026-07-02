@@ -36,7 +36,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         yield return new WaitForSeconds(2.5f);
 
         var updatedAddons = new List<string>();
-        yield return AddonStartupUpdater.CheckInstallCustomAvatars(updatedAddons);
+        yield return AddonStartupUpdater.CheckInstallAll(updatedAddons);
 
         var showModUpdateNotice = false;
         var openModReleasePage = false;
@@ -49,8 +49,8 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
                 cauLaunchPath = cauPath;
             });
 
-        foreach (var displayName in updatedAddons)
-            yield return ShowAddonUpdateNoticeWhenMainMenuReady(displayName);
+        if (updatedAddons.Count > 0)
+            yield return ShowAddonUpdateNoticesWhenMainMenuReady(updatedAddons);
 
         if (showModUpdateNotice)
             yield return ShowUpdateNoticeWhenMainMenuReady(openModReleasePage);
@@ -144,15 +144,49 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
         }
     }
 
-    private IEnumerator ShowAddonUpdateNoticeWhenMainMenuReady(string displayName)
+    private IEnumerator ShowAddonUpdateNoticesWhenMainMenuReady(IReadOnlyList<string> displayNames)
     {
+        if (displayNames.Count == 0)
+            yield break;
+
         yield return WaitForMainMenuReadyThenDelay(MainMenuUpdateNoticeDelaySec);
         if (!IsMainMenuSceneActive())
             yield break;
 
-        var message =
-            $"Addon {displayName} has just been updated. please restart your game to apply new addon update.";
-        yield return PresentTitleBarNoticeRoutine(openReleasePage: false, message);
+        var messages = new List<string>(displayNames.Count);
+        foreach (var displayName in displayNames)
+        {
+            messages.Add(
+                $"Addon {displayName} has just been updated. please restart your game to apply new addon update.");
+        }
+
+        yield return PresentTitleBarNoticesRoutine(messages);
+    }
+
+    private static IEnumerator PresentTitleBarNoticesRoutine(IReadOnlyList<string> messages)
+    {
+        if (messages.Count == 0)
+            yield break;
+
+        for (var i = 0; i < 160 && ChatBubbleManager.Instance == null; i++)
+            yield return new WaitForSeconds(0.25f);
+
+        if (ChatBubbleManager.Instance == null)
+        {
+            MpChatLog.UpdaterWarn("[MPChat] Update notice skipped: title-bar chat host not ready.");
+            yield break;
+        }
+
+        yield return ChatBubbleManager.Instance.PresentTimedHeaderSystemMessagesWhenReady(messages, 30f);
+
+        if (ChatBubbleManager.Instance.HasPendingTimedHeaderNotice)
+        {
+            MpChatLog.UpdaterWarn("[MPChat] Update notice skipped: title-bar chat anchor not ready.");
+            yield break;
+        }
+
+        foreach (var text in messages)
+            MpChatLog.UpdaterInfo($"[MPChat] Update notice shown on title bar: {text}");
     }
 
     private IEnumerator ShowUpdateNoticeWhenMainMenuReady(bool openReleasePage, string? message = null)

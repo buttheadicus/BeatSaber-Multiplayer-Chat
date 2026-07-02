@@ -5,20 +5,21 @@ using System.IO;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Startup update check for Custom Avatars only (runs from VersionChecker with the core mod update).
+// Startup update check for installed addons (runs from VersionChecker with the core mod update).
 internal static class AddonStartupUpdater
 {
-    private static readonly AddonReleaseDefinition CustomAvatars = AddonReleaseDefinitions.CustomAvatars;
-
-    internal static IEnumerator CheckInstallCustomAvatars(ICollection<string> updatedDisplayNames)
+    internal static IEnumerator CheckInstallAll(ICollection<string> updatedDisplayNames)
     {
         updatedDisplayNames.Clear();
-        MpChatLog.UpdaterInfo("[MPChat][Addons] Checking Custom Avatars for updates...");
+        MpChatLog.UpdaterInfo("[MPChat][Addons] Checking installed addons for updates...");
 
-        string? installedDisplayName = null;
-        yield return CheckInstallAddon(CustomAvatars, name => installedDisplayName = name);
-        if (!string.IsNullOrEmpty(installedDisplayName))
-            updatedDisplayNames.Add(installedDisplayName);
+        foreach (var definition in AddonReleaseDefinitions.All)
+        {
+            string? installedDisplayName = null;
+            yield return CheckInstallAddon(definition, name => installedDisplayName = name);
+            if (!string.IsNullOrEmpty(installedDisplayName))
+                updatedDisplayNames.Add(installedDisplayName);
+        }
     }
 
     private static IEnumerator CheckInstallAddon(
@@ -30,9 +31,11 @@ internal static class AddonStartupUpdater
         var dllPath = Path.Combine(AddonPaths.AddonsRoot, definition.DllFileName);
         if (!File.Exists(dllPath))
         {
-            MpChatLog.DebugLine($"[MPChat][Addons] Startup update skipped for {definition.AddonId}: DLL not installed.");
+            MpChatLog.DebugLine($"[MPChat][Addons] Startup update skipped for {definition.DisplayName}: DLL not installed.");
             yield break;
         }
+
+        MpChatLog.UpdaterInfo($"[MPChat][Addons] Checking {definition.DisplayName} for updates...");
 
         var buildPath = AddonInstallVersion.GetAddonBuildFilePath(definition.AddonId);
         if (!AddonInstallVersion.TryReadBuildNumber(buildPath, out var localBuild))
@@ -52,7 +55,7 @@ internal static class AddonStartupUpdater
 
         if (!fetchOk)
         {
-            MpChatLog.UpdaterWarn($"[MPChat][Addons] Custom Avatars update check failed: {fetchError}");
+            MpChatLog.UpdaterWarn($"[MPChat][Addons] {definition.DisplayName} update check failed: {fetchError}");
             yield break;
         }
 
@@ -62,23 +65,25 @@ internal static class AddonStartupUpdater
                 out var latestBuild))
         {
             MpChatLog.UpdaterWarn(
-                $"[MPChat][Addons] Could not parse Custom Avatars release tag. Ensure the tag is a number and {definition.DllFileName} is attached to the release.");
+                $"[MPChat][Addons] Could not parse {definition.DisplayName} release tag. Ensure the tag is a number and {definition.DllFileName} is attached to the release.");
             yield break;
         }
 
         if (latestBuild <= localBuild)
         {
             MpChatLog.UpdaterInfo(
-                $"[MPChat][Addons] Custom Avatars is up to date (installed build {localBuild}, latest release tag {latestBuild}).");
+                $"[MPChat][Addons] {definition.DisplayName} is up to date (installed build {localBuild}, latest release tag {latestBuild}).");
+            if (!File.Exists(buildPath))
+                AddonInstallVersion.WriteBuildNumber(buildPath, latestBuild);
             yield break;
         }
 
         MpChatLog.UpdaterWarn(
-            $"[MPChat][Addons] Custom Avatars update available: installed build {localBuild} -> release tag {latestBuild}. Downloading...");
+            $"[MPChat][Addons] {definition.DisplayName} update available: installed build {localBuild} -> release tag {latestBuild}. Downloading...");
 
         if (!TryQueueReleaseAssets(definition, releaseJson, out var installs, out var installError))
         {
-            MpChatLog.UpdaterWarn($"[MPChat][Addons] Custom Avatars update install failed: {installError}");
+            MpChatLog.UpdaterWarn($"[MPChat][Addons] {definition.DisplayName} update install failed: {installError}");
             yield break;
         }
 
@@ -100,7 +105,7 @@ internal static class AddonStartupUpdater
             if (!done || !success)
             {
                 MpChatLog.UpdaterWarn(
-                    $"[MPChat][Addons] Failed to download {install.FileName} for Custom Avatars: {error}");
+                    $"[MPChat][Addons] Failed to download {install.FileName} for {definition.DisplayName}: {error}");
                 yield break;
             }
 
@@ -109,7 +114,7 @@ internal static class AddonStartupUpdater
         }
 
         MpChatLog.UpdaterWarn(
-            $"[MPChat][Addons] Installed Custom Avatars build {latestBuild}. Restart Beat Saber to load it.");
+            $"[MPChat][Addons] Installed {definition.DisplayName} build {latestBuild}. Restart Beat Saber to load it.");
         onInstalled(definition.DisplayName);
     }
 
