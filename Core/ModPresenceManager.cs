@@ -23,6 +23,7 @@ public class ModPresenceManager : IInitializable, IDisposable
 
     private readonly HashSet<string> _playersWithMod = new();
     private readonly HashSet<string> _playersWithLobbyCustomAvatars = new();
+    private readonly HashSet<string> _playersSlzCompanion = new(StringComparer.Ordinal);
     private readonly object _lock = new();
     private Coroutine? _presenceRetryCoroutine;
     private bool _hasReceivedPresenceReply;
@@ -96,6 +97,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         {
             _playersWithMod.Clear();
             _playersWithLobbyCustomAvatars.Clear();
+            _playersSlzCompanion.Clear();
         }
 
         // GameCore disposes its ModPresenceManager while lobby instance may still be alive; restore lobby packet handler so presence keeps working.
@@ -126,6 +128,19 @@ public class ModPresenceManager : IInitializable, IDisposable
         if (local != null && local.userId == userId)
             return true;
         lock (_lock) return _playersWithMod.Contains(userId);
+    }
+
+    public bool IsSlzCompanionClient(string userId)
+    {
+        if (string.IsNullOrEmpty(userId))
+            return false;
+
+        var local = _sessionManager.localPlayer;
+        if (local != null && local.userId == userId)
+            return SlzMode.IsEnabled && ChatClientHandoff.IsTakenOver;
+
+        lock (_lock)
+            return _playersSlzCompanion.Contains(userId);
     }
 
     public bool HasLobbyCustomAvatars(string userId)
@@ -170,13 +185,15 @@ public class ModPresenceManager : IInitializable, IDisposable
 
         var modRemoved = false;
         var avatarsRemoved = false;
+        var slzRemoved = false;
         lock (_lock)
         {
             modRemoved = _playersWithMod.Remove(userId);
             avatarsRemoved = _playersWithLobbyCustomAvatars.Remove(userId);
+            slzRemoved = _playersSlzCompanion.Remove(userId);
         }
 
-        if (modRemoved || avatarsRemoved)
+        if (modRemoved || avatarsRemoved || slzRemoved)
             PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
@@ -353,15 +370,22 @@ public class ModPresenceManager : IInitializable, IDisposable
         if (!connected.Any(p => p.userId == userId))
             return;
 
+        var newlyAdded = false;
         lock (_lock)
         {
-            if (!_playersWithMod.Add(userId))
-                return;
+            newlyAdded = _playersWithMod.Add(userId);
+            if (isSlzCompanionClient)
+                _playersSlzCompanion.Add(userId);
+            else
+                _playersSlzCompanion.Remove(userId);
 
-            MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {userName} has chat mod");
-            PresenceUpdated?.Invoke(this, EventArgs.Empty);
-            PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor, isSlzCompanionClient));
+            if (!newlyAdded)
+                return;
         }
+
+        MultiplayerChat.Plugin.Log?.Info($"[MPChat] ModPresence: {userName} has chat mod");
+        PresenceUpdated?.Invoke(this, EventArgs.Empty);
+        PlayerWithModAdded?.Invoke(this, new PlayerWithModEventArgs(userId, userName, senderNameColor, isSlzCompanionClient));
     }
 
     private void SchedulePresenceRetry()
@@ -395,7 +419,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             IsIgnoredFromSong = ignoredFromSong,
             SenderChatId = ChatPersistentId.Current,
             SenderNameColor = NormalizeNameColorForPacket(ModSettings.NameColor),
-            IsSlzCompanionClient = SlzMode.IsEnabled,
+            IsSlzCompanionClient = SlzMode.IsEnabled && ChatClientHandoff.IsTakenOver,
             HasLobbyCustomAvatarsEnabled = CustomAvatarDependenciesBootstrap.IsSessionActive(),
             VoiceIsDeafened = VoiceChatRuntimeState.IsDeaf,
             VoiceIsHotMicMuted = VoiceChatRuntimeState.IsHotMicMuted

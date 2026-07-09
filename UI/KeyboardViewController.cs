@@ -132,6 +132,13 @@ public class KeyboardViewController : BSMLAutomaticViewController
     [UIAction("SubmitClicked")]
     private void SubmitClicked()
     {
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+        {
+            ClearTypingBroadcastIfNeeded();
+            Cancelled?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
         var text = _chatInput?.Text?.Trim() ?? "";
         if (string.IsNullOrEmpty(text))
         {

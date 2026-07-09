@@ -18,6 +18,11 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
 
     public string? TargetChatId;
 
+    /// <summary>
+    /// Optional display name override (e.g. "BOT" for SLZ). Appended for forward compat; old clients ignore.
+    /// </summary>
+    public string? DisplayNameOverride;
+
     public override void Serialize(NetDataWriter writer)
     {
         writer.PutBytesWithLength(EncryptedPayload ?? Array.Empty<byte>());
@@ -25,6 +30,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
         writer.Put(NormalizeHex(NameColor) ?? "");
         writer.Put(SenderChatId ?? "");
         writer.Put(TargetChatId ?? "");
+        writer.Put(DisplayNameOverride ?? "");
     }
 
     public override void Deserialize(NetDataReader reader)
@@ -40,6 +46,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
                 NameColor = null;
                 SenderChatId = null;
                 TargetChatId = null;
+                DisplayNameOverride = null;
                 return;
             }
             if (payload.Length > MaxPayloadSize)
@@ -50,6 +57,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
                 NameColor = null;
                 SenderChatId = null;
                 TargetChatId = null;
+                DisplayNameOverride = null;
                 return;
             }
             EncryptedPayload = payload;
@@ -57,6 +65,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             NameColor = null;
             SenderChatId = null;
             TargetChatId = null;
+            DisplayNameOverride = null;
             if (reader.AvailableBytes > 0)
             {
                 var target = reader.GetString();
@@ -81,6 +90,12 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
                 if (!string.IsNullOrEmpty(tc))
                     TargetChatId = tc;
             }
+            if (reader.AvailableBytes > 0)
+            {
+                var display = reader.GetString();
+                if (!string.IsNullOrEmpty(display))
+                    DisplayNameOverride = display;
+            }
         }
         catch (Exception ex)
         {
@@ -90,6 +105,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
             NameColor = null;
             SenderChatId = null;
             TargetChatId = null;
+            DisplayNameOverride = null;
         }
     }
 

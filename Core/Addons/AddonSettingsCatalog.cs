@@ -37,6 +37,8 @@ internal static class AddonSettingsCatalog
         foreach (var id in AddonSettingsBridge.PresentersSnapshot.Keys)
             ids.Add(id);
 
+        // Private bot addons (e.g. slzMode) never register settings presenters, so they
+        // cannot open settings even if they appear in a future dynamic list.
         var rows = new List<AddonSettingsRow>();
         foreach (var id in ids.OrderBy(id => ResolveDisplayName(id, onDisk), StringComparer.OrdinalIgnoreCase))
         {
@@ -46,7 +48,10 @@ internal static class AddonSettingsCatalog
             var displayName = ResolveDisplayName(id, onDisk);
             var status = ResolveStatus(entry != null, enabled, loadedInfo);
             var label = $"{displayName} ({status})";
-            var canOpen = loadedInfo != null && enabled && AddonSettingsBridge.TryGetPresenter(id, out _);
+            var onDiskAndPresentable = entry != null &&
+                AddonSettingsFlowRegistry.TryGet(id, out _) &&
+                AddonSettingsBridge.TryGetPresenter(id, out _);
+            var canOpen = onDiskAndPresentable;
             rows.Add(new AddonSettingsRow
             {
                 AddonId = id,

@@ -391,7 +391,16 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         {
             var rt = _lobbyHeaderRoot.GetComponent<RectTransform>();
             if (rt != null)
-                ModSettings.LobbyChatPosition = rt.anchoredPosition;
+            {
+                var pos = rt.anchoredPosition;
+                if (!MpChatTitleBarAnchoredChatRoot.IsSaneLobbyChatOffset(pos))
+                {
+                    pos = DefaultAnchoredPositionForCurrentLobbyRoot();
+                    rt.anchoredPosition = pos;
+                    ModSettings.CustomPlacement = false;
+                }
+                ModSettings.LobbyChatPosition = pos;
+            }
         }
     }
 
@@ -415,7 +424,21 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
         if (ModSettings.CustomPlacement)
         {
-            rt.anchoredPosition = ModSettings.LobbyChatPosition;
+            var saved = ModSettings.LobbyChatPosition;
+            if (!MpChatTitleBarAnchoredChatRoot.IsSaneLobbyChatOffset(saved))
+            {
+                MultiplayerChat.Plugin.Log?.Warn(
+                    $"[MPChat] Ignoring corrupt lobby chat position ({saved.x:0},{saved.y:0}); resetting to default.");
+                var fallback = DefaultAnchoredPositionForCurrentLobbyRoot();
+                ModSettings.LobbyChatPosition = fallback;
+                ModSettings.CustomPlacement = false;
+                ApplyDefaultLobbyHeaderAnchoredPosition(rt);
+                _isMoveMode = false;
+                RemoveMoveHandle();
+                return;
+            }
+
+            rt.anchoredPosition = saved;
             if (_isMoveMode)
                 EnsureMoveHandle();
             else
@@ -914,7 +937,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootRect.anchorMax = new Vector2(1f, 1f);
         rootRect.pivot = new Vector2(0.5f, 1f);
         rootRect.sizeDelta = new Vector2(0f, 320f);
-        rootRect.anchoredPosition = ModSettings.CustomPlacement ? ModSettings.LobbyChatPosition : DefaultChatPosition;
+        rootRect.anchoredPosition = MpChatTitleBarAnchoredChatRoot.ResolveSafeAnchoredPosition(
+            ModSettings.CustomPlacement, ModSettings.LobbyChatPosition, DefaultChatPosition);
 
         var le = rootObj.AddComponent<LayoutElement>();
         le.preferredHeight = 320f;
@@ -1092,7 +1116,8 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         rootRect.anchorMin = new Vector2(0.5f, 1f);
         rootRect.anchorMax = new Vector2(0.5f, 1f);
         rootRect.pivot = new Vector2(0.5f, 0f);
-        rootRect.anchoredPosition = ModSettings.CustomPlacement ? ModSettings.LobbyChatPosition : DefaultChatPosition;
+        rootRect.anchoredPosition = MpChatTitleBarAnchoredChatRoot.ResolveSafeAnchoredPosition(
+            ModSettings.CustomPlacement, ModSettings.LobbyChatPosition, DefaultChatPosition);
         rootRect.sizeDelta = new Vector2(420f, 320f);
 
         ApplyLobbyBubbleStackLayout(rootObj);
@@ -1517,6 +1542,22 @@ internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
         rt.anchorMin = new Vector2(0f, 1f);
         rt.anchorMax = new Vector2(1f, 1f);
         rt.pivot = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = customPlacement ? customPosition : DefaultAnchoredOffset;
+        rt.anchoredPosition = ResolveSafeAnchoredPosition(customPlacement, customPosition, DefaultAnchoredOffset);
     }
+
+    /// <summary>
+    /// Reject absurd saved/custom offsets (e.g. drag scale blow-ups or stale values from a different parent).
+    /// Those show up as chat bubbles far below the ground.
+    /// </summary>
+    internal static Vector2 ResolveSafeAnchoredPosition(bool customPlacement, Vector2 customPosition, Vector2 fallback)
+    {
+        if (!customPlacement)
+            return fallback;
+        if (!IsSaneLobbyChatOffset(customPosition))
+            return fallback;
+        return customPosition;
+    }
+
+    internal static bool IsSaneLobbyChatOffset(Vector2 pos) =>
+        Mathf.Abs(pos.x) <= 900f && pos.y >= -80f && pos.y <= 900f;
 }

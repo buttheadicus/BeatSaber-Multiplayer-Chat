@@ -43,6 +43,17 @@ internal static class AddonSettingsFlowRegistry
             AddonIds.CustomAvatars,
             "MultiplayerChat.UI.CustomAvatarsSettingsFlowCoordinator",
             "MultiplayerChat.UI.CustomAvatarsSettingsViewController");
+
+        RegisterPresentersFromBindings();
+    }
+
+    private static void RegisterPresentersFromBindings()
+    {
+        foreach (var binding in Bindings.Values)
+        {
+            var label = AddonEnablement.DisplayNameFor(binding.AddonId);
+            AddonSettingsBridge.RegisterPresenter(binding.AddonId, binding.FlowType, label);
+        }
     }
 
     internal static bool TryGet(string addonId, out AddonSettingsFlowBinding binding) =>

@@ -218,6 +218,9 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     [UIAction("SubmitClicked")]
     private void SubmitClicked()
     {
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+            return;
+
         var text = _chatInput?.Text?.Trim() ?? "";
         if (string.IsNullOrEmpty(text))
         {
@@ -235,6 +238,9 @@ public class LobbyChatTabRegistrar : MonoBehaviour
 
     private void OpenMuteOrDmGrid(PlayerListViewController.Mode mode)
     {
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+            return;
+
         var mainFlow = BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator;
         var topFlow = FlowCoordinatorHelper.GetTopFlowCoordinator(mainFlow);
         // MonoBehaviour FlowCoordinators must be resolved (bound FromNewComponentOnNewGameObject), not DiContainer.Instantiate<T>().

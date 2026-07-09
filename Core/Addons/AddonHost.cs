@@ -199,6 +199,8 @@ internal sealed class AddonHost
 
     internal void UnloadAll()
     {
+        // ChatClientHandoff lives in core; SLZ releases on its own OnUnload.
+        // Do not couple public Addons.dll to handoff APIs.
         SetCapability(AddonCapability.None, false);
         for (var i = _loaded.Count - 1; i >= 0; i--)
         {

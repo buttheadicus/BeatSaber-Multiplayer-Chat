@@ -116,7 +116,7 @@ internal static class AddonZenjectSettingsBinder
             AddonPatcherRegistry.Clear();
         }
 
-        EnsurePreloaderHasEnabledAddons();
+        EnsurePreloaderHasCatalogAddons();
 
         BindFlowAndView(container, AddonIds.AvatarColoring,
             "MultiplayerChat.UI.AvatarNameEntryFlowCoordinator",
@@ -202,13 +202,10 @@ internal static class AddonZenjectSettingsBinder
         }
     }
 
-    private static void EnsurePreloaderHasEnabledAddons()
+    private static void EnsurePreloaderHasCatalogAddons()
     {
         foreach (var entry in AddonCatalog.Scan())
         {
-            if (!AddonEnablement.IsEnabled(entry.Manifest.Id))
-                continue;
-
             if (AddonZenjectPreloader.TryGetAssembly(entry.Manifest.Id, out _))
                 continue;
 

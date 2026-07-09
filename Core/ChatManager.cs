@@ -418,11 +418,31 @@ public class ChatManager : IInitializable, IDisposable
 
     public bool SendMessage(string text)
     {
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+            return false;
+        return SendMessageInternal(text, fromController: false);
+    }
+
+    /// <summary>
+    /// Bot/controller send path. Allowed only while chat client is claimed.
+    /// Bypasses the human spam cooldown so bot command lists can send quickly.
+    /// </summary>
+    public bool SendMessageFromController(string text)
+    {
+        if (!ChatClientHandoff.IsTakenOver)
+            return false;
+        return SendMessageInternal(text, fromController: true);
+    }
+
+    private bool SendMessageInternal(string text, bool fromController)
+    {
         if (string.IsNullOrWhiteSpace(text))
             return false;
 
         var now = Time.realtimeSinceStartup;
-        if (_lastOutgoingTextChatAt.HasValue && now - _lastOutgoingTextChatAt.Value < OutgoingSpamCooldownSeconds)
+        if (!fromController &&
+            _lastOutgoingTextChatAt.HasValue &&
+            now - _lastOutgoingTextChatAt.Value < OutgoingSpamCooldownSeconds)
         {
             PostSystemMessage("Woah there! Sorry about this, some sort of spam prevention had to be in place...");
             return false;
@@ -438,7 +458,9 @@ public class ChatManager : IInitializable, IDisposable
         if (text.Length > 500)
             text = text.Substring(0, 500);
 
-        if (_dmState.IsInDMMode)
+        // Controllers always send as lobby broadcast (no human DM mode).
+        var useDm = !fromController && _dmState.IsInDMMode;
+        if (useDm)
         {
             if (string.IsNullOrEmpty(_dmState.DMTargetUserId) || !ChatPersistentId.IsValidFormat(_dmState.DMTargetChatId))
             {
@@ -455,7 +477,8 @@ public class ChatManager : IInitializable, IDisposable
             return false;
         }
 
-        if (_dmState.PendingDmIntroForFirstMessage
+        if (!fromController
+            && _dmState.PendingDmIntroForFirstMessage
             && !string.IsNullOrEmpty(_dmState.DMTargetUserId)
             && _dmState.DMTargetUserId == _dmState.ReceivedDmIntroFromUserId)
         {
@@ -463,7 +486,7 @@ public class ChatManager : IInitializable, IDisposable
             PostSystemMessageRich(BuildMutualDmLine(peerName, null));
         }
 
-        if (_dmState.IsInDMMode && _dmState.PendingDmIntroForFirstMessage && !string.IsNullOrEmpty(_dmState.DMTargetUserId))
+        if (useDm && _dmState.PendingDmIntroForFirstMessage && !string.IsNullOrEmpty(_dmState.DMTargetUserId))
         {
             _sessionManager.Send(new DmIntroNotifyPacket
             {
@@ -479,9 +502,10 @@ public class ChatManager : IInitializable, IDisposable
         {
             EncryptedPayload = encrypted,
             NameColor = NormalizeHexForPacket(ModSettings.NameColor),
-            SenderChatId = ChatPersistentId.Current
+            SenderChatId = ChatPersistentId.Current,
+            DisplayNameOverride = fromController ? "BOT" : null
         };
-        if (_dmState.IsInDMMode)
+        if (useDm)
         {
             packet.TargetUserId = _dmState.DMTargetUserId;
             packet.TargetChatId = _dmState.DMTargetChatId;
@@ -494,9 +518,9 @@ public class ChatManager : IInitializable, IDisposable
         var localPlayer = _sessionManager.localPlayer;
         if (localPlayer != null)
         {
-            var isDm = _dmState.IsInDMMode;
             var nameColor = NormalizeHexForPacket(ModSettings.NameColor);
-            NotifyMessageReceived(new ChatMessageEventArgs(localPlayer.userName, text, localPlayer.userId, isDm, nameColor: nameColor));
+            var displayName = fromController ? "BOT" : localPlayer.userName;
+            NotifyMessageReceived(new ChatMessageEventArgs(displayName, text, localPlayer.userId, useDm, nameColor: nameColor));
         }
 
         return true;
@@ -994,7 +1018,13 @@ public class ChatManager : IInitializable, IDisposable
             return;
         }
 
-        NotifyMessageReceived(new ChatMessageEventArgs(sender.userName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
+        var displayName = !string.IsNullOrWhiteSpace(packet.DisplayNameOverride)
+            ? packet.DisplayNameOverride!.Trim()
+            : ModPresenceManager.Instance != null &&
+              ModPresenceManager.Instance.IsSlzCompanionClient(sender.userId)
+                ? "BOT"
+                : sender.userName;
+        NotifyMessageReceived(new ChatMessageEventArgs(displayName, decrypted, sender.userId, isDm, nameColor: packet.NameColor));
     }
 
     public event Action<string>? SystemMessageRemovalRequested;

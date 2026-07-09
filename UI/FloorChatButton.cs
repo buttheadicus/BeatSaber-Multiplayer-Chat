@@ -45,7 +45,7 @@ public class FloorChatButton : MonoBehaviour
         }
 
         if (_buttonRoot != null)
-            _buttonRoot.SetActive(_cachedInLobbyState);
+            _buttonRoot.SetActive(_cachedInLobbyState && !ChatClientHandoff.IsHumanClientSuppressed);
     }
 
     private bool IsInMultiplayerLobby()

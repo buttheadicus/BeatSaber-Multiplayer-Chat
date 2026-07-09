@@ -34,12 +34,6 @@ public sealed class AddonsSettingsFlowCoordinator : FlowCoordinator
 
     private void OnAddonClicked(string addonId)
     {
-        if (!AddonEnablement.IsEnabled(addonId))
-        {
-            MultiplayerChat.Plugin.Log?.Warn($"[MPChat][Addons] {addonId} is disabled in settings.");
-            return;
-        }
-
         if (!AddonSettingsBridge.TryGetPresenter(addonId, out _))
         {
             var reloadHint = MpChatDebugMode.IsEnabled
