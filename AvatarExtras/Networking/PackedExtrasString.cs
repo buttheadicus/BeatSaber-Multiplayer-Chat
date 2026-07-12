@@ -92,7 +92,7 @@ public struct PackedExtrasString
 
     public void ApplyTo(AvatarData avatarData)
     {
-        // BinaryWriter.Write(string) throws if null; vanilla JSON uses "None" for absent accessory ids.
+        // binaryWriter.Write(string) throws if null; vanilla JSON uses "None" for absent accessory ids.
         avatarData.glassesId = GlassesId ?? "None";
 
         if (WireGlassesColor.HasValue)
@@ -103,7 +103,7 @@ public struct PackedExtrasString
         if (GlassesId != null || FacialHairId != null)
             avatarData.facialHairId = ToWireString();
 
-        // Same BinaryWriter null rule as glassesId when neither packed id nor wire string was written.
+        // same BinaryWriter null rule as glassesId when neither packed id nor wire string was written.
         avatarData.facialHairId ??= "None";
     }
 

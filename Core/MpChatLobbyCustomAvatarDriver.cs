@@ -212,7 +212,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
         return !string.IsNullOrEmpty(localUserId);
     }
 
-    // Mirror pedestal previews your avatar; your own lobby/arena slot is for others to see on their client.
+    // mirror pedestal previews your avatar; your own lobby/arena slot is for others to see on their client.
     private bool SkipStartupAsLocalPlayerSlot() =>
         IsDisplayingLocalPlayer() && !IsMirrorPedestal();
 
@@ -567,7 +567,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
 
     private void OnDisable()
     {
-        // Arena facade/pose toggles during intro; keep spawn and sync hooks until the facade is destroyed.
+        // arena facade/pose toggles during intro; keep spawn and sync hooks until the facade is destroyed.
         if (IsArenaContext())
         {
             if (_loadCoroutine != null)
@@ -1085,7 +1085,7 @@ public sealed class MpChatLobbyCustomAvatarDriver : MonoBehaviour
             yield break;
         }
 
-        // Let Custom Avatars finish activating hierarchy before we hide vanilla rig parts.
+        // let Custom Avatars finish activating hierarchy before we hide vanilla rig parts.
         yield return null;
 
         if (_spawnedAvatar == null)

@@ -6,7 +6,7 @@ using System.Text;
 
 namespace MultiplayerChat.Core;
 
-// Session-scoped AES/HMAC for chat and voice blobs; key derived from sorted participant id material (includes Chat IDs where CollectEncryptionParticipantIds supplies them).
+// session-scoped AES/HMAC for chat and voice blobs; key derived from sorted participant id material (includes Chat IDs where CollectEncryptionParticipantIds supplies them).
 public class EncryptionManager
 {
     private const int KeySize = 32;
@@ -43,8 +43,8 @@ public class EncryptionManager
 
         _lastSessionState = state;
 
-        // Fast deterministic session key (sorted platform user ids are the secret material).
-        // Avoid PBKDF2 here: 10k iterations on the main thread caused visible lobby join/leave hitches.
+        // fast deterministic session key (sorted platform user ids are the secret material).
+        // avoid PBKDF2 here: 10k iterations on the main thread caused visible lobby join/leave hitches.
         using var sha = SHA256.Create();
         var material = Encoding.UTF8.GetBytes(state + "\0" + KeyDerivationSalt);
         _sessionKey = sha.ComputeHash(material);

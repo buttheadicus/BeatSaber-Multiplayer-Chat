@@ -94,7 +94,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             StartCoroutine(ApplySavedEyeHeightWhenReady());
     }
 
-    // Remote metadata is static across lobby + GameCore; hand Instance back after arena teardown.
+    // remote metadata is static across lobby + GameCore; hand Instance back after arena teardown.
     internal static void EnsureActiveLobbyHostAfterArena()
     {
         if (!MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive())
@@ -447,7 +447,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
         MpChatLobbyAvatarLifecycleHost.QueuePlayerLeaveAvatarWork(userId);
     }
 
-    // Static remote rows survive lobby Zenject teardown; clear when the lobby session ends.
+    // static remote rows survive lobby Zenject teardown; clear when the lobby session ends.
     public static void ClearAllRemotes()
     {
         lock (RemoteLock)
@@ -471,7 +471,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             Instance.ClearBroadcastDedupeState();
     }
 
-    // Full teardown when the multiplayer session is no longer connected.
+    // full teardown when the multiplayer session is no longer connected.
     public static void FlushLobbyCustomAvatarsOnServerLeaveIfDisconnected()
     {
         if (!MpChatFeatures.LobbyCustomAvatars)
@@ -594,7 +594,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
             Instance.TryBroadcastScaleOnly();
     }
 
-    // Height calibrate: scale packet first so peers apply height before a full metadata/spawn refresh.
+    // height calibrate: scale packet first so peers apply height before a full metadata/spawn refresh.
     public static void BroadcastScaleThenMetadata()
     {
         BroadcastScaleOnlyNow();
@@ -711,7 +711,7 @@ public sealed class MpCustomAvatarSyncManager : MonoBehaviour, IInitializable
         if (!forceSend && MpChatPerformanceGate.IsMultiplayerSceneTransitionLikely())
             return;
 
-        // Arena/GameCore: metadata is learned in lobby; no periodic relay while in song or between rounds.
+        // arena/GameCore: metadata is learned in lobby; no periodic relay while in song or between rounds.
         if (!forceSend &&
             MpChatLobbyDiagnostics.AnyGameCoreLoaded() &&
             !MpChatLobbyDiagnostics.LobbyHierarchyLooksLikeMultiplayerLobby())

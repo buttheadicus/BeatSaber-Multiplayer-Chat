@@ -5,7 +5,7 @@ using System.IO;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Startup update check for installed addons (runs from VersionChecker with the core mod update).
+// startup update check for installed addons (runs from VersionChecker with the core mod update).
 internal static class AddonStartupUpdater
 {
     internal static IEnumerator CheckInstallAll(ICollection<string> updatedDisplayNames)

@@ -4,7 +4,7 @@ using MultiplayerCore.Networking;
 
 namespace MultiplayerChat.Core;
 
-// One-shot diagnostics when debug mode is on (safe on any thread that already holds session state).
+// one-shot diagnostics when debug mode is on (safe on any thread that already holds session state).
 internal static class MpChatRuntimeAudit
 {
     internal static void LogAfterLobbyChatInit(

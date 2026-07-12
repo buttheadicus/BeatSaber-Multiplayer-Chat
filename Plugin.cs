@@ -52,11 +52,21 @@ public class Plugin
         {
             var vrMenuHarmony = new Harmony("com.multiplayerchat.ignorevrsystemmenu");
             MpChatIgnoreVrSystemMenuPatches.Apply(vrMenuHarmony);
-            logger.Info("[MPChat] VR system menu will not pause or fail gameplay.");
+            logger.Info("[MPChat] SteamVR / system menu overlays will not pause, fail, or freeze controllers.");
         }
         catch (Exception ex)
         {
             logger.Warn($"[MPChat] VR system menu ignore patches failed: {ex.Message}");
+        }
+
+        try
+        {
+            var handLimitHarmony = new Harmony("com.multiplayerchat.avatarhandlimit");
+            MpChatAvatarHandLimitPatch.Apply(handLimitHarmony);
+        }
+        catch (Exception ex)
+        {
+            logger.Warn($"[MPChat] Avatar hand limit unlock failed: {ex.Message}");
         }
 
         if (!MultiplayerExtensionsBootstrap.TryContinueAfterEnsuringStandaloneMpex(logger))

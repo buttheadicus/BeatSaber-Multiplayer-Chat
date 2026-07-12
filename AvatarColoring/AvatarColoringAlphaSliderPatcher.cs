@@ -39,16 +39,16 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
 
     private const float SliderVisualScale = 1.1f;
 
-    // Whole r/g/b/a column position in anchored pixels after layout parents this rect.
+    // whole r/g/b/a column position in anchored pixels after layout parents this rect.
     public static Vector2 RgbaSliderStackAnchoredPixelOffset = new Vector2(24f, 52f);
 
-    // Nudge the RGB mode / direct-entry toggle row (horizontal layout) inside the column.
+    // nudge the RGB mode / direct-entry toggle row (horizontal layout) inside the column.
     public static Vector2 RgbOptionsRowAnchoredPixelOffset = new Vector2(-13f, 7f);
 
     // -1 keeps auto order; otherwise set sibling index on the column under the parent row.
     public static int RgbaStackSiblingIndex = -1;
 
-    // Nudge r/g/b/a labels relative to each slider row.
+    // nudge r/g/b/a labels relative to each slider row.
     public static Vector2 RgbaChannelLetterAnchoredPixelNudge = new Vector2(10f, 0f);
 
     internal static AvatarColoringAlphaSliderPatcher? Instance { get; private set; }
@@ -206,7 +206,7 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
             _aStringSetting.Text = FormatDirectEntryScalar(value.a);
     }
 
-    // Round-trip friendly display for Direct # rows (no range clamp in direct mode).
+    // round-trip friendly display for Direct # rows (no range clamp in direct mode).
     private static string FormatDirectEntryScalar(float v)
     {
         if (float.IsNaN(v))
@@ -235,8 +235,8 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
     [AffinityPostfix]
     public void PostfixEditColorDidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
     {
-        // Returning to the main avatar editor often deactivates this screen without removing it from the hierarchy.
-        // Skipping here left the draft active and skipped Abort revert until the whole editor closed.
+        // returning to the main avatar editor often deactivates this screen without removing it from the hierarchy.
+        // skipping here left the draft active and skipped Abort revert until the whole editor closed.
         StopRgbRowAnchoredNudgeCoroutine();
         if (ModSettings.EnableAvatarColoringExtensions)
             AvatarColorEditorDraft.AbortIfStillActive(_editColorViewController, _beatAvatarEditorViewController);
@@ -563,7 +563,7 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
         && Mathf.Approximately(a.g, b.g)
         && Mathf.Approximately(a.b, b.b);
 
-    // VerticalLayoutGroup resets child positions after rebuild; nudge on the next frames after layout runs.
+    // verticalLayoutGroup resets child positions after rebuild; nudge on the next frames after layout runs.
     private void ScheduleRgbOptionsRowAnchoredNudge(RectTransform? rowRt = null)
     {
         rowRt ??= _alphaColumnRoot != null
@@ -621,8 +621,8 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
             return true;
 
         __instance.SetColor(color);
-        // Stock ChangeColor drives preview and lobby UV edits; skipping it left coloring dead once draft snapshot worked.
-        // Calling ChangeColor again without bypass would recurse forever; CommitBypassScope turns off intercept for one nested call.
+        // stock ChangeColor drives preview and lobby UV edits; skipping it left coloring dead once draft snapshot worked.
+        // calling ChangeColor again without bypass would recurse forever; CommitBypassScope turns off intercept for one nested call.
         using (AvatarColorEditorDraft.CommitBypassScope())
             __instance.InvokeMethod<object, EditAvatarColorViewController>("ChangeColor", color);
 
@@ -643,8 +643,7 @@ public sealed class AvatarColoringAlphaSliderPatcher : IAffinity, IInitializable
         return false;
     }
 
-    /// When vc.color matches AvatarData for this edit, stock is syncing UI after Cancel (or no-op). When it differs,
-    /// vc holds uncommitted preview while SaveColorChange would persist it early (wheel Apply / dragging paths).
+    // when vc.color matches AvatarData, stock is syncing after Cancel; when it differs, defer SaveColorChange
     private static bool ShouldDeferSaveColorDuringDraft(AvatarPart avatarEditPart, Color vcColor, AvatarData? data)
     {
         if (!AvatarColorEditorDraft.ShouldInterceptChangeColor || data == null)

@@ -102,7 +102,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
             return;
         }
 
-        // Lobby often reuses Menu / other scene names; detect the same objects presence uses.
+        // lobby often reuses Menu / other scene names; detect the same objects presence uses.
         StartCoroutine(ReloadVoipIfMultiplayerLobbyDeferred($"[MPChat] VoIP reloaded (scene loaded: {scene.name})"));
     }
 
@@ -142,7 +142,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         if (string.Equals(SceneManager.GetActiveScene().name, "GameCore", System.StringComparison.Ordinal))
             yield break;
         TryRunVoipReload(logLine, bypassDebounce: false);
-        // Debounced reload skips work inside TryRunVoipReload; still sync mute/deaf-during-song for lobby return.
+        // debounced reload skips work inside TryRunVoipReload; still sync mute/deaf-during-song for lobby return.
         ApplySongVoicePolicy();
     }
 
@@ -152,7 +152,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         yield return null;
         yield return new WaitForSecondsRealtime(0.25f);
         TryRunVoipReload(logLine, bypassDebounce: false);
-        // Debounced skip leaves ApplySongVoicePolicy uncalled inside TryRunVoipReload; always re-evaluate after arena/lobby transition wait.
+        // debounced skip leaves ApplySongVoicePolicy uncalled inside TryRunVoipReload; always re-evaluate after arena/lobby transition wait.
         ApplySongVoicePolicy();
     }
 
@@ -196,17 +196,17 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         if (MpChatVerboseDebug.IsOn)
             Plugin.Log?.Info($"[MPChat][VoIP] TryRunVoipReload end: {logLine}");
 
-        // Arena entry: GameCore is loaded and this reload just ran  -  apply mute/deaf-during-song in lockstep with the new ChatManager / mic pipeline.
+        // arena entry: GameCore is loaded and this reload just ran  -  apply mute/deaf-during-song in lockstep with the new ChatManager / mic pipeline.
         ApplySongVoicePolicy();
     }
 
     private void ApplySongVoicePolicy()
     {
-        // SongGameplayLikelyActive can call FindObjectOfType repeatedly  -  throttle; song-edge timing error is negligible.
+        // songGameplayLikelyActive can call FindObjectOfType repeatedly  -  throttle; song-edge timing error is negligible.
         var nowRlPolicy = Time.realtimeSinceStartup;
         if (nowRlPolicy >= _songPolicyNextGameplaySampleRealtime)
         {
-            // In menu / lobby, SongGameplayLikelyActive may fall back to FindObjectOfType  -  sample less often than in GameCore.
+            // in menu / lobby, SongGameplayLikelyActive may fall back to FindObjectOfType  -  sample less often than in GameCore.
             var interval = MpChatLobbyDiagnostics.AnyGameCoreLoaded() ? 0.08f : 0.28f;
             _songPolicyNextGameplaySampleRealtime = nowRlPolicy + interval;
             _songPolicyCachedGameplayLikely = MpChatLobbyDiagnostics.SongGameplayLikelyActive();
@@ -285,7 +285,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
             return;
         }
 
-        // FindObjectOfType<AudioListener> every LateUpdate wasted ms; assume present and re-check periodically.
+        // findObjectOfType<AudioListener> every LateUpdate wasted ms; assume present and re-check periodically.
         var nowRl = Time.realtimeSinceStartup;
         if (nowRl >= _nextCachedAudioListenerCheckTime)
         {
@@ -299,7 +299,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         var dt = Time.unscaledDeltaTime;
         var audible = IsIncomingVoiceAudibleNow();
 
-        // Hot mic / voice messages arrive in bursts with gaps; a multi-second “continuous audible” gate
+        // hot mic / voice messages arrive in bursts with gaps; a multi-second “continuous audible” gate
         // prevented ducking from ever engaging. Latch on any audible activity; release after a short silence tail.
         if (audible)
         {

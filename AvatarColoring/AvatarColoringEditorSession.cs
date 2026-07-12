@@ -10,7 +10,7 @@ using Newtonsoft.Json;
 
 namespace MultiplayerChat.AvatarColoring;
 
-// Holds active avatar editor instances so save/load flows can refresh disk-backed presets.
+// holds active avatar editor instances so save/load flows can refresh disk-backed presets.
 internal static class AvatarColoringEditorSession
 {
     internal static BeatAvatarEditorViewController? EditorVc { get; private set; }

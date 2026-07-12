@@ -163,7 +163,7 @@ public static class MultiplayerExtensionsBootstrap
 
     private static void ForceExitAfterDelay()
     {
-        // Brief delay so IPA / log sinks can flush the message above.
+        // brief delay so IPA / log sinks can flush the message above.
         Thread.Sleep(450);
 
         try

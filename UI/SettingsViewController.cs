@@ -11,6 +11,7 @@ namespace MultiplayerChat.UI;
 [ViewDefinition("MultiplayerChat.UI.SettingsView.bsml")]
 public class SettingsViewController : BSMLAutomaticViewController
 {
+    private const string LabelUnlockAvatarHandPositions = "Unlock Avatar Hand Positions";
     private const string LabelEnableCau = "Enable 'Chat Auto Updater' (CAU)";
     private const string LabelDebugLogging = "Debug mode (very verbose; will lag; install only)";
 
@@ -26,11 +27,21 @@ public class SettingsViewController : BSMLAutomaticViewController
 
     public event Action? PerformanceClicked;
 
+    [UIComponent("UnlockAvatarHandPositionsToggle")]
+    private ToggleSetting? _unlockAvatarHandPositionsToggle;
+
     [UIComponent("EnableCauToggle")]
     private ToggleSetting? _enableCauToggle;
 
     [UIComponent("DebugLoggingToggle")]
     private ToggleSetting? _debugLoggingToggle;
+
+    [UIValue("UnlockAvatarHandPositions")]
+    public bool UnlockAvatarHandPositions
+    {
+        get => ModSettings.UnlockAvatarHandPositions;
+        set => ModSettings.UnlockAvatarHandPositions = value;
+    }
 
     [UIValue("EnableCau")]
     public bool EnableCau
@@ -67,6 +78,7 @@ public class SettingsViewController : BSMLAutomaticViewController
         MpChatDebugMode.Refresh();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
         ApplyToggleLabels();
+        _unlockAvatarHandPositionsToggle?.ReceiveValue();
         _debugLoggingToggle?.ReceiveValue();
     }
 
@@ -76,11 +88,14 @@ public class SettingsViewController : BSMLAutomaticViewController
         MpChatDebugMode.Refresh();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
         ApplyToggleLabels();
+        _unlockAvatarHandPositionsToggle?.ReceiveValue();
         _debugLoggingToggle?.ReceiveValue();
     }
 
     private void ApplyToggleLabels()
     {
+        if (_unlockAvatarHandPositionsToggle != null)
+            _unlockAvatarHandPositionsToggle.Text = LabelUnlockAvatarHandPositions;
         if (_enableCauToggle != null)
             _enableCauToggle.Text = LabelEnableCau;
         if (_debugLoggingToggle != null)
@@ -90,6 +105,10 @@ public class SettingsViewController : BSMLAutomaticViewController
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
+        var unlockHandsTgl = _unlockAvatarHandPositionsToggle?.GetComponentInChildren<Toggle>(true);
+        if (unlockHandsTgl != null)
+            ModSettings.UnlockAvatarHandPositions = unlockHandsTgl.isOn;
+
         var cauTgl = _enableCauToggle?.GetComponentInChildren<Toggle>(true);
         if (cauTgl != null)
             ModSettings.EnableCau = cauTgl.isOn;

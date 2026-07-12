@@ -19,7 +19,7 @@ internal enum NametagHeadphoneIconState
     CannotHearYou
 }
 
-// Per-peer voice icon state for nametag overlays. Remote fields update from network packets; talking uses a short holdover.
+// per-peer voice icon state for nametag overlays. Remote fields update from network packets; talking uses a short holdover.
 internal static class NametagVoiceStatusRegistry
 {
     private const float TalkingHoldoverSec = 0.25f;

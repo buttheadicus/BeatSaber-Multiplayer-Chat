@@ -10,7 +10,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// User mute lists keyed by Chat ID and by platform user id (DPAPI JSON). Platform-only entries migrate when we learn that user's Chat ID.
+// user mute lists keyed by Chat ID and by platform user id (DPAPI JSON). Platform-only entries migrate when we learn that user's Chat ID.
 public class ChatIdConfigStore : IInitializable
 {
     private readonly object _lock = new();
@@ -150,7 +150,7 @@ public class ChatIdConfigStore : IInitializable
         MutedStateChanged?.Invoke();
     }
 
-    // When a peer Chat ID becomes known, promote mute from platformUserId bucket to chatId bucket so it survives ID regeneration.
+    // when a peer Chat ID becomes known, promote mute from platformUserId bucket to chatId bucket so it survives ID regeneration.
     public void OnChatIdLearnedForUser(string platformUserId, string chatId)
     {
         if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId)) return;

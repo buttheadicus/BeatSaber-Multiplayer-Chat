@@ -15,7 +15,7 @@ using IPALogger = IPA.Logging.Logger;
 
 namespace MultiplayerChat.Core;
 
-// When lobby custom avatars are enabled, ensure DynamicBone, Custom Avatars, and Final IK are present.
+// when lobby custom avatars are enabled, ensure DynamicBone, Custom Avatars, and Final IK are present.
 public static class CustomAvatarDependenciesBootstrap
 {
     public const string CustomAvatarDll = "CustomAvatar.dll";
@@ -44,7 +44,7 @@ public static class CustomAvatarDependenciesBootstrap
 
     private const string DynamicBoneModName = "Dynamic Bone";
 
-    // BeatMods CDN fallbacks for BS 1.40.x when the API is unreachable.
+    // beatMods CDN fallbacks for BS 1.40.x when the API is unreachable.
     private static readonly Dictionary<string, string> BeatModsZipHashFallbacks140 =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -128,7 +128,7 @@ public static class CustomAvatarDependenciesBootstrap
         return true;
     }
 
-    // Download every missing dependency first, install together, then exit once (no one-at-a-time restarts).
+    // download every missing dependency first, install together, then exit once (no one-at-a-time restarts).
     private static bool TryBatchInstallMissingDependencies(
         IPALogger log,
         string installRoot,

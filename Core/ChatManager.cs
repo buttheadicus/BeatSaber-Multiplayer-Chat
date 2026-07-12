@@ -13,7 +13,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// Registers MP packet callbacks, encrypt/decrypt, DM state, voice playback, and outbound spam timers. Inbound paths call ChatPacketIdValidation.TryAcceptSenderChatId before handling content.
+// registers MP packet callbacks, encrypt/decrypt, DM state, voice playback, and outbound spam timers. Inbound paths call ChatPacketIdValidation.TryAcceptSenderChatId before handling content.
 public class ChatManager : IInitializable, IDisposable
 {
     public static ChatManager? Instance { get; private set; }
@@ -215,7 +215,7 @@ public class ChatManager : IInitializable, IDisposable
         _packetSerializer.RegisterCallback<TalkToNotifyPacket>(OnTalkToNotifyReceived);
         _packetSerializer.RegisterCallback<VoiceDeafenStatePacket>(OnVoiceDeafenStateReceived);
         _packetSerializer.RegisterCallback<ChatActivityPacket>(OnChatActivityReceived);
-        // New packet types must be registered last so existing packet IDs stay stable across mod updates.
+        // new packet types must be registered last so existing packet IDs stay stable across mod updates.
         _packetSerializer.RegisterCallback<ListenToNotifyPacket>(OnListenToNotifyReceived);
         _packetSerializer.RegisterCallback<VoiceHotMicMuteStatePacket>(OnVoiceHotMicMuteStateReceived);
     }
@@ -334,7 +334,7 @@ public class ChatManager : IInitializable, IDisposable
         foreach (var player in _hotMicSequentialPlayers.Values)
         {
             if (player?.Root == null) continue;
-            // Cheaper than scanning each HM_seg with GetComponent<AudioSource>(); segments parent here immediately.
+            // cheaper than scanning each HM_seg with GetComponent<AudioSource>(); segments parent here immediately.
             if (player.Root.transform.childCount > 0)
                 return true;
         }
@@ -423,10 +423,7 @@ public class ChatManager : IInitializable, IDisposable
         return SendMessageInternal(text, fromController: false);
     }
 
-    /// <summary>
-    /// Bot/controller send path. Allowed only while chat client is claimed.
-    /// Bypasses the human spam cooldown so bot command lists can send quickly.
-    /// </summary>
+    // bot/controller send path; only while chat client is claimed (skips human spam cooldown)
     public bool SendMessageFromController(string text)
     {
         if (!ChatClientHandoff.IsTakenOver)
@@ -458,7 +455,7 @@ public class ChatManager : IInitializable, IDisposable
         if (text.Length > 500)
             text = text.Substring(0, 500);
 
-        // Controllers always send as lobby broadcast (no human DM mode).
+        // controllers always send as lobby broadcast (no human DM mode).
         var useDm = !fromController && _dmState.IsInDMMode;
         if (useDm)
         {
@@ -514,7 +511,7 @@ public class ChatManager : IInitializable, IDisposable
         _sessionManager.Send(packet);
         _lastOutgoingTextChatAt = Time.realtimeSinceStartup;
 
-        // Show our own message locally for immediate feedback
+        // show our own message locally for immediate feedback
         var localPlayer = _sessionManager.localPlayer;
         if (localPlayer != null)
         {
@@ -1359,6 +1356,9 @@ public class ChatManager : IInitializable, IDisposable
     public bool SendVoiceHotMicChunk(byte[] voicePlainBlob)
     {
         if (voicePlainBlob == null || voicePlainBlob.Length == 0)
+            return false;
+
+        if (ChatClientHandoff.IsHumanClientSuppressed)
             return false;
 
         if (!ChatPersistentId.IsValidFormat(ChatPersistentId.Current))

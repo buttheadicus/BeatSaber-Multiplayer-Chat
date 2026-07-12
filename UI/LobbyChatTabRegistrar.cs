@@ -243,9 +243,9 @@ public class LobbyChatTabRegistrar : MonoBehaviour
 
         var mainFlow = BeatSaberMarkupLanguage.BeatSaberUI.MainFlowCoordinator;
         var topFlow = FlowCoordinatorHelper.GetTopFlowCoordinator(mainFlow);
-        // MonoBehaviour FlowCoordinators must be resolved (bound FromNewComponentOnNewGameObject), not DiContainer.Instantiate<T>().
+        // monoBehaviour FlowCoordinators must be resolved (bound FromNewComponentOnNewGameObject), not DiContainer.Instantiate<T>().
         var fc = _container.Resolve<PlayerListFlowCoordinator>();
-        // Reuse one coordinator: dismiss if still presented so Present does not stack UIs.
+        // reuse one coordinator: dismiss if still presented so Present does not stack UIs.
         if (fc.ParentFlow != null)
         {
             try
@@ -263,7 +263,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     [UIAction("DMClicked")]
     private void DMClicked()
     {
-        // Foolproof: always snap DM button to default (black) first; tab OnEnable re-applies blue if still DMing.
+        // foolproof: always snap DM button to default (black) first; tab OnEnable re-applies blue if still DMing.
         var wasDm = _dmState.IsInDMMode;
         ForceDmButtonNeutralVisual();
 
@@ -547,7 +547,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
             yield break;
         }
 
-        // Wait for the modal to appear (BSML opens it on the next frame); avoid clearing typing if there is no modal UI.
+        // wait for the modal to appear (BSML opens it on the next frame); avoid clearing typing if there is no modal UI.
         var showDeadline = Time.realtimeSinceStartup + 2f;
         while (_lobbyTypingBroadcastToOthers && !go.activeInHierarchy && Time.realtimeSinceStartup < showDeadline)
             yield return null;
@@ -773,7 +773,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         _capturedHz = _recordingHz;
         UpdateRecordButtonLabel();
 
-        // Voice message recording uses Microphone.Start/End on the same device as hot mic; release so hot mic can restart.
+        // voice message recording uses Microphone.Start/End on the same device as hot mic; release so hot mic can restart.
         _voiceHotMicManager.ForceReloadMicrophone();
     }
 

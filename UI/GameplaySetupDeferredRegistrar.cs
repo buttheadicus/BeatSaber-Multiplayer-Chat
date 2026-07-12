@@ -30,7 +30,7 @@ public class GameplaySetupDeferredRegistrar : MonoBehaviour
 
     private IEnumerator TryAddTabWhenReady()
     {
-        // GameplaySetup is created when song selection or lobby loads - keep retrying until it exists
+        // gameplaySetup is created when song selection or lobby loads - keep retrying until it exists
         while (!_tabAdded)
         {
             yield return new WaitForSeconds(0.5f);
@@ -49,7 +49,7 @@ public class GameplaySetupDeferredRegistrar : MonoBehaviour
             }
             catch (Exception)
             {
-                // Retry later
+                // retry later
             }
         }
     }

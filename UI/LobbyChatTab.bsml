@@ -2,7 +2,7 @@
 <bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
   <vertical pad="3" spacing="2">
-    <text text="Multiplayer Chat BETA-v0.3.7-C" font-size="4" align="Center"/>
+    <text text="Multiplayer Chat BETA-v0.3.7-D" font-size="4" align="Center"/>
     <horizontal spacing="3" child-align="UpperLeft" id="LobbyTopRow">
       <vertical spacing="1" id="VoiceMessageButtonsColumn">
         <button id="RecordButton" text="RECORD" on-click="RecordClicked"/>

@@ -176,7 +176,7 @@ public static class MpChatLobbyDiagnostics
     private static bool _beatmapGameplayCached;
     private const float BeatmapGameplayCacheTtlSec = 0.35f;
 
-    // Active beatmap (notes spawning / song time advancing). False during GameCore intro and lobby.
+    // active beatmap (notes spawning / song time advancing). False during GameCore intro and lobby.
     public static bool BeatmapGameplayLikelyActive()
     {
         var now = Time.realtimeSinceStartup;
@@ -230,14 +230,14 @@ public static class MpChatLobbyDiagnostics
     {
         if (AnyGameCoreLoaded())
         {
-            // Map ended: MP results on lobby return is not active gameplay even if GameCore is still loaded.
+            // map ended: MP results on lobby return is not active gameplay even if GameCore is still loaded.
             if (ResultsLikeUiVisibleUncached() && !BeatmapGameplayLikelyActiveUncached())
                 return false;
             return true;
         }
         if (ActiveSceneIsMainMenuWithoutGameCore())
             return false;
-        // Multiplayer lobby UI: not beatmap gameplay  -  avoids repeated FindObjectOfType scans on policy ticks.
+        // multiplayer lobby UI: not beatmap gameplay  -  avoids repeated FindObjectOfType scans on policy ticks.
         if (LobbyHierarchyLooksLikeMultiplayerLobbyUncached())
             return false;
         try
@@ -306,7 +306,7 @@ public static class MpChatLobbyDiagnostics
         return SongGameplayLikelyActive();
     }
 
-    // Lobby pedestal sync and metadata ticks only in lobby UI or arena (GameCore), not main menu while still in session.
+    // lobby pedestal sync and metadata ticks only in lobby UI or arena (GameCore), not main menu while still in session.
     public static bool MultiplayerAvatarSyncContextActive(IMultiplayerSessionManager? sessionManager)
     {
         if (AnyGameCoreLoaded())
@@ -314,7 +314,7 @@ public static class MpChatLobbyDiagnostics
         return LobbyHierarchyLooksLikeMultiplayerLobby();
     }
 
-    // Voice nametag sync, presence voice flags, and icon ticks only while MP lobby UI is up (never during arena GameCore).
+    // voice nametag sync, presence voice flags, and icon ticks only while MP lobby UI is up (never during arena GameCore).
     public static bool NametagVoiceLobbySyncActive() => LobbyHierarchyLooksLikeMultiplayerLobby();
 
     public static bool LobbyHierarchyLooksLikeMultiplayerLobby()
@@ -346,7 +346,7 @@ public static class MpChatLobbyDiagnostics
     private static bool _inactiveLobbyChromeCached;
     private const float InactiveLobbyChromeCacheTtlSec = 1.0f;
 
-    // Lobby chrome can stay inactive under the MP results overlay while the session is still in lobby.
+    // lobby chrome can stay inactive under the MP results overlay while the session is still in lobby.
     public static bool InactiveMultiplayerLobbyChromeExists()
     {
         var now = Time.realtimeSinceStartup;
@@ -391,7 +391,7 @@ public static class MpChatLobbyDiagnostics
         return false;
     }
 
-    // Active lobby UI or arena-return results where inactive lobby chrome still exists underneath.
+    // active lobby UI or arena-return results where inactive lobby chrome still exists underneath.
     public static bool MultiplayerLobbyReturnContextActive()
     {
         if (LobbyHierarchyLooksLikeMultiplayerLobby())

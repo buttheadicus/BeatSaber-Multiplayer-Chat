@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Loads addon assemblies once at core init so menu settings flow coordinators can be Zenject-bound.
+// loads addon assemblies once at core init so menu settings flow coordinators can be Zenject-bound.
 internal static class AddonZenjectPreloader
 {
     private static readonly Dictionary<string, Assembly> AssembliesById = new(StringComparer.Ordinal);

@@ -1,10 +1,6 @@
 namespace MultiplayerChat.Core;
 
-/// <summary>
-/// Exclusive chat-client ownership. When claimed, core stays transport + bubbles;
-/// human UI/input is suppressed and only the owner may send via the controller path.
-/// Lives in core (no Contracts dependency) so ChatManager/UI can gate on it.
-/// </summary>
+// exclusive chat-client ownership; when claimed, human UI/input is suppressed
 public static class ChatClientHandoff
 {
     private static readonly object Gate = new();

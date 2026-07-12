@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.Core.QuickBinds;
 
-// Drives menu button presses for Quick Disconnect.
+// drives menu button presses for Quick Disconnect.
 internal static class MpMenuUiAutomation
 {
     private sealed class ScheduledStep

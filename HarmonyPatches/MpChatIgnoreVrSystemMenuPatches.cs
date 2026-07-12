@@ -4,8 +4,8 @@ using HarmonyLib;
 
 namespace MultiplayerChat.HarmonyPatches;
 
-// SteamVR / system dashboard steals VR input focus; Beat Saber treats that as pause or multiplayer fail.
-// These patches no-op the focus/HMD handlers so opening the system menu does not affect gameplay.
+// SteamVR / system dashboard steals VR input focus and user presence; Beat Saber
+// pauses, fails multiplayer, and deactivates controllers. no-op all of that.
 internal static class MpChatIgnoreVrSystemMenuPatches
 {
     internal static void Apply(Harmony harmony)
@@ -18,6 +18,12 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         TryPatch(harmony, typeof(MultiplayerGameplayIgnoreVrFocusCapturedPatch));
         TryPatch(harmony, typeof(MultiplayerInGameMenuIgnoreInputFocusCapturedPatch));
         TryPatch(harmony, typeof(MultiplayerInGameMenuIgnoreApplicationPausePatch));
+        TryPatch(harmony, typeof(KeepControllersActiveOnFocusCapturePatch));
+        TryPatch(harmony, typeof(IgnoreUserPresenceLossPatch));
+        TryPatch(harmony, typeof(AlwaysHasInputFocusPatch));
+        TryPatch(harmony, typeof(AlwaysHasVrFocusPatch));
+        TryPatch(harmony, typeof(SongPreviewIgnoreInputFocusCapturedPatch));
+        TryPatch(harmony, typeof(LevelGridIgnoreInputFocusCapturedPatch));
     }
 
     private static void TryPatch(Harmony harmony, Type patchType)
@@ -56,7 +62,7 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         private static MethodBase TargetMethod() =>
             AccessTools.Method(typeof(PauseController), "OnApplicationPause")!;
 
-        // Block pause-on-background only; allow resume when focus returns.
+        // block pause-on-background only; allow resume when focus returns.
         private static bool Prefix(bool pauseStatus) => !pauseStatus;
     }
 
@@ -103,5 +109,69 @@ internal static class MpChatIgnoreVrSystemMenuPatches
             AccessTools.Method(typeof(MultiplayerLocalActivePlayerInGameMenuController), "OnApplicationPause")!;
 
         private static bool Prefix(bool pauseStatus) => !pauseStatus;
+    }
+
+    // SteamVR overlay clears user presence; that deactivates controller GameObjects and freezes hands
+    [HarmonyPatch]
+    private static class KeepControllersActiveOnFocusCapturePatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(DeactivateVRControllersOnFocusCapture), "UpdateVRControllerActiveState")!;
+
+        private static bool Prefix() => false;
+    }
+
+    // SteamVR dashboard cancels OpenXR user presence; swallow loss so capture/hmd-unmount events never fire
+    [HarmonyPatch]
+    private static class IgnoreUserPresenceLossPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(UnityXRHelper), "set_userPresence")!;
+
+        private static bool Prefix(bool value) => value;
+    }
+
+    [HarmonyPatch]
+    private static class AlwaysHasInputFocusPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.DeclaredMethod(typeof(UnityXRHelper), "get_hasInputFocus")!;
+
+        private static bool Prefix(ref bool __result)
+        {
+            __result = true;
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    private static class AlwaysHasVrFocusPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.DeclaredMethod(typeof(UnityXRHelper), "get_hasVrFocus")!;
+
+        private static bool Prefix(ref bool __result)
+        {
+            __result = true;
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    private static class SongPreviewIgnoreInputFocusCapturedPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(SongPreviewPlayerPauseOnInputFocusLost), "HandleInputFocusCaptured")!;
+
+        private static bool Prefix() => false;
+    }
+
+    [HarmonyPatch]
+    private static class LevelGridIgnoreInputFocusCapturedPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(AnnotatedBeatmapLevelCollectionsGridView), "HandleVRPlatformHelperInputFocusCaptured")!;
+
+        private static bool Prefix() => false;
     }
 }

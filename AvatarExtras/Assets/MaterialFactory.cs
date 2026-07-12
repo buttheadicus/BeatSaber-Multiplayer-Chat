@@ -22,7 +22,7 @@ public static class MaterialFactory
 
     private static Shader? ResolveFlatShader()
     {
-        // Prefer legacy Unlit/Color: single _Color * _MainTex, works reliably for flat tint in URP projects.
+        // prefer legacy Unlit/Color: single _Color * _MainTex, works reliably for flat tint in URP projects.
         string[] candidates =
         {
             "Unlit/Color",

@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace MultiplayerChat.Core;
 
-// Shared MD5 helpers for lobby custom avatar settings validation (core-owned).
+// shared MD5 helpers for lobby custom avatar settings validation (core-owned).
 internal static class CustomAvatarHashUtil
 {
     internal static bool LooksLikeMd5Hex(string? s)

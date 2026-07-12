@@ -23,7 +23,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
     private const int MaxMessages = 200;
     private const float MessageFontSize = 3f;
 
-    // Chatroom styling: yellow usernames, white message text
+    // chatroom styling: yellow usernames, white message text
     private static readonly Color UsernameColor = new(1f, 0.84f, 0f); // #FFD700
 
     protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
@@ -34,7 +34,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
             _chatManager.MessageReceived += OnMessageReceived;
             _chatManager.SystemMessageRemovalRequested += OnSystemMessageRemovalRequested;
         }
-        // Force content flat every activation - FloatingScreen can inherit rotation
+        // force content flat every activation - FloatingScreen can inherit rotation
         EnsureFlatTransform();
         EnsureContentWidth();
     }
@@ -63,7 +63,7 @@ public class FloatingChatViewController : BSMLAutomaticViewController
         {
             child.localEulerAngles = Vector3.zero;
         }
-        // Force this view to fill parent (FloatingScreen) so width/height take effect
+        // force this view to fill parent (FloatingScreen) so width/height take effect
         if (transform is RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;

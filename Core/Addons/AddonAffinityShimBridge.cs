@@ -2,7 +2,7 @@ using System;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Affinity shims live in MultiplayerChat.dll; addon runtime registers implementations here.
+// affinity shims live in MultiplayerChat.dll; addon runtime registers implementations here.
 internal static class AddonAffinityShimBridge
 {
     internal static Func<string, string, object?[], object?>? CreatePatcher { get; private set; }

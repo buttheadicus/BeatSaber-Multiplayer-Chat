@@ -56,7 +56,7 @@ internal static class AvatarDataMultiplayerSerializationPatches
 
     private static string LogicalMemberName(string reflectionName)
     {
-        // C# auto-property backing field: <glassesId>k__BackingField
+        // c# auto-property backing field: <glassesId>k__BackingField
         if (reflectionName.StartsWith("<", StringComparison.Ordinal)
             && reflectionName.EndsWith(">k__BackingField", StringComparison.Ordinal))
         {

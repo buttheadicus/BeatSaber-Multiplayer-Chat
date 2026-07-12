@@ -231,6 +231,16 @@ public static class ModSettings
         }
     }
 
+    public static bool UnlockAvatarHandPositions
+    {
+        get => D.UnlockAvatarHandPositions;
+        set
+        {
+            D.UnlockAvatarHandPositions = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
     public static bool EnableAvatarColoringExtensions
     {
         get => D.Addons.EnableAvatarColoringExtensions;

@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Downloads Contracts before the runtime assembly is loaded.
+// downloads Contracts before the runtime assembly is loaded.
 internal static class AddonContractsEarlyEnsure
 {
     private static bool _initialized;

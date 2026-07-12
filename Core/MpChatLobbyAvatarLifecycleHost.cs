@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 
 namespace MultiplayerChat.Core;
 
-// Refreshes lobby pedestal custom avatars after arena / GameCore transitions.
+// refreshes lobby pedestal custom avatars after arena / GameCore transitions.
 public sealed class MpChatLobbyAvatarLifecycleHost : MonoBehaviour
 {
     public static MpChatLobbyAvatarLifecycleHost? Instance { get; private set; }

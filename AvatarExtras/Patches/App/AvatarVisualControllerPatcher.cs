@@ -117,7 +117,7 @@ public class AvatarVisualControllerPatcher : IAffinity
             facialHairMeshFilter.gameObject.SetActive(false);
         }
 
-        // Vanilla UpdateAvatarVisual ends with UpdateAvatarColors() before this postfix runs. Packed facialHairId made
+        // vanilla UpdateAvatarVisual ends with UpdateAvatarColors() before this postfix runs. Packed facialHairId made
         // vanilla pick the default beard mesh; we then swap meshes and cleared MPB. Re-run stock tinting with *light* applied.
         if ((repaintGlasses || repaintFacial) && avatarExtras != null)
             BeatAvatarUpdateAvatarColors?.Invoke(__instance, null);

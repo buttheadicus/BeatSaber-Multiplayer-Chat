@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-// One shared 10 Hz tick for all nametag voice icons instead of per-avatar Update loops.
+// one shared 10 Hz tick for all nametag voice icons instead of per-avatar Update loops.
 internal sealed class NametagVoiceStatusTicker : MonoBehaviour
 {
     private const float TickIntervalSec = 0.1f;

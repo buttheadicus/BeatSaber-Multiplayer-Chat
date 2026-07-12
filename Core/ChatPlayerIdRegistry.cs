@@ -1,6 +1,6 @@
 namespace MultiplayerChat.Core;
 
-// Thin facade over LearnedChatIdsStore for Zenject injection into ChatManager and validators.
+// thin facade over LearnedChatIdsStore for Zenject injection into ChatManager and validators.
 public class ChatPlayerIdRegistry
 {
     private readonly LearnedChatIdsStore _store;

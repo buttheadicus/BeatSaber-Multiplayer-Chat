@@ -10,7 +10,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// Facade-mounted drivers are outside the pose Zenject subgraph; fill deps manually when Inject fails.
+// facade-mounted drivers are outside the pose Zenject subgraph; fill deps manually when Inject fails.
 internal static class MpChatArenaDependencyResolver
 {
     internal static bool TryFill(MpChatLobbyCustomAvatarDriver driver, Transform facadeRoot)

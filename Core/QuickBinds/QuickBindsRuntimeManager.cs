@@ -60,7 +60,7 @@ public sealed class QuickBindsRuntimeManager : MonoBehaviour
         if (trackReady)
             ExpireComboIfNeeded(_quickReadyUpProgress, ref _quickReadyUpComboExpiry);
 
-        // One edge stream shared by all binds. Do not drain it in the first PollCombo only.
+        // one edge stream shared by all binds. Do not drain it in the first PollCombo only.
         VrQuickBindInput.BeginInputFrame();
         while (VrQuickBindInput.TryConsumeAnyEdge(out var pressed))
         {

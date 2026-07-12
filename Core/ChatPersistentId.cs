@@ -6,7 +6,7 @@ using MultiplayerChat.Settings;
 
 namespace MultiplayerChat.Core;
 
-// Local player's Chat ID (8-digit or 8-digit + IdGeneratedOfficial). Stored under ChatIdFilePaths.ChatIdFilePath with DPAPI.
+// local player's Chat ID (8-digit or 8-digit + IdGeneratedOfficial). Stored under ChatIdFilePaths.ChatIdFilePath with DPAPI.
 public static class ChatPersistentId
 {
     public const string IdGeneratedOfficialSuffix = "IdGeneratedOfficial";

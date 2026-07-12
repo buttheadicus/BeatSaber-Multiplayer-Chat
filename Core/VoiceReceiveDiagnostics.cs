@@ -95,7 +95,7 @@ internal static class VoiceReceiveDiagnostics
     public static void LogFilterSnapshotForBlockedSender(string senderUserId)
     {
         if (VoiceBareStreamMode.Enabled) return;
-        // One throttle key: otherwise each sender produces a new key and spam floods the log.
+        // one throttle key: otherwise each sender produces a new key and spam floods the log.
         var key = "incoming_voice_filter_blocked_global";
         var now = Time.realtimeSinceStartup;
         if (s_nextDropLog.TryGetValue(key, out var t) && now < t) return;

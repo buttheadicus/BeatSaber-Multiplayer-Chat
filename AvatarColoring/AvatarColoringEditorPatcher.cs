@@ -200,7 +200,7 @@ public sealed class AvatarColoringEditorPatcher : IAffinity
             return true;
         if (n.Contains("prevbutton") || n.Contains("nextbutton"))
             return true;
-        // Arrow-only chrome under RandomizePanel
+        // arrow-only chrome under RandomizePanel
         return n.Contains("<") || n.Contains(">");
     }
 

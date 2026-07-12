@@ -6,7 +6,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// ScaleAnimator patches shrink lobby pedestals; local pedestal has no custom driver, so keep it visible.
+// scaleAnimator patches shrink lobby pedestals; local pedestal has no custom driver, so keep it visible.
 public sealed class MpChatLobbyPedestalScaleGuard : MonoBehaviour
 {
     private IConnectedPlayer _connectedPlayer = null!;

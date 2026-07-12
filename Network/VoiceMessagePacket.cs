@@ -3,7 +3,7 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-// Encrypted VMSG or hot-mic chunk; DM fills TargetUserId and TargetChatId.
+// encrypted VMSG or hot-mic chunk; DM fills TargetUserId and TargetChatId.
 public class VoiceMessagePacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     internal const int MaxPlaintextVoiceBytes = 4_194_304;
@@ -33,7 +33,7 @@ public class VoiceMessagePacket : MultiplayerCore.Networking.Abstractions.MpPack
     {
         try
         {
-            // Blob first; trailing strings are optional so older packet layouts still deserialize.
+            // blob first; trailing strings are optional so older packet layouts still deserialize.
             var payload = reader.GetBytesWithLength();
             if (payload == null || payload.Length == 0)
             {

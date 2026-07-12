@@ -8,7 +8,7 @@ internal static class CustomAvatarInstallListing
 {
     internal const string DefaultBeatSaberAvatarLabel = "Default Beat Saber Avatar";
 
-    // Wire sentinel: receivers restore the stock multiplayer lobby rig.
+    // wire sentinel: receivers restore the stock multiplayer lobby rig.
     internal const string VanillaDescriptorHash = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
 
     internal static bool IsDefaultBeatSaberAvatarLabel(string? label) =>

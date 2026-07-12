@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace MultiplayerChat.AvatarColoring;
 
-// Reads/writes Beat Saber AvatarData.dat (JSON) under LocalLow for randomize and save/load presets.
+// reads/writes Beat Saber AvatarData.dat (JSON) under LocalLow for randomize and save/load presets.
 internal static class AvatarDatOperations
 {
     private static readonly string[] HeadTopIds =
@@ -84,7 +84,7 @@ internal static class AvatarDatOperations
             RandomizeAllColorObjects(root);
 
             File.WriteAllText(path, root.ToString(Formatting.Indented));
-            // New seed so the next randomize / in-editor random calls are not correlated to this file write.
+            // new seed so the next randomize / in-editor random calls are not correlated to this file write.
             UnityEngine.Random.InitState(
                 unchecked((int)DateTime.UtcNow.Ticks) ^ Environment.TickCount);
             return true;
@@ -170,7 +170,7 @@ internal static class AvatarDatOperations
         }
     }
 
-    // Removes a preset folder (nested AvatarData.dat layout) or a legacy flat file under Avatar Storage.
+    // removes a preset folder (nested AvatarData.dat layout) or a legacy flat file under Avatar Storage.
     internal static bool DeletePresetFromStorage(string presetName)
     {
         if (string.IsNullOrWhiteSpace(presetName))

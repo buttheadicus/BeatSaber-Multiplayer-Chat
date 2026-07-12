@@ -3,7 +3,7 @@ using System.IO;
 
 namespace MultiplayerChat.Core;
 
-// Install-local toggle: marker file next to the mod DLL (not AppData). Off by default each fresh copy.
+// install-local toggle: marker file next to the mod DLL (not AppData). Off by default each fresh copy.
 public static class MpChatDebugMode
 {
     public const string MarkerFileName = "Debug.dat";

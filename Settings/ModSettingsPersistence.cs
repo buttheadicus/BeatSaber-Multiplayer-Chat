@@ -93,6 +93,9 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("enableAvatarExtensions")] public bool EnableAvatarExtensions { get; set; }
 
+        // default on: remotes can move hands outside the HMD box unless the player opts out
+        [JsonProperty("unlockAvatarHandPositions")] public bool UnlockAvatarHandPositions { get; set; } = true;
+
         [JsonProperty("enableLobbyCustomAvatars")] public bool EnableLobbyCustomAvatars { get; set; }
 
         [JsonProperty("lobbyCustomAvatarRelativePath")] public string LobbyCustomAvatarRelativePath { get; set; } = "";

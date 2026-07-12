@@ -13,7 +13,7 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-// Nametag row: [custom avatars?][chat][MPEX][name]. Mod users also get mic/headphone icons centered above the row.
+// nametag row: [custom avatars?][chat][MPEX][name]. Mod users also get mic/headphone icons centered above the row.
 public class ChatBubbleAnchor : MonoBehaviour
 {
     // MPEX platform icons: 64px assets, 10 PPU, localScale 3.2 on the RectTransform.
@@ -572,7 +572,7 @@ public class ChatBubbleAnchor : MonoBehaviour
                _nameText.transform.parent == _bg.transform;
     }
 
-    // With MPEX: [custom avatars][1px][chat icon][1px gap][platform icon][name spacing][name]. Without MPEX: [custom avatars?][chat icon][name].
+    // with MPEX: [custom avatars][1px][chat icon][1px gap][platform icon][name spacing][name]. Without MPEX: [custom avatars?][chat icon][name].
     private void ApplyNametagLayoutOrder()
     {
         if (_bg == null || _iconView == null || _nameText == null)

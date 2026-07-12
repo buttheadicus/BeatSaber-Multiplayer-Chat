@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-// Reads PlayerAvatarManager.scale after CA resize (same value as "Resized avatar with scale" in CA logs).
+// reads PlayerAvatarManager.scale after CA resize (same value as "Resized avatar with scale" in CA logs).
 internal static class MpCustomAvatarScaleSource
 {
     private const float MinScale = 0.25f;

@@ -13,8 +13,8 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// Broadcasts ModPresencePacket so lobby peers learn who runs MP Chat and can map platformUserId <-> SenderChatId when format-valid.
-// Lobby-scoped instance sometimes hands off to GameCore; Dispose re-registers the lobby serializer when core tears down.
+// broadcasts ModPresencePacket so lobby peers learn who runs MP Chat and can map platformUserId <-> SenderChatId when format-valid.
+// lobby-scoped instance sometimes hands off to GameCore; Dispose re-registers the lobby serializer when core tears down.
 public class ModPresenceManager : IInitializable, IDisposable
 {
     public static ModPresenceManager? Instance { get; private set; }
@@ -43,7 +43,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         _sessionManager.playerConnectedEvent += OnPlayerConnected;
         _sessionManager.playerDisconnectedEvent += OnPlayerDisconnected;
 
-        // Add local player (we have the mod)
+        // add local player (we have the mod)
         var local = _sessionManager.localPlayer;
         if (local != null && !string.IsNullOrEmpty(local.userId))
         {
@@ -54,7 +54,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             }
         }
 
-        // Presence sends immediately. Reply waits 6 seconds. Ignored from song -> retry in 3 seconds.
+        // presence sends immediately. Reply waits 6 seconds. Ignored from song -> retry in 3 seconds.
         MultiplayerChat.Plugin.Log?.Info("[MPChat] ModPresenceManager initialized");
         if (!MpChatLobbyDiagnostics.SongGameplayLikelyActive())
             BroadcastPresence();
@@ -197,7 +197,7 @@ public class ModPresenceManager : IInitializable, IDisposable
             PresenceUpdated?.Invoke(this, EventArgs.Empty);
     }
 
-    // Updates ChatPlayerIdRegistry when SenderChatId is valid; still drives has-mod UI when SenderChatId is temporarily invalid (reset/regenerate window).
+    // updates ChatPlayerIdRegistry when SenderChatId is valid; still drives has-mod UI when SenderChatId is temporarily invalid (reset/regenerate window).
     private void OnModPresenceReceived(ModPresencePacket packet, IConnectedPlayer sender)
     {
         if (string.IsNullOrEmpty(sender.userId)) return;
@@ -255,20 +255,20 @@ public class ModPresenceManager : IInitializable, IDisposable
         var local = _sessionManager.localPlayer;
         if (local == null || string.IsNullOrEmpty(local.userId)) return;
 
-        // Targeted packet: only the intended recipient should process it
+        // targeted packet: only the intended recipient should process it
         if (packet.TargetUserId != null)
         {
             if (packet.TargetUserId != local.userId)
                 return; // Not for us - ignore
-            // We are the target (e.g. Lyra)
+            // we are the target (e.g. Lyra)
             if (packet.IsIgnoredFromSong)
             {
-                // They're in a song - retry only if we haven't gotten a proper reply yet (ignore stale "ignored" packets)
+                // they're in a song - retry only if we haven't gotten a proper reply yet (ignore stale "ignored" packets)
                 if (!_hasReceivedPresenceReply)
                     SchedulePresenceRetry();
                 return;
             }
-            // Proper reply - they have the mod.
+            // proper reply - they have the mod.
             _hasReceivedPresenceReply = true;
             CancelPresenceRetry();
             TryRegisterRemotePlayerWithMod(
@@ -281,16 +281,16 @@ public class ModPresenceManager : IInitializable, IDisposable
             return;
         }
 
-        // Broadcast presence from joining client (e.g. Lyra)
+        // broadcast presence from joining client (e.g. Lyra)
         if (!IsInLobby())
         {
-            // We're in a song - send "ignored", don't process
+            // we're in a song - send "ignored", don't process
             SendPresenceIgnoredTo(sender.userId);
             return;
         }
 
-        // We're in lobby - register mod user and reply immediately.
-        // Skip if sender already left (e.g. delayed packet)
+        // we're in lobby - register mod user and reply immediately.
+        // skip if sender already left (e.g. delayed packet)
         var connected = _sessionManager.connectedPlayers ?? Array.Empty<IConnectedPlayer>();
         if (!connected.Any(p => p.userId == sender.userId))
             return;
@@ -468,7 +468,7 @@ public class ModPresenceManager : IInitializable, IDisposable
         _sessionManager.Send(BuildPresencePacket());
     }
 
-    // After gameplay when lobby UI is active again (presence was skipped during the song).
+    // after gameplay when lobby UI is active again (presence was skipped during the song).
     public void RefreshAfterLobbyReturn()
     {
         if (MpChatLobbyDiagnostics.ShouldSkipMultiplayerPlayerSessionHooks())

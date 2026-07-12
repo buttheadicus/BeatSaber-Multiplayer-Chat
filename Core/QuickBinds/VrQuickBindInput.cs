@@ -50,7 +50,7 @@ internal static class VrQuickBindInput
         _recPriWas = _recSecWas = _recTrigWas = _recGripWas = false;
     }
 
-    // After the arm delay, mark currently held buttons so only new presses count as edges.
+    // after the arm delay, mark currently held buttons so only new presses count as edges.
     internal static void SyncRecordingEdgeStateToHeld()
     {
         var left = PrimaryDeviceAt(XRNode.LeftHand);

@@ -4,11 +4,11 @@ namespace MultiplayerChat.Core;
 
 internal static class MpChatPerformanceGate
 {
-    // Spawn, load, disk cache, and avatar file transfer (never during active beatmap).
+    // spawn, load, disk cache, and avatar file transfer (never during active beatmap).
     public static bool ShouldBlockAvatarHeavyWork =>
         MpChatLobbyDiagnostics.BeatmapGameplayLikelyActive();
 
-    // Arena: keep custom avatars on waiting platforms and in-song; defer only lobby pedestal work.
+    // arena: keep custom avatars on waiting platforms and in-song; defer only lobby pedestal work.
     public static bool ShouldBlockAvatarHeavyWorkForDriver(bool arenaContext) =>
         !arenaContext && ShouldBlockAvatarHeavyWork;
 
@@ -20,7 +20,7 @@ internal static class MpChatPerformanceGate
 
     public static bool ShouldDeferIncomingAvatarData => ShouldDeferLobbyPedestalAvatarRefresh;
 
-    // Menu load, GameCore unload, or spectate handoff: avoid avatar storms that hitch networking.
+    // menu load, GameCore unload, or spectate handoff: avoid avatar storms that hitch networking.
     public static bool IsMultiplayerSceneTransitionLikely()
     {
         if (MpChatLobbyDiagnostics.AnyGameCoreLoaded() &&

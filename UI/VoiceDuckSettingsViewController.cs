@@ -68,7 +68,7 @@ public class VoiceDuckSettingsViewController : BSMLAutomaticViewController
     [UIAction("ApplyClicked")]
     private void ApplyClicked()
     {
-        // ToggleSetting does not always push BSML [UIValue] on user interaction unless UpdateOnChange is enabled  -  read Unity toggle directly.
+        // toggleSetting does not always push BSML [UIValue] on user interaction unless UpdateOnChange is enabled  -  read Unity toggle directly.
         if (_duckEnabledToggle != null && _duckEnabledToggle.Toggle != null)
             _duckEnabledDraft = _duckEnabledToggle.Toggle.isOn;
         ModSettings.VoiceDuckingEnabled = _duckEnabledDraft;

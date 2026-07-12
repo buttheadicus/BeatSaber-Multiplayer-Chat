@@ -5,8 +5,8 @@ using MultiplayerCore.Models;
 
 namespace MultiplayerChat.Core;
 
-// Inbound Chat ID policy: platform user id comes from the MP session; SenderChatId is treated like persisted settings.
-// We update LearnedChatIdsStore when we see a valid SenderChatId, adopt changed IDs, and accept packets even when the field is empty until we learn one.
+// inbound Chat ID policy: platform user id comes from the MP session; SenderChatId is treated like persisted settings.
+// we update LearnedChatIdsStore when we see a valid SenderChatId, adopt changed IDs, and accept packets even when the field is empty until we learn one.
 internal static class ChatPacketIdValidation
 {
     public static bool TryAcceptSenderChatId(string? senderChatId, IConnectedPlayer sender, ChatPlayerIdRegistry registry,
@@ -42,7 +42,7 @@ internal static class ChatPacketIdValidation
             MpChatVerboseDebug.ChatIdBlock(sb.ToString());
         }
 
-        // SenderChatId missing or malformed on wire (older builds or player mid-reset).
+        // senderChatId missing or malformed on wire (older builds or player mid-reset).
         if (!validSender)
         {
             if (registry.TryGetChatId(sender.userId, out var learned) &&
@@ -62,7 +62,7 @@ internal static class ChatPacketIdValidation
                 return true;
             }
 
-            // No row yet: still accept so chat/voice can flow; first valid SenderChatId on a later packet will SetMapping.
+            // no row yet: still accept so chat/voice can flow; first valid SenderChatId on a later packet will SetMapping.
             if (ModSettings.DebugLogging)
             {
                 MultiplayerChat.Plugin.Log?.Debug(
@@ -78,7 +78,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
-        // Official suffix form always replaces whatever we had for this platform user.
+        // official suffix form always replaces whatever we had for this platform user.
         if (official)
         {
             registry.SetMapping(sender.userId, senderChatId!);
@@ -90,7 +90,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
-        // Known Chat ID for this user: merge legacy 8-digit vs official-tagged for same number, else overwrite with new ID.
+        // known Chat ID for this user: merge legacy 8-digit vs official-tagged for same number, else overwrite with new ID.
         if (registry.TryGetChatId(sender.userId, out var known))
         {
             if (known == senderChatId)
@@ -122,7 +122,7 @@ internal static class ChatPacketIdValidation
             return true;
         }
 
-        // First time we see a valid SenderChatId for this platform user.
+        // first time we see a valid SenderChatId for this platform user.
         registry.SetMapping(sender.userId, senderChatId!);
         if (MpChatVerboseDebug.IsOn)
             MpChatVerboseDebug.ChatIdBlock(
@@ -152,7 +152,7 @@ internal static class ChatPacketIdValidation
         return false;
     }
 
-    // For DM-shaped packets: local player must match TargetUserId and local ChatPersistentId must match TargetChatId (broadcast packets skip this).
+    // for DM-shaped packets: local player must match TargetUserId and local ChatPersistentId must match TargetChatId (broadcast packets skip this).
     public static bool IsLocalParticipant(string? targetUserId, string? targetChatId, bool isDm, string? localUserId, string senderUserId)
     {
         if (!isDm)

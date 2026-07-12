@@ -47,7 +47,7 @@ internal static class AddonSettingsFlowInstantiator
 
     private static ViewController InstantiateViewController(DiContainer menu, string addonId, Type viewType)
     {
-        // Mirrors BSML's BeatSaberUI.CreateViewController: UI layer, full-stretch rect,
+        // mirrors BSML's BeatSaberUI.CreateViewController: UI layer, full-stretch rect,
         // canvas with the curved-UI shader channel, and a concrete VRGraphicRaycaster added
         // before the view controller so RequireComponent(BaseRaycaster) is satisfied.
         var go = new GameObject(viewType.Name)

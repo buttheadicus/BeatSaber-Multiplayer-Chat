@@ -5,7 +5,7 @@ using IPALogger = IPA.Logging.Logger;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Downloads official addon DLLs and MultiplayerChat.Contracts.dll from GitHub releases on first install.
+// downloads official addon DLLs and MultiplayerChat.Contracts.dll from GitHub releases on first install.
 public static class AddonsAndContractsBootstrap
 {
     private sealed class PendingAsset

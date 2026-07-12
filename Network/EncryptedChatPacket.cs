@@ -3,7 +3,7 @@ using LiteNetLib.Utils;
 
 namespace MultiplayerChat.Network;
 
-// Text chat payload; DM mode sets TargetUserId and TargetChatId for routing and decryption scope.
+// text chat payload; DM mode sets TargetUserId and TargetChatId for routing and decryption scope.
 public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPacket
 {
     private const int MaxPayloadSize = 4096;
@@ -18,9 +18,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
 
     public string? TargetChatId;
 
-    /// <summary>
-    /// Optional display name override (e.g. "BOT" for SLZ). Appended for forward compat; old clients ignore.
-    /// </summary>
+    // optional display name override (e.g. "BOT" for SLZ); old clients ignore
     public string? DisplayNameOverride;
 
     public override void Serialize(NetDataWriter writer)
@@ -37,7 +35,7 @@ public class EncryptedChatPacket : MultiplayerCore.Networking.Abstractions.MpPac
     {
         try
         {
-            // Blob first; routing and Chat ID fields follow only if bytes remain (compat with minimal payloads).
+            // blob first; routing and Chat ID fields follow only if bytes remain (compat with minimal payloads).
             var payload = reader.GetBytesWithLength();
             if (payload == null || payload.Length == 0)
             {

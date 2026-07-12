@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace MultiplayerChat.Core.Addons;
 
-// Applies Harmony.PatchAll for addon assemblies. SiraUtil IAffinity patchers are bound via AddonZenjectSettingsBinder.
+// applies Harmony.PatchAll for addon assemblies. SiraUtil IAffinity patchers are bound via AddonZenjectSettingsBinder.
 internal static class AffinityHarmonyForwarder
 {
     internal static void PatchAssembly(HarmonyLib.Harmony harmony, Assembly assembly)

@@ -4,7 +4,7 @@ using System.Reflection;
 
 namespace MultiplayerChat.Core;
 
-// Hotfix build counter embedded from the repo "version" file (0, 1, 2, ...).
+// hotfix build counter embedded from the repo "version" file (0, 1, 2, ...).
 internal static class ModBuildVersion
 {
     public const string EmbeddedResourceName = "MultiplayerChat.version";

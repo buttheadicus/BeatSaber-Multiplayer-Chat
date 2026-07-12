@@ -12,6 +12,9 @@
       <button text="Performance" pad="2" min-width="36" on-click="PerformanceClicked"/>
     </horizontal>
     <horizontal child-expand-width="true">
+      <toggle-setting id="UnlockAvatarHandPositionsToggle" text="Unlock Avatar Hand Positions" value="UnlockAvatarHandPositions"/>
+    </horizontal>
+    <horizontal child-expand-width="true">
       <toggle-setting id="EnableCauToggle" text="Enable Chat Auto Updater (CAU)" value="EnableCau"/>
     </horizontal>
     <horizontal child-expand-width="true">

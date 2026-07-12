@@ -4,16 +4,16 @@ using MultiplayerChat.Settings;
 
 namespace MultiplayerChat.Core;
 
-// Layers push-to-talk and optional named suppressors over outbound capture logic so outbound voice stops when PTT is not held.
-// VoiceHotMicManager refreshes hold state on a throttled cadence (LastPolledPushToTalkHeld). Chunk sends still evaluate suppressors every poll tick.
-// Extra suppressors are for future policies (for example song-phase mute) without toggling the lobby mute button state.
+// layers push-to-talk and optional named suppressors over outbound capture logic so outbound voice stops when PTT is not held.
+// voiceHotMicManager refreshes hold state on a throttled cadence (LastPolledPushToTalkHeld). Chunk sends still evaluate suppressors every poll tick.
+// extra suppressors are for future policies (for example song-phase mute) without toggling the lobby mute button state.
 public static class VoiceDynamicTransmitGate
 {
     private static readonly HashSet<string> ExtraSuppressors = new(StringComparer.Ordinal);
 
     private static bool _lastPolledPushToTalkHeld;
 
-    // Cached binding poll updated by VoiceHotMicManager (throttled, not necessarily each Unity frame).
+    // cached binding poll updated by VoiceHotMicManager (throttled, not necessarily each Unity frame).
     public static bool LastPolledPushToTalkHeld => _lastPolledPushToTalkHeld;
 
     internal static void NotifyPushToTalkHeld(bool held) => _lastPolledPushToTalkHeld = held;
@@ -30,6 +30,9 @@ public static class VoiceDynamicTransmitGate
 
     public static bool ShouldSuppressOutboundVoice()
     {
+        // SLZ / claimed chat client: no human voice outbound (PTT or open mic).
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+            return true;
         if (ExtraSuppressors.Count > 0)
             return true;
         if (!ModSettings.PushToTalkEnabled)

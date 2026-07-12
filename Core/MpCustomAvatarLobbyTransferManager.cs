@@ -11,7 +11,7 @@ using Zenject;
 
 namespace MultiplayerChat.Core;
 
-// Lobby .avatar transfer: on-demand only, short unicast bursts when requested.
+// lobby .avatar transfer: on-demand only, short unicast bursts when requested.
 public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitializable
 {
     public static MpCustomAvatarLobbyTransferManager? Instance { get; private set; }
@@ -20,10 +20,10 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
 
     private const float RequestCooldownSeconds = 1.2f;
 
-    // Unicast to one requester: up to this many bytes per frame, then yield one frame.
+    // unicast to one requester: up to this many bytes per frame, then yield one frame.
     private const int UnicastBytesBudgetPerFrame = 256 * 1024;
 
-    // Legacy/broadcast fan-out stays slower so large lobbies do not spike the relay.
+    // legacy/broadcast fan-out stays slower so large lobbies do not spike the relay.
     private const float MulticastChunkIntervalSeconds = 0.06f;
 
     private const float FlushCooldownSeconds = 1f;
@@ -89,7 +89,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
             Instance = null;
     }
 
-    // Stop arena/transition transfers; queued work runs on FlushDeferredLobbyAvatarFileTransfers unless discarded.
+    // stop arena/transition transfers; queued work runs on FlushDeferredLobbyAvatarFileTransfers unless discarded.
     public static void SuspendLobbyAvatarFileTransfer(bool discardInFlightSendQueue = false)
     {
         var host = _lobbyScopeTransferManager;
@@ -239,7 +239,7 @@ public sealed class MpCustomAvatarLobbyTransferManager : MonoBehaviour, IInitial
         host.SendFileRequest(md5HexUpper, ownerUserId);
     }
 
-    // Disabled: proactive .avatar push on connect flooded BeatTogether relays.
+    // disabled: proactive .avatar push on connect flooded BeatTogether relays.
     public static void TryProactiveShareLocalAvatar(string targetUserId)
     {
         _ = targetUserId;

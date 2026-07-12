@@ -33,7 +33,7 @@ public static class VoiceChatRuntimeState
         return (false, IsHotMicMuted);
     }
 
-    // Reapply saved lobby self-mute/deaf state (game launch or settings reload).
+    // reapply saved lobby self-mute/deaf state (game launch or settings reload).
     public static void RestoreFromPersistence(bool deafened, bool hotMicMutedWhenUndeafened)
     {
         _hotMicMutedBeforeDeaf = null;

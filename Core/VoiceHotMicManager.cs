@@ -58,7 +58,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     private const int PttInputPollIntervalFrames = 24;
 
-    // Decremented each Update while Push-to-talk is on; when not positive, poll XR bindings and refresh VoiceDynamicTransmitGate.
+    // decremented each Update while Push-to-talk is on; when not positive, poll XR bindings and refresh VoiceDynamicTransmitGate.
     private int _framesUntilPttInputPoll;
 
     public void Initialize()
@@ -84,7 +84,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
             Instance = this;
     }
 
-    // Results overlay can disable lobby Zenject hosts; keep lobby PTT polling alive after GameCore tears down.
+    // results overlay can disable lobby Zenject hosts; keep lobby PTT polling alive after GameCore tears down.
     internal static void EnsureActiveLobbyHostAfterArena()
     {
         if (!MpChatLobbyDiagnostics.MultiplayerLobbyReturnContextActive())
@@ -124,7 +124,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         _deferredMicRestartCoroutine = StartCoroutine(DeferredRestartMicrophoneRoutine());
     }
 
-    // After arena/lobby VoIP reload: re-hand Instance to lobby host, reset PTT gate, force an immediate binding poll.
+    // after arena/lobby VoIP reload: re-hand Instance to lobby host, reset PTT gate, force an immediate binding poll.
     internal static void OnVoipPipelineReloaded()
     {
         VoiceDynamicTransmitGate.NotifyPushToTalkHeld(false);
@@ -220,7 +220,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     private void Update()
     {
-        // Only one manager (current Instance) may run the mic; the other Zenject context's component would otherwise
+        // only one manager (current Instance) may run the mic; the other Zenject context's component would otherwise
         // keep Microphone.Start alive and bypass PTT / doublesend.
         if (!IsActiveHotMicHost)
         {
@@ -283,6 +283,14 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     {
         if (_sessionManager?.localPlayer == null)
             return;
+
+        if (ChatClientHandoff.IsHumanClientSuppressed)
+        {
+            if (_lastPttInputCombined)
+                ChatBubbleManager.Instance?.SetLocalPushToTalkOpen(false);
+            _lastPttInputCombined = false;
+            return;
+        }
 
         var pttOn = ModSettings.PushToTalkEnabled;
         if (!pttOn)
@@ -350,6 +358,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
     private bool CanCaptureHotMic()
     {
         if (_sessionManager?.localPlayer == null) return false;
+        if (ChatClientHandoff.IsHumanClientSuppressed) return false;
         if (VoiceChatRuntimeState.IsDeaf) return false;
 
         var pushToTalk = ModSettings.PushToTalkEnabled;
@@ -357,7 +366,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
         if (VoiceChatRuntimeState.IsHotMicMuted)
         {
-            // Manual / lobby mute: stay silent. Song policy mute (you were unmuted at map start): allow TX while PTT held.
+            // manual / lobby mute: stay silent. Song policy mute (you were unmuted at map start): allow TX while PTT held.
             if (!pushToTalk || !GlobalChatAudioHost.SongMicCoercionAllowsPttBypass() || !pttHeld)
                 return false;
         }
@@ -419,7 +428,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         _postedMicStartFailedUi = false;
 
         _lastReadFrame = 0;
-        // Slightly longer frames than 100ms = fewer send boundaries (was ~4×100ms → ~400ms coalesced clips with ~25ms inter-burst gaps).
+        // slightly longer frames than 100ms = fewer send boundaries (was ~4×100ms → ~400ms coalesced clips with ~25ms inter-burst gaps).
         _chunkMonoSamples = Mathf.Max(256, (int)(_micLoop.frequency * 0.15f));
         _micWarmupChunksRemaining = Mathf.Max(0, VoiceHotMicTransport.WarmupChunksToSkip);
         _voiceGateActive = false;

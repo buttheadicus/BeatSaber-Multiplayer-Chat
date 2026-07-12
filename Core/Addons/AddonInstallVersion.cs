@@ -38,7 +38,7 @@ internal static class AddonInstallVersion
         }
         catch (Exception ex)
         {
-            // Best effort; bootstrap still records install success via the downloaded files.
+            // best effort; bootstrap still records install success via the downloaded files.
             _ = ex;
         }
     }

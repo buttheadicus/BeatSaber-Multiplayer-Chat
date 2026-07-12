@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace MultiplayerChat.Core;
 
-// One throttled poll loop for all lobby custom-avatar pose inputs (avoids per-driver LateUpdate + FindObjectsOfType).
+// one throttled poll loop for all lobby custom-avatar pose inputs (avoids per-driver LateUpdate + FindObjectsOfType).
 internal static class MpChatLobbyPosePoll
 {
     private static readonly List<MpChatLobbyLivePoseInput> ActiveInputs = new();

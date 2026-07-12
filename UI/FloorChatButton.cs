@@ -60,7 +60,7 @@ public class FloorChatButton : MonoBehaviour
     {
         if (CreateButtonInHostSetup())
         {
-            // Created in Host Setup area (right of START, near Per Player Difficulty)
+            // created in Host Setup area (right of START, near Per Player Difficulty)
         }
         else if (FindShoesOrAvatarButton() is { } shoesButton)
         {
@@ -68,11 +68,11 @@ public class FloorChatButton : MonoBehaviour
         }
         else if (CreateButtonInTitleBar())
         {
-            // Created in title bar
+            // created in title bar
         }
         else if (CreateFloatingFloorButton())
         {
-            // Created from ModsButton
+            // created from ModsButton
         }
         else
         {
@@ -173,7 +173,7 @@ public class FloorChatButton : MonoBehaviour
 
     private bool CreateButtonInTitleBar()
     {
-        // Try multiple paths - lobby and main menu use different hierarchies
+        // try multiple paths - lobby and main menu use different hierarchies
         var titleView = GameObject.Find("Wrapper/MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
             ?? GameObject.Find("MenuCore/UI/ScreenSystem/TopScreen/TitleViewController")
             ?? GameObject.Find("TitleViewController");
@@ -222,7 +222,7 @@ public class FloorChatButton : MonoBehaviour
 
     private bool CreateFloatingFloorButton()
     {
-        // Fallback: clone any existing button (e.g. from MODS panel) and reposition
+        // fallback: clone any existing button (e.g. from MODS panel) and reposition
         var modsButton = GameObject.Find("ModsButton") ?? GameObject.Find("BSMLButton");
         if (modsButton != null)
         {
@@ -237,7 +237,7 @@ public class FloorChatButton : MonoBehaviour
 
     private void CreateFromAnyButton()
     {
-        // Last resort: find ANY Button in the scene and clone it (lobby has various buttons)
+        // last resort: find ANY Button in the scene and clone it (lobby has various buttons)
         var buttons = Object.FindObjectsOfType<Button>();
         foreach (var btn in buttons)
         {
@@ -260,7 +260,7 @@ public class FloorChatButton : MonoBehaviour
 
     private void CreateStandaloneCanvasButton()
     {
-        // Last resort: create a Canvas + Button in center-right (Host Setup area)
+        // last resort: create a Canvas + Button in center-right (Host Setup area)
         var canvasObj = new GameObject("MPChatCanvas");
         var canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;

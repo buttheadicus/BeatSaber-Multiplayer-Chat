@@ -14,7 +14,7 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-// Lobby stacked chat bubbles plus ephemeral typing/recording lines; anchors under multiplayer lobby UI (prefers a strip above TitleViewController).
+// lobby stacked chat bubbles plus ephemeral typing/recording lines; anchors under multiplayer lobby UI (prefers a strip above TitleViewController).
 public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 {
     private const int MaxVisibleBubbles = 8;
@@ -228,7 +228,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
 
     private bool _lastPollInLobby;
 
-    // Polls lobby vs song; finds/creates header root, clears bubbles when leaving lobby, keeps nametag icons wired while in lobby.
+    // polls lobby vs song; finds/creates header root, clears bubbles when leaving lobby, keeps nametag icons wired while in lobby.
     private IEnumerator EnsureLobbyHeaderRoot()
     {
         _lastPollInLobby = false;
@@ -621,7 +621,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         handleObj.transform.SetAsLastSibling();
 
         var rect = handleObj.AddComponent<RectTransform>();
-        // Centered grab handle over the chat stack (ignores vertical layout, like draggable affordances in list UIs).
+        // centered grab handle over the chat stack (ignores vertical layout, like draggable affordances in list UIs).
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
@@ -814,7 +814,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
         return null;
     }
 
-    // Inserts a strip immediately BEFORE TitleViewController so vertical layouts stack it above the title row:
+    // inserts a strip immediately BEFORE TitleViewController so vertical layouts stack it above the title row:
     // bottom edge of the chat block sits just above the top edge of the title bar.
     private static Transform? FindTitleViewControllerTransformForChatAnchor()
     {
@@ -1449,7 +1449,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
             return false;
         if (MpChatLobbyDiagnostics.ResultsLikeUiVisible())
         {
-            // Inactive lobby chrome under results yields wild canvas positions; wait for dismiss.
+            // inactive lobby chrome under results yields wild canvas positions; wait for dismiss.
             if (_lobbyHeaderRoot == null || _lobbyHeaderRoot.gameObject == null)
                 return false;
             if (!_lobbyHeaderRoot.gameObject.activeInHierarchy)
@@ -1502,7 +1502,7 @@ public class ChatBubbleManager : MonoBehaviour, IInitializable, IDisposable
     }
 }
 
-// Title-bar chat strip: ignore parent layout groups and keep a stable anchored offset above TitleViewController.
+// title-bar chat strip: ignore parent layout groups and keep a stable anchored offset above TitleViewController.
 internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
 {
     internal static readonly Vector2 DefaultAnchoredOffset = new(0f, 310f);
@@ -1545,10 +1545,7 @@ internal sealed class MpChatTitleBarAnchoredChatRoot : MonoBehaviour
         rt.anchoredPosition = ResolveSafeAnchoredPosition(customPlacement, customPosition, DefaultAnchoredOffset);
     }
 
-    /// <summary>
-    /// Reject absurd saved/custom offsets (e.g. drag scale blow-ups or stale values from a different parent).
-    /// Those show up as chat bubbles far below the ground.
-    /// </summary>
+    // reject absurd saved/custom offsets (drag blow-ups / stale values show as bubbles under the ground)
     internal static Vector2 ResolveSafeAnchoredPosition(bool customPlacement, Vector2 customPosition, Vector2 fallback)
     {
         if (!customPlacement)

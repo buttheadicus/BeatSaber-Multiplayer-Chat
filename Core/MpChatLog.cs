@@ -6,7 +6,7 @@ using MultiplayerChat.Settings;
 
 namespace MultiplayerChat.Core;
 
-// Debug off: BSIPA FilterLevel Error (errors only). Debug on: FilterLevel Debug (info, warn, debug, error).
+// debug off: BSIPA FilterLevel Error (errors only). Debug on: FilterLevel Debug (info, warn, debug, error).
 internal static class MpChatLog
 {
     private static IPALogger? _logger;
@@ -84,7 +84,7 @@ internal static class MpChatLog
         _logger?.Debug(message);
     }
 
-    // Addon updater messages are always visible in the IPA log (not gated on debug settings).
+    // addon updater messages are always visible in the IPA log (not gated on debug settings).
     internal static void UpdaterInfo(string message) => _logger?.Info(message);
 
     internal static void UpdaterWarn(string message) => _logger?.Warn(message);

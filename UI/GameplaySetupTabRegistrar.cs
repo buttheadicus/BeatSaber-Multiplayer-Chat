@@ -23,7 +23,7 @@ public class GameplaySetupTabRegistrar : MonoBehaviour, IDisposable
 
     private IEnumerator AddTabWhenReady()
     {
-        // Give GameplaySetup time to initialize
+        // give GameplaySetup time to initialize
         for (var i = 0; i < 10; i++)
         {
             yield return new WaitForSeconds(0.2f);
@@ -41,7 +41,7 @@ public class GameplaySetupTabRegistrar : MonoBehaviour, IDisposable
             }
             catch (Exception)
             {
-                // Retry
+                // retry
             }
         }
     }

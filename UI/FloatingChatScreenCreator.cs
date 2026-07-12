@@ -38,7 +38,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
         var position = ChatPositionSettings.LoadPosition();
         var rotation = ChatPositionSettings.LoadRotation();
 
-        // Super wide for readable chat
+        // super wide for readable chat
         var size = new Vector2(450f, 140f);
         Screen = FloatingScreen.CreateFloatingScreen(size, createHandle: true, position, rotation);
 
@@ -47,10 +47,10 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
         Screen.HighlightHandle = true;
         Screen.ShowHandle = true;
 
-        // Force screen size (in case HMUI/Screen overwrites it)
+        // force screen size (in case HMUI/Screen overwrites it)
         Screen.ScreenSize = size;
 
-        // Force view controller to fill the entire screen - critical for width to take effect
+        // force view controller to fill the entire screen - critical for width to take effect
         var vcRect = _viewController.transform as RectTransform;
         if (vcRect != null)
         {
@@ -60,7 +60,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
             vcRect.offsetMax = Vector2.zero;
         }
 
-        // Reset view controller transform so content displays flat (like BeatmapScanner)
+        // reset view controller transform so content displays flat (like BeatmapScanner)
         _viewController.transform.localScale = Vector3.one;
         _viewController.transform.localEulerAngles = Vector3.zero;
 
@@ -79,7 +79,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
     {
         if (Screen == null) return;
 
-        // Prevent going below floor (like BeatmapScanner)
+        // prevent going below floor (like BeatmapScanner)
         if (Screen.Handle != null && Screen.Handle.transform.position.y < 0)
         {
             Screen.transform.position += new Vector3(0f, -Screen.Handle.transform.position.y + 0.1f, 0f);
