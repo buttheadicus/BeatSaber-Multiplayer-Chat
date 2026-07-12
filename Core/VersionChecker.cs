@@ -56,7 +56,7 @@ public class VersionChecker : MonoBehaviour, IInitializable, IDisposable
             yield return ShowUpdateNoticeWhenMainMenuReady(openModReleasePage);
 
         if (!string.IsNullOrEmpty(cauLaunchPath))
-            LaunchCauAndQuit(cauLaunchPath);
+            LaunchCauAndQuit(cauLaunchPath!);
     }
 
     private IEnumerator CheckCoreModUpdate(Action<bool, bool, string?> setResult)

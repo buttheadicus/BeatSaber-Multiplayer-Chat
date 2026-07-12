@@ -75,8 +75,8 @@ internal static class AddonSettingsFlowRegistry
         Type? nestedViewType = null;
         if (!string.IsNullOrEmpty(nestedFlowTypeName) && !string.IsNullOrEmpty(nestedViewTypeName))
         {
-            nestedFlowType = AddonZenjectPreloader.ResolveType(addonId, nestedFlowTypeName);
-            nestedViewType = AddonZenjectPreloader.ResolveType(addonId, nestedViewTypeName);
+            nestedFlowType = AddonZenjectPreloader.ResolveType(addonId, nestedFlowTypeName!);
+            nestedViewType = AddonZenjectPreloader.ResolveType(addonId, nestedViewTypeName!);
             if (nestedFlowType == null || nestedViewType == null)
                 return;
         }

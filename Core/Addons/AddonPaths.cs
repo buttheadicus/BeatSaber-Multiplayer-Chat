@@ -13,7 +13,7 @@ internal static class AddonPaths
         get
         {
             if (!string.IsNullOrEmpty(_pluginsDirectory))
-                return _pluginsDirectory;
+                return _pluginsDirectory!;
 
             var fromAssembly = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrEmpty(fromAssembly))

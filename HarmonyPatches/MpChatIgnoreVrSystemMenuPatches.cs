@@ -20,10 +20,16 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         TryPatch(harmony, typeof(MultiplayerInGameMenuIgnoreApplicationPausePatch));
         TryPatch(harmony, typeof(KeepControllersActiveOnFocusCapturePatch));
         TryPatch(harmony, typeof(IgnoreUserPresenceLossPatch));
+        TryPatch(harmony, typeof(IgnoreUserPresenceCanceledPatch));
+        TryPatch(harmony, typeof(IgnoreUnityXrApplicationPausePatch));
+        TryPatch(harmony, typeof(IgnoreVrFocusLossPatch));
         TryPatch(harmony, typeof(AlwaysHasInputFocusPatch));
         TryPatch(harmony, typeof(AlwaysHasVrFocusPatch));
         TryPatch(harmony, typeof(SongPreviewIgnoreInputFocusCapturedPatch));
         TryPatch(harmony, typeof(LevelGridIgnoreInputFocusCapturedPatch));
+        TryPatch(harmony, typeof(IgnoreAnimatorFocusCapturePatch));
+        TryPatch(harmony, typeof(CustomAvatarAlwaysHasFocusPatch));
+        TryPatch(harmony, typeof(CustomAvatarTrackingRigKeepEnabledPatch));
     }
 
     private static void TryPatch(Harmony harmony, Type patchType)
@@ -62,7 +68,6 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         private static MethodBase TargetMethod() =>
             AccessTools.Method(typeof(PauseController), "OnApplicationPause")!;
 
-        // block pause-on-background only; allow resume when focus returns.
         private static bool Prefix(bool pauseStatus) => !pauseStatus;
     }
 
@@ -111,7 +116,6 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         private static bool Prefix(bool pauseStatus) => !pauseStatus;
     }
 
-    // SteamVR overlay clears user presence; that deactivates controller GameObjects and freezes hands
     [HarmonyPatch]
     private static class KeepControllersActiveOnFocusCapturePatch
     {
@@ -121,12 +125,39 @@ internal static class MpChatIgnoreVrSystemMenuPatches
         private static bool Prefix() => false;
     }
 
-    // SteamVR dashboard cancels OpenXR user presence; swallow loss so capture/hmd-unmount events never fire
     [HarmonyPatch]
     private static class IgnoreUserPresenceLossPatch
     {
         private static MethodBase TargetMethod() =>
             AccessTools.Method(typeof(UnityXRHelper), "set_userPresence")!;
+
+        private static bool Prefix(bool value) => value;
+    }
+
+    [HarmonyPatch]
+    private static class IgnoreUserPresenceCanceledPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(UnityXRHelper), "OnUserPresenceCanceled")!;
+
+        private static bool Prefix() => false;
+    }
+
+    // SteamVR overlay triggers Unity pause on the XR helper; that fires vrFocusWasCapturedEvent
+    [HarmonyPatch]
+    private static class IgnoreUnityXrApplicationPausePatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(UnityXRHelper), "OnApplicationPause")!;
+
+        private static bool Prefix(bool pauseStatus) => !pauseStatus;
+    }
+
+    [HarmonyPatch]
+    private static class IgnoreVrFocusLossPatch
+    {
+        private static MethodBase TargetMethod() =>
+            AccessTools.Method(typeof(UnityXRHelper), "set_hasVrFocus")!;
 
         private static bool Prefix(bool value) => value;
     }
@@ -173,5 +204,72 @@ internal static class MpChatIgnoreVrSystemMenuPatches
             AccessTools.Method(typeof(AnnotatedBeatmapLevelCollectionsGridView), "HandleVRPlatformHelperInputFocusCaptured")!;
 
         private static bool Prefix() => false;
+    }
+
+    [HarmonyPatch]
+    private static class IgnoreAnimatorFocusCapturePatch
+    {
+        private static MethodBase? TargetMethod() =>
+            AccessTools.Method(typeof(DeactivateAnimatorOnInputFocusCapture), "HandleInputFocusCaptured");
+
+        private static bool Prefix() => false;
+    }
+
+    // Custom Avatars disables VRController behaviours when it thinks focus is lost
+    [HarmonyPatch]
+    private static class CustomAvatarAlwaysHasFocusPatch
+    {
+        private static MethodBase? TargetMethod()
+        {
+            var type = AccessTools.TypeByName("CustomAvatar.Utilities.BeatSaberUtilities");
+            return type == null ? null : AccessTools.DeclaredMethod(type, "get_hasFocus");
+        }
+
+        private static bool Prefix(ref bool __result)
+        {
+            __result = true;
+            return false;
+        }
+    }
+
+    [HarmonyPatch]
+    private static class CustomAvatarTrackingRigKeepEnabledPatch
+    {
+        private static MethodBase? TargetMethod()
+        {
+            var type = AccessTools.TypeByName("CustomAvatar.Tracking.TrackingRig");
+            return type == null ? null : AccessTools.DeclaredMethod(type, "UpdateBehaviourEnabled");
+        }
+
+        private static bool Prefix(object __instance)
+        {
+            try
+            {
+                var behaviour = __instance as UnityEngine.Behaviour;
+                if (behaviour != null)
+                    behaviour.enabled = true;
+
+                var left = AccessTools.PropertyGetter(__instance.GetType(), "leftHand")?.Invoke(__instance, null);
+                var right = AccessTools.PropertyGetter(__instance.GetType(), "rightHand")?.Invoke(__instance, null);
+                EnableController(left);
+                EnableController(right);
+            }
+            catch
+            {
+                // keep trying to skip the original disable path
+            }
+
+            return false;
+        }
+
+        private static void EnableController(object? node)
+        {
+            if (node == null)
+                return;
+            var controller = AccessTools.PropertyGetter(node.GetType(), "controller")?.Invoke(node, null)
+                as UnityEngine.Behaviour;
+            if (controller != null)
+                controller.enabled = true;
+        }
     }
 }

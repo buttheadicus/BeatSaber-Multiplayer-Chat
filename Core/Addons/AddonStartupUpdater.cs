@@ -18,7 +18,7 @@ internal static class AddonStartupUpdater
             string? installedDisplayName = null;
             yield return CheckInstallAddon(definition, name => installedDisplayName = name);
             if (!string.IsNullOrEmpty(installedDisplayName))
-                updatedDisplayNames.Add(installedDisplayName);
+                updatedDisplayNames.Add(installedDisplayName!);
         }
     }
 

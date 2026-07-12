@@ -45,13 +45,13 @@ internal static class AddonGitHubDownload
         {
             var body = request.downloadHandler?.text?.Trim();
             var error = request.error ?? "request failed";
-            if (!string.IsNullOrEmpty(body) && body.Length <= 512)
+            if (body is { Length: > 0 and <= 512 })
                 error = $"{error} | {body}";
             onComplete(false, error);
             yield break;
         }
 
-        onComplete(true, request.downloadHandler.text);
+        onComplete(true, request.downloadHandler?.text ?? "");
     }
 
     internal static bool TryDownloadFileSync(string url, string destPath, out string error)
