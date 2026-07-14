@@ -130,6 +130,25 @@ public class ModPresenceManager : IInitializable, IDisposable
         lock (_lock) return _playersWithMod.Contains(userId);
     }
 
+    // true when at least one connected peer (not local) has Multiplayer Chat
+    public bool HasRemotePlayerWithMod()
+    {
+        var localId = _sessionManager.localPlayer?.userId;
+        lock (_lock)
+        {
+            foreach (var id in _playersWithMod)
+            {
+                if (string.IsNullOrEmpty(id))
+                    continue;
+                if (!string.IsNullOrEmpty(localId) && id == localId)
+                    continue;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public bool IsSlzCompanionClient(string userId)
     {
         if (string.IsNullOrEmpty(userId))

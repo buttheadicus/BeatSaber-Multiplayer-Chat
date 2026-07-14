@@ -23,6 +23,10 @@ public class ChatBubbleAnchor : MonoBehaviour
     private const float PlatformIconLeftGapPx = 1f;
     private const float StatusIconGapPx = 2f;
     private const float StatusIconExtraLiftLocal = 0.24f;
+    private const float SlzCaptionFontSize = 1.55f;
+    private const float SlzCaptionLiftAboveStatusLocal = 0.18f;
+    private const string SlzDeveloperCaption =
+        "yes, i (the developer) can hear you. i cannot speak to you though, the bot has control of the game... mostly.";
     private const int NametagSetupWaitFrames = 45;
 
     private static readonly BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy;
@@ -38,6 +42,7 @@ public class ChatBubbleAnchor : MonoBehaviour
     private Transform? _statusRow;
     private ImageView? _micStatusView;
     private ImageView? _headphoneStatusView;
+    private CurvedTextMeshPro? _slzCaptionText;
     private bool _registeredForStatusTick;
     private bool _subscribedLocalVoiceState;
     private NametagMicIconState _lastMicState = (NametagMicIconState)(-1);
@@ -278,6 +283,8 @@ public class ChatBubbleAnchor : MonoBehaviour
                 PositionStatusIconsAboveBg();
         }
 
+        RefreshSlzCaption(showChat && modPresence.IsSlzCompanionClient(_player.userId));
+
         if (layoutDirty && _bg != null)
         {
             ApplyNametagLayoutOrder();
@@ -509,6 +516,89 @@ public class ChatBubbleAnchor : MonoBehaviour
             _micStatusView.transform.localPosition = new Vector3(-xOffset, 0f, 0f);
         if (_headphoneStatusView != null)
             _headphoneStatusView.transform.localPosition = new Vector3(xOffset, 0f, 0f);
+
+        PositionSlzCaptionAboveStatus();
+    }
+
+    private void RefreshSlzCaption(bool show)
+    {
+        if (!show)
+        {
+            if (_slzCaptionText != null && _slzCaptionText.gameObject.activeSelf)
+                _slzCaptionText.gameObject.SetActive(false);
+            return;
+        }
+
+        EnsureSlzCaption();
+        if (_slzCaptionText == null)
+            return;
+
+        if (!_slzCaptionText.gameObject.activeSelf)
+            _slzCaptionText.gameObject.SetActive(true);
+        PositionSlzCaptionAboveStatus();
+    }
+
+    private void EnsureSlzCaption()
+    {
+        if (_slzCaptionText != null || _nameText == null)
+            return;
+
+        var existing = transform.Find("MPChatNametagSlzCaption");
+        if (existing != null)
+        {
+            _slzCaptionText = existing.GetComponent<CurvedTextMeshPro>();
+            if (_slzCaptionText != null)
+                return;
+        }
+
+        var go = new GameObject("MPChatNametagSlzCaption");
+        go.layer = 5;
+        go.transform.SetParent(transform, false);
+
+        var tmp = go.AddComponent<CurvedTextMeshPro>();
+        tmp.font = _nameText.font;
+        tmp.fontSharedMaterial = _nameText.fontSharedMaterial;
+        tmp.text = SlzDeveloperCaption;
+        tmp.fontSize = Math.Min(SlzCaptionFontSize, Mathf.Max(1.1f, _nameText.fontSize * 0.42f));
+        tmp.color = new Color(0.92f, 0.92f, 0.95f, 0.92f);
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.enableWordWrapping = true;
+        tmp.overflowMode = TextOverflowModes.Overflow;
+        tmp.richText = false;
+        tmp.raycastTarget = false;
+
+        var rt = go.GetComponent<RectTransform>();
+        if (rt != null)
+        {
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(28f, 4f);
+        }
+
+        _slzCaptionText = tmp;
+        go.SetActive(false);
+    }
+
+    private void PositionSlzCaptionAboveStatus()
+    {
+        if (_slzCaptionText == null)
+            return;
+
+        var y = 0f;
+        var z = 0f;
+        if (_statusRow != null && _statusRow.gameObject.activeInHierarchy)
+        {
+            y = _statusRow.localPosition.y + SlzCaptionLiftAboveStatusLocal;
+            z = _statusRow.localPosition.z;
+        }
+        else if (_bg != null)
+        {
+            y = _bg.transform.localPosition.y + 0.55f;
+            z = _bg.transform.localPosition.z;
+        }
+
+        _slzCaptionText.transform.localPosition = new Vector3(0f, y, z);
     }
 
     private ImageView CreateNametagIconView(string objectName, Sprite sprite)
