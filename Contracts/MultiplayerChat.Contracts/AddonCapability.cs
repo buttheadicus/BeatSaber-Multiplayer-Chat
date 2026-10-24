@@ -9,4 +9,5 @@ public enum AddonCapability
     QuickBinds = 1 << 0,
     AvatarColoring = 1 << 1,
     LobbyCustomAvatars = 1 << 3,
+    Spectaplay = 1 << 4,
 }
