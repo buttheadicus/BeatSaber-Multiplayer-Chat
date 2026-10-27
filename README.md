@@ -1,23 +1,51 @@
 # Multiplayer Chat
 
-Encrypted text/voice chat for BeatTogether (or other supported server (in theory, any server))
+Encrypted text/voice chat for BeatTogether (or other supported server (in theory, any server. doesnt include multiplayer+ currently))
 
 ## Already implemented features
 
-- **Encrypted text/voice chat**: fully encrypted packets, server cant read what you say or type.
-- **Voice chat & messages**: speak to other players with hot mic, or give them a nice voice message!
-- **DMs**: self explanitory, have only one player read/hear your text/voice message.
-- **Mute / deafen**: self explanitory
-- **Talk-to / listen filters**: listen to one player, or talk to one player! (very useful in groups)
-- **Custom avatars**: (THIS IS AN OPTIONAL ADDON, GO TO THE SETTINGS TO ENABLE THIS FEATURE) use custom unity avatars in multiplayer rather then the default Beat Saber avatars!
+<details>
+  <summary>Voice chat / text chat</summary><br/>
+	chat with players with a text chat, or use voice chat-you do you. (note, packets are encrypted, beattogether or whatever server you use can NOT read what you say/type.
+</details>
+
+<details>
+  <summary>DMs</summary><br/>
+	self explanitory, have only one player read/hear your text/voice message. to be expanded in 0.4.0's major server update.
+</details>
+
+<details>
+  <summary>Mute / deafen</summary><br/>
+	self explanitory
+</details>
+
+<details>
+  <summary>Talk-to / listen filters</summary><br/>
+	listen to one player, or talk to one player! (very useful in groups)
+</details>
 
 ## Fused mods
 - [AvatarExtras](https://github.com/roydejong/BeatSaberAvatarExtras) 
 
 ## Addons [GO TO SETTINGS TO ENABLE THESE FEATURES]
-- **Custom Multiplayer Avatars**
-- **Avatar Coloring Extentions**
-- **Quick Binds**
+
+<details>
+  <summary>Custom Multiplayer Avatars</summary><br/>
+	This addon allows custom avatars to be used in multiplayer-players with this addon enabled can see your avatar and vice versa. 
+	**does not require the Custom Avatars mod as of 0.3.8**
+</details>
+
+<details>
+  <summary>Avatar Coloring Extentions</summary><br/>
+	This addon gives you extra color settings that allow you to create exotic colors and effects that **ANYBODY** can see in multiplayer.
+</details>
+
+<details>
+  <summary>Quick Binds</summary><br/>
+	This addon gives you the ability to bind game events to your controllers
+	current bindable events; 
+</details>
+
 
 ## Plans
 
@@ -54,3 +82,7 @@ yeah, it does. soo it will close beatsaber a few times after the first install, 
 4. Copy `bin/Release/MultiplayerChat.dll` to `Beat Saber/Plugins/`
 5. Piss yourself when build fails
 6. Restart step 1
+
+## License
+
+MultiplayerChat is dedicated to the public domain under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). See [LICENSE](LICENSE).
