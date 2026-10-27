@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
+// needs a refresh, this approach kinda sucks.
+
 namespace MultiplayerChat.Core;
 
 internal static class VoiceReceiveDiagnostics

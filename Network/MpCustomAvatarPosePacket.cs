@@ -1,6 +1,8 @@
 using System;
 using LiteNetLib.Utils;
 
+// really only good for fbt, which probably doesnt even work i nthe current state of the codebase-probably gonna be touched in the future when custom avatars are reworked
+
 namespace MultiplayerChat.Network;
 
 public class MpCustomAvatarPosePacket : MultiplayerCore.Networking.Abstractions.MpPacket

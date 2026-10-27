@@ -11,6 +11,8 @@ using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 using Zenject;
 
+// written by grok
+
 namespace MultiplayerChat.Core;
 
 public class VersionChecker : MonoBehaviour, IInitializable, IDisposable

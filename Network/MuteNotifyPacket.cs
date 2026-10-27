@@ -1,5 +1,7 @@
 using LiteNetLib.Utils;
 
+// really only for the icons. (the icons that rest above players nametags)
+
 namespace MultiplayerChat.Network;
 
 public class MuteNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket

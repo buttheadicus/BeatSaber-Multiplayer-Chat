@@ -1,6 +1,8 @@
 using MultiplayerChat;
 using UnityEngine;
 
+// this is the bullshrimp that fills up logs when debug mode is enabled. cooL!
+
 namespace MultiplayerChat.Core;
 
 public static class VoipPipelineTrace

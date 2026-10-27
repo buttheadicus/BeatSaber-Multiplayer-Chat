@@ -1695,6 +1695,7 @@ public class ChatManager : IInitializable, IDisposable
         src.bypassEffects = true;
         src.bypassListenerEffects = true;
         src.bypassReverbZones = true;
+        src.ignoreListenerVolume = true;
         yield return WaitForAudioSourceClipEnd(src, clip);
         UnityEngine.Object.Destroy(clip);
         if (_voicePlaybackGameObject == go)
@@ -1933,6 +1934,7 @@ public class ChatManager : IInitializable, IDisposable
         src.spatialBlend = 0f;
         src.pitch = 1f;
         src.ignoreListenerPause = true;
+        src.ignoreListenerVolume = true;
         src.bypassEffects = true;
         src.bypassListenerEffects = true;
         src.bypassReverbZones = true;

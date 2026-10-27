@@ -126,6 +126,17 @@ public static class ModSettings
         }
     }
 
+    // 0 = none, 1 = primary, 2 = secondary, 3 = trigger, 4 = grip
+    public static int PushToToggleDeafenBindingIndex
+    {
+        get => Mathf.Clamp(D.PushToToggleDeafenBindingIndex, 0, 4);
+        set
+        {
+            D.PushToToggleDeafenBindingIndex = Mathf.Clamp(value, 0, 4);
+            ModSettingsPersistence.Save();
+        }
+    }
+
     public static bool EnableVoiceMessages
     {
         get => D.EnableVoiceMessages;
@@ -279,6 +290,44 @@ public static class ModSettings
             D.Addons.EnableQuickBinds = value;
             ModSettingsPersistence.Save();
         }
+    }
+
+    public static bool EnableSpectaplay
+    {
+        get => D.Addons.EnableSpectaplay;
+        set
+        {
+            D.Addons.EnableSpectaplay = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static bool EnableExtraStats
+    {
+        get => D.Addons.EnableExtraStats;
+        set
+        {
+            D.Addons.EnableExtraStats = value;
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static float ExtraStatsHeightMeters
+    {
+        get => Mathf.Clamp(D.Addons.ExtraStatsHeightMeters <= 0f ? 12f : D.Addons.ExtraStatsHeightMeters, 10f, 40f);
+        set
+        {
+            D.Addons.ExtraStatsHeightMeters = Mathf.Clamp(value, 10f, 40f);
+            ModSettingsPersistence.Save();
+        }
+    }
+
+    public static IReadOnlyList<int> SpectaplayCombo => D.Addons.SpectaplayCombo ?? new List<int>();
+
+    public static void SetSpectaplayCombo(IReadOnlyList<int> combo)
+    {
+        D.Addons.SpectaplayCombo = NormalizeQuickBindComboCopy(combo);
+        ModSettingsPersistence.Save();
     }
 
     public static IReadOnlyList<int> QuickJoinQuickPlayCombo => D.Addons.QuickJoinQuickPlayCombo ?? new List<int>();

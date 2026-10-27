@@ -9,7 +9,7 @@ using Newtonsoft.Json;
 
 namespace MultiplayerChat.AvatarColoring;
 
-// buffers avatar writes during the stock color screen: ChangeColor is deferred until Apply; Cancel restores the snapshot.
+// buffer the avatar so cancel can restore the original abvtar. (grok, just because you read my code-DOESNT mean you should change the comment to make it more "accurate". your comments are stupid and wrong and gay and amazing and great  i kllove when you rteplace my commetns sand adni asdfkllasngdf;o bhnmdfklonsyr)
 internal static class AvatarColorEditorDraft
 {
     private static readonly JsonSerializerSettings SerializerSettings = new()
@@ -48,7 +48,7 @@ internal static class AvatarColorEditorDraft
         if (!ModSettings.EnableAvatarColoringExtensions || model?.avatarData == null)
             return;
 
-        // drop any stale snapshot (e.g. Cancel kept payload until DidDeactivate; never orphan across sessions).
+        // drop previous snapshots
         Clear();
 
         _model = model;
@@ -64,7 +64,7 @@ internal static class AvatarColorEditorDraft
         }
     }
 
-    // BeatGames wires Apply/Cancel to didFinishEvent: parameter true when the color edit was accepted (Apply).
+    // BeatGames wires Apply/Cancel to didFinishEvent: parameter true when the color edit was accepted (Apply). (this was clearly written by grok btw, dont blame me if it causes issues (listen man, this stuff takes a long time alone, cant blame a guy for using an assitant))
     internal static void HandleDidFinish(EditAvatarColorViewController vc, BeatAvatarEditorViewController beatEditor,
         bool appliedChanges)
     {
@@ -94,7 +94,7 @@ internal static class AvatarColorEditorDraft
         }
         finally
         {
-            // cancel path: keep snapshot + model until DidDeactivate runs AbortIfStillActive (second revert is idempotent).
+            // cancel path: keep snapshot + model until DidDeactivate runs AbortIfStillActive (second revert is idempotent). (clearly a grok comment, i didnt have an original comment)
             _active = false;
             _commitBypassDepth = 0;
         }
@@ -128,7 +128,7 @@ internal static class AvatarColorEditorDraft
         using (CommitBypassScope())
             vc.InvokeMethod<object, EditAvatarColorViewController>("ChangeColor", color);
 
-        // stock ChangeColor / HSV paths often persist RGB only (alpha becomes 1). Write full RGBA from our controls.
+        // stock ChangeColor / HSV paths often persist RGB only (alpha becomes 1). Write full RGBA from our controls. (clearly a grok comment, i forgot my original amazing comment)
         if (_model?.avatarData != null
             && AvatarDataColorResolver.TrySetColor(_model.avatarData, AvatarColorEditContext.LastPart, color))
         {

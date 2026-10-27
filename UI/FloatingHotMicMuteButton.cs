@@ -5,6 +5,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+// doesnt work btw, im not gonna fix it, its gonna be adressed when the ui redesign happens.
+
 namespace MultiplayerChat.UI;
 
 public class FloatingHotMicMuteButton : MonoBehaviour

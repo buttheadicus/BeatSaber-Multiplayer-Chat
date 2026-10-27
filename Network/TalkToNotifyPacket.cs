@@ -1,5 +1,6 @@
 using LiteNetLib.Utils;
 
+
 namespace MultiplayerChat.Network;
 
 public class TalkToNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket

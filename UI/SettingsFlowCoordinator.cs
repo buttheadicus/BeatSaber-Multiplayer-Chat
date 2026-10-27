@@ -13,6 +13,7 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
     [Inject] private readonly MicSettingsFlowCoordinator _micSettingsFlowCoordinator = null!;
     [Inject] private readonly FusedModsSettingsFlowCoordinator _fusedModsSettingsFlowCoordinator = null!;
     [Inject] private readonly PerformanceSettingsFlowCoordinator _performanceSettingsFlowCoordinator = null!;
+    [Inject] private readonly ExperimentalSettingsFlowCoordinator _experimentalSettingsFlowCoordinator = null!;
 
     public HMUI.FlowCoordinator? ParentFlow { get; set; }
 
@@ -33,6 +34,7 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
             _settingsViewController.FusedModsClicked += OnFusedModsClicked;
             _settingsViewController.AddonsClicked += OnAddonsClicked;
             _settingsViewController.PerformanceClicked += OnPerformanceClicked;
+            _settingsViewController.ExperimentalClicked += OnExperimentalClicked;
         }
     }
 
@@ -46,6 +48,7 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
             _settingsViewController.FusedModsClicked -= OnFusedModsClicked;
             _settingsViewController.AddonsClicked -= OnAddonsClicked;
             _settingsViewController.PerformanceClicked -= OnPerformanceClicked;
+            _settingsViewController.ExperimentalClicked -= OnExperimentalClicked;
         }
     }
 
@@ -106,6 +109,16 @@ public class MultiplayerChatSettingsFlowCoordinator : FlowCoordinator
 
         _performanceSettingsFlowCoordinator.ParentFlow = this;
         PresentFlowCoordinator(_performanceSettingsFlowCoordinator);
+    }
+
+    private void OnExperimentalClicked()
+    {
+        var child = FlowCoordinatorHelper.GetChildFlowCoordinator(this);
+        if (child == _experimentalSettingsFlowCoordinator)
+            return;
+
+        _experimentalSettingsFlowCoordinator.ParentFlow = this;
+        PresentFlowCoordinator(_experimentalSettingsFlowCoordinator);
     }
 
     protected override void BackButtonWasPressed(ViewController topViewController) => Dismiss();

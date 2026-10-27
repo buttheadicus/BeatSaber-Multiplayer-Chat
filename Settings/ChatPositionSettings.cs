@@ -6,7 +6,7 @@ namespace MultiplayerChat.Settings;
 public static class ChatPositionSettings
 {
     private const string KeyVersion = "MultiplayerChat.LayoutVersion";
-    private const int CurrentVersion = 3; // Bump to reset saved position when layout changes
+    private const int CurrentVersion = 3; // bump that soulja boy when dat layeouwt chaynges!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     private const string KeyPosX = "MultiplayerChat.PosX";
     private const string KeyPosY = "MultiplayerChat.PosY";
     private const string KeyPosZ = "MultiplayerChat.PosZ";

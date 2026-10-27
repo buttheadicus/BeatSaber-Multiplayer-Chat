@@ -4,6 +4,8 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
+// ts doesnt even work, may do somthing withit before 0.4.0, i have full intentions on redesigning the ENTIRE UI system to use its own elements instead of the games UI :3
+
 public class ChatMoveHandle : MonoBehaviour, IBeginDragHandler, IDragHandler
 {
     private RectTransform? _parentRect;

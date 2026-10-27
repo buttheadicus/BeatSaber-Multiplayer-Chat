@@ -178,15 +178,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
     [UIAction("DeafClicked")]
     private void DeafClicked()
     {
-        VoiceChatRuntimeState.SetDeaf(!VoiceChatRuntimeState.IsDeaf);
-        ModSettings.SaveVoiceSelfStateFromRuntime();
-        _chatManager.SendVoiceDeafenStateNotify(VoiceChatRuntimeState.IsDeaf);
-        _chatManager.SendVoiceHotMicMuteStateNotify(VoiceChatRuntimeState.IsHotMicMuted);
-        if (VoiceChatRuntimeState.IsDeaf)
-            _chatManager.PostSystemMessageRich(
-                "<color=#CCCCCC>You have went deaf, you cannot hear anybody, not even voice messages.</color>");
-        else
-            _chatManager.PostSystemMessageRich("<color=#CCCCCC>You have went undeaf, you can hear all voices.</color>");
+        VoiceDeafenToggle.ToggleFromUserInput();
         UpdateLobbyActionButtonHighlights();
     }
 
@@ -795,6 +787,7 @@ public class LobbyChatTabRegistrar : MonoBehaviour
         src.bypassEffects = true;
         src.bypassListenerEffects = true;
         src.bypassReverbZones = true;
+        src.ignoreListenerVolume = true;
         src.Play();
         yield return new WaitForSeconds(clip.length + 0.08f);
         Destroy(clip);

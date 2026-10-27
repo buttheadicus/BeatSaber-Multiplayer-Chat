@@ -6,6 +6,8 @@ using MultiplayerChat.AvatarExtras.Assets;
 using MultiplayerChat.Settings;
 using UnityEngine;
 
+//  NO FRIGGEN WAY!!! IT MAKE SONDS WEN TUOUCH!!!!!
+
 namespace MultiplayerChat.Core;
 
 public static class ChatSoundEffects
@@ -24,7 +26,7 @@ public static class ChatSoundEffects
         if (_loadStarted)
             yield break;
         _loadStarted = true;
-
+        // holy crap lois! actual embedded oggs!!! my old approach of shipping the oggs was stupid!!!!!!!!!!!!!!o (grok did the embedding part, i dont know how to embed oggs since i never had to before)
         yield return LoadEmbeddedOgg("Chat.ogg", c => ChatClip = c);
         yield return LoadEmbeddedOgg("Muted.ogg", c => MutedClip = c);
         yield return LoadEmbeddedOgg("Unmuted.ogg", c => UnmutedClip = c);
@@ -122,6 +124,7 @@ public static class ChatSoundEffects
         src.bypassEffects = true;
         src.bypassListenerEffects = true;
         src.bypassReverbZones = true;
+        src.ignoreListenerVolume = true;
         src.Play();
         UnityEngine.Object.Destroy(go, clip.length + 0.05f);
     }

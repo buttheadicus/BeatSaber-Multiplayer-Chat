@@ -5,7 +5,7 @@ using Zenject;
 
 namespace MultiplayerChat.UI;
 
-// lists avatar presets from Avatar Storage and replaces AvatarData.dat when one is picked.
+// lists avatar presets from Avatar Storage and replaces AvatarData.dat when one is picked. (i really need to upgrade this system, it will probably extend into the floor if you have enough avatars)
 public sealed class AvatarLoadListFlowCoordinator : FlowCoordinator
 {
     [Inject] private readonly AvatarLoadListViewController _viewController = null!;

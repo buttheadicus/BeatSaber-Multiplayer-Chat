@@ -3,6 +3,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+// penos is a really good commenter, i really appreciate his help with the codebase. (cursor suggested this comment, so i let it through cuz it was funny)
+
 namespace MultiplayerChat.UI;
 
 public class UpdateMessager : MonoBehaviour

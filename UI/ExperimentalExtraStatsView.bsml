@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="8" spacing="5">
+    <text text="Extra Stats" font-size="5" align="Center"/>
+    <toggle-setting id="ExtraStatsToggle" text="Enable Extra Stats" value="ExtraStatsEnabledDraft"/>
+    <slider-setting id="ExtraStatsHeightSlider" text="Height (m)" min="10" max="40" increment="1" show-value="true" value="ExtraStatsHeightMetersDraft"/>
+    <text text="Floating HUD above other players while playing or spectating: percent, score, combo, multiplier." font-size="3.2" align="Center" enable-word-wrapping="true"/>
+    <button text="Apply" pad="2" on-click="ApplyClicked"/>
+  </vertical>
+</bg>

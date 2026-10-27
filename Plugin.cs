@@ -175,6 +175,7 @@ public class Plugin
         container.BindInterfacesAndSelfTo<ModPresenceManager>().AsSingle();
         container.Bind<CoroutineHost>().FromNewComponentOnNewGameObject().AsSingle();
         container.BindInterfacesAndSelfTo<ChatPresenceNotifier>().AsSingle().NonLazy();
+        container.BindInterfacesAndSelfTo<ExperimentalExtraStatsHost>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();
 
         if (lobbyUi)
         {
@@ -190,6 +191,15 @@ public class Plugin
             container.Bind<VoiceDuckSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<PerformanceSettingsViewController>().FromNewComponentAsViewController().AsSingle();
             container.Bind<PerformanceSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<ExperimentalWarningViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<ExperimentalSettingsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<ExperimentalSettingsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<ExperimentalChatSongViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<ExperimentalChatSongFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<ExperimentalSkinSnatcherViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<ExperimentalSkinSnatcherFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
+            container.Bind<ExperimentalExtraStatsViewController>().FromNewComponentAsViewController().AsSingle();
+            container.Bind<ExperimentalExtraStatsFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.Bind<PlayerListViewController>().FromNewComponentAsViewController().AsTransient();
             container.Bind<PlayerListFlowCoordinator>().FromNewComponentOnNewGameObject().AsSingle();
             container.BindInterfacesAndSelfTo<LobbyChatTabRegistrar>().FromNewComponentOnNewGameObject().AsSingle().NonLazy();

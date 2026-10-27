@@ -42,7 +42,7 @@ public class CustomAvatarsSettingsViewController : BSMLAutomaticViewController
 
     private const string DefaultDescriptionText =
         "Simple to use! Tap your wanted avatar from the dropdown menu then tap apply, or calibrate height! "
-        + "This addon is designated for future enhancements, not finished yet.";
+        + "This addon is designated for future enhancements, not finished yet-big reworks coming soon.";
 
     private const float DisabledSectionAlpha = 0.45f;
 

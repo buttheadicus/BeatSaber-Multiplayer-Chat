@@ -3,6 +3,8 @@ using System.Text;
 using MultiplayerChat.Settings;
 using MultiplayerCore.Models;
 
+// was originally gonna be a secure thing, stopped caring when monkuh's chat id broke and couldnt talk to anyone anymroe, now just a glorified registry for the chat id system-i think
+
 namespace MultiplayerChat.Core;
 
 // inbound Chat ID policy: platform user id comes from the MP session; SenderChatId is treated like persisted settings.

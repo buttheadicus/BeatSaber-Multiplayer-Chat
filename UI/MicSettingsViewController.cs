@@ -20,12 +20,15 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
 
     [UIComponent("PttBindDropdown")] private DropDownListSetting? _pttDropdown;
 
+    [UIComponent("DeafenBindDropdown")] private DropDownListSetting? _deafenDropdown;
+
     [UIComponent("PushToTalkToggle")] private ToggleSetting? _pushToTalkToggle;
 
     [UIComponent("EnableVoiceMessagesToggle")] private ToggleSetting? _enableVoiceMessagesToggle;
 
     private readonly List<object> _micOptionObjects = new() { MicDefaultLabel };
     private readonly List<object> _pttOptionObjects = new() { "Primary", "Secondary", "Trigger", "Grip" };
+    private readonly List<object> _deafenOptionObjects = new() { "None", "Primary", "Secondary", "Trigger", "Grip" };
 
     private bool _draftEnableVoiceMessages;
 
@@ -34,6 +37,9 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
 
     [UIValue("PttOptions")]
     public IList PttOptions => _pttOptionObjects;
+
+    [UIValue("DeafenBindOptions")]
+    public IList DeafenBindOptions => _deafenOptionObjects;
 
     [UIValue("PushToTalk")]
     public bool PushToTalk
@@ -55,6 +61,7 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
         _draftEnableVoiceMessages = ModSettings.EnableVoiceMessages;
         BuildMicList();
         BuildPttDropdown();
+        BuildDeafenDropdown();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
@@ -64,6 +71,7 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
         _draftEnableVoiceMessages = ModSettings.EnableVoiceMessages;
         BuildMicList();
         BuildPttDropdown();
+        BuildDeafenDropdown();
         BsmlDefaultStringCleanup.StripPlaceholderLabels(gameObject);
     }
 
@@ -110,6 +118,17 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
         _pttDropdown.ReceiveValue();
     }
 
+    private void BuildDeafenDropdown()
+    {
+        if (_deafenDropdown == null) return;
+        _deafenDropdown.Values = _deafenOptionObjects;
+        _deafenDropdown.UpdateChoices();
+        var idx = ModSettings.PushToToggleDeafenBindingIndex;
+        if (idx >= 0 && idx < _deafenOptionObjects.Count)
+            _deafenDropdown.Value = _deafenOptionObjects[idx];
+        _deafenDropdown.ReceiveValue();
+    }
+
     [UIAction("ApplyClicked")]
     private void OnApplyClicked()
     {
@@ -127,6 +146,19 @@ public sealed class MicSettingsViewController : BSMLAutomaticViewController
                 "Secondary" => 1,
                 "Trigger" => 2,
                 "Grip" => 3,
+                _ => 0
+            };
+        }
+
+        if (_deafenDropdown != null)
+        {
+            var s = _deafenDropdown.Value?.ToString() ?? "None";
+            ModSettings.PushToToggleDeafenBindingIndex = s switch
+            {
+                "Primary" => 1,
+                "Secondary" => 2,
+                "Trigger" => 3,
+                "Grip" => 4,
                 _ => 0
             };
         }

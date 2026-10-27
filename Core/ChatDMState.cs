@@ -45,7 +45,7 @@ public class ChatDMState
             _dmTargetUserId = userId;
             _dmTargetUserName = userName;
             _dmTargetChatId = targetChatId;
-            // only keep "they sent intro first" if we're DMing that same person.
+            // only keep "they sent intro first" if we're DMing that same person. (holy crap, i actally used an apostrophe in a comment, i think i might be getting better at this)
             if (string.IsNullOrEmpty(userId) || userId != _receivedDmIntroFromUserId)
                 _receivedDmIntroFromUserId = null;
         }

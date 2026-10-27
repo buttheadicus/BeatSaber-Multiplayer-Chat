@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 using Zenject;
 
 namespace MultiplayerChat.Core.Addons;
@@ -17,13 +16,13 @@ internal static class AddonAffinityForwarder
     {
         if (AddonHost.Instance == null || !AddonHost.Instance.IsAddonLoaded(addonId))
         {
-            WarnOnce($"{addonId}:{typeFullName}:not-loaded", $"Patcher skipped for {typeFullName}: addon not loaded.");
+            MpChatLog.Error($"[MPChat][Addons] Patcher skipped for {typeFullName}: addon not loaded.");
             return null;
         }
 
         if (!AddonPatcherRegistry.TryGet(addonId, typeFullName, out var patcherType))
         {
-            WarnOnce($"{addonId}:{typeFullName}:unregistered", $"Patcher skipped for {typeFullName}: not registered.");
+            MpChatLog.Error($"[MPChat][Addons] Patcher skipped for {typeFullName}: not registered.");
             return null;
         }
 
@@ -34,14 +33,14 @@ internal static class AddonAffinityForwarder
         var menuContainer = AddonZenjectSettingsBinder.MenuContainer;
         if (menuContainer == null)
         {
-            WarnOnce($"{addonId}:{typeFullName}:no-menu", $"Patcher skipped for {typeFullName}: menu container missing.");
+            MpChatLog.Error($"[MPChat][Addons] Patcher skipped for {typeFullName}: menu container missing.");
             return null;
         }
 
         try
         {
-            var parentContainer = ResolveInjectionContainer(contextualArgs) ?? menuContainer;
-            var patcher = InstantiatePatcher(parentContainer, patcherType, contextualArgs);
+            // always menu container. scene context on the editor is missing addon flow bindings.
+            var patcher = InstantiatePatcher(menuContainer, patcherType, contextualArgs);
 
             if (contextKey != null)
                 ContextPatchers.Add(contextKey, patcher);
@@ -50,7 +49,7 @@ internal static class AddonAffinityForwarder
         }
         catch (Exception ex)
         {
-            WarnOnce($"{addonId}:{typeFullName}:instantiate", $"Patcher instantiate failed for {typeFullName}: {ex.Message}");
+            MpChatLog.Error($"[MPChat][Addons] Patcher instantiate failed for {typeFullName}: {ex.Message}");
             return null;
         }
     }
@@ -81,27 +80,8 @@ internal static class AddonAffinityForwarder
         container.Bind(instanceType).FromInstance(instance);
         for (var baseType = instanceType.BaseType; baseType != null && baseType != typeof(object); baseType = baseType.BaseType)
             container.Bind(baseType).FromInstance(instance);
-        foreach (var iface in instanceType.GetInterfaces())
+            foreach (var iface in instanceType.GetInterfaces())
             container.Bind(iface).FromInstance(instance);
-    }
-
-    private static DiContainer? ResolveInjectionContainer(object?[] contextualArgs)
-    {
-        for (var i = 0; i < contextualArgs.Length; i++)
-        {
-            if (contextualArgs[i] is not Component component)
-                continue;
-
-            var gameObjectContext = component.GetComponentInParent<GameObjectContext>(true);
-            if (gameObjectContext != null)
-                return gameObjectContext.Container;
-
-            var sceneContext = component.GetComponentInParent<SceneContext>(true);
-            if (sceneContext != null)
-                return sceneContext.Container;
-        }
-
-        return null;
     }
 
     internal static void ClearContextPatchers()
@@ -117,7 +97,20 @@ internal static class AddonAffinityForwarder
         var method = target.GetType().GetMethod(
             methodName,
             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-        method?.Invoke(target, args);
+        if (method == null)
+        {
+            MpChatLog.Error($"[MPChat][Addons] Patcher {target.GetType().Name} has no {methodName}.");
+            return;
+        }
+
+        try
+        {
+            method.Invoke(target, args);
+        }
+        catch (Exception ex)
+        {
+            MpChatLog.Error($"[MPChat][Addons] Patcher {target.GetType().Name}.{methodName} failed: {ex.InnerException?.Message ?? ex.Message}");
+        }
     }
 
     internal static bool InvokePrefix(object? target, string methodName, params object?[] args)

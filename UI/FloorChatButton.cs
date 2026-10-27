@@ -7,6 +7,8 @@ using UnityEngine.UI;
 using Zenject;
 using Object = UnityEngine.Object;
 
+// this will be the ground zero for the ui redesign. it was originally supposed to be a button on the floor, but i decided to make it in the mods tab for now. (hey, its a beta, what do you want from me???)
+
 namespace MultiplayerChat.UI;
 
 public class FloorChatButton : MonoBehaviour

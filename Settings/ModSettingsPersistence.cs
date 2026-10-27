@@ -44,6 +44,21 @@ internal static class ModSettingsPersistence
 
         [JsonProperty("allowQuickBindsDuringSong")]
         public bool AllowQuickBindsDuringSong { get; set; }
+
+        [JsonProperty("enableSpectaplay")]
+        public bool EnableSpectaplay { get; set; }
+
+        [JsonProperty("enableSkinSnatcher")]
+        public bool EnableSkinSnatcher { get; set; }
+
+        [JsonProperty("enableExtraStats")]
+        public bool EnableExtraStats { get; set; }
+
+        [JsonProperty("extraStatsHeightMeters")]
+        public float ExtraStatsHeightMeters { get; set; } = 12f;
+
+        [JsonProperty("spectaplayCombo")]
+        public List<int> SpectaplayCombo { get; set; } = new();
     }
 
     internal sealed class PerformanceSettingsSection
@@ -75,6 +90,8 @@ internal static class ModSettingsPersistence
         [JsonProperty("pushToTalkEnabled")] public bool PushToTalkEnabled { get; set; }
 
         [JsonProperty("pttBindingIndex")] public int PttBindingIndex { get; set; }
+
+        [JsonProperty("pushToToggleDeafenBindingIndex")] public int PushToToggleDeafenBindingIndex { get; set; }
 
         [JsonProperty("enableVoiceMessages")] public bool EnableVoiceMessages { get; set; }
 
@@ -253,6 +270,7 @@ internal static class ModSettingsPersistence
 
         d.BubbleDuration = Mathf.Clamp(d.BubbleDuration, 15f, 60f);
         d.PttBindingIndex = Mathf.Clamp(d.PttBindingIndex, 0, 3);
+        d.PushToToggleDeafenBindingIndex = Mathf.Clamp(d.PushToToggleDeafenBindingIndex, 0, 4);
         d.VoiceDuckTargetPercent = Mathf.Clamp(d.VoiceDuckTargetPercent, 5, 100);
         var hex = (d.NameColor ?? "").Trim();
         if (hex.StartsWith("#")) hex = hex.Substring(1);
@@ -280,10 +298,15 @@ internal static class ModSettingsPersistence
         d.Addons.QuickJoinQuickPlayCombo ??= new List<int>();
         d.Addons.QuickDisconnectCombo ??= new List<int>();
         d.Addons.QuickReadyUpCombo ??= new List<int>();
+        d.Addons.SpectaplayCombo ??= new List<int>();
         NormalizeQuickBindCombo(d.Addons.QuickJoinQuickPlayCombo);
         NormalizeQuickBindCombo(d.Addons.QuickDisconnectCombo);
         NormalizeQuickBindCombo(d.Addons.QuickReadyUpCombo);
+        NormalizeQuickBindCombo(d.Addons.SpectaplayCombo);
         d.Addons.QuickBindComboExpireSeconds = Mathf.Clamp(d.Addons.QuickBindComboExpireSeconds, 1, 60);
+        if (d.Addons.ExtraStatsHeightMeters <= 0f)
+            d.Addons.ExtraStatsHeightMeters = 12f;
+        d.Addons.ExtraStatsHeightMeters = Mathf.Clamp(d.Addons.ExtraStatsHeightMeters, 10f, 40f);
     }
 
     private static void NormalizeQuickBindCombo(List<int> combo)

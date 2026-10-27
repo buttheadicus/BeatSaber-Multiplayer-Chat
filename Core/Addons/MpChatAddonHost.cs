@@ -175,7 +175,7 @@ internal sealed class MpChatAddonHost : IMpChatHost
 
     public void Inject(object instance)
     {
-        var zenjectContainer = ProjectContext.Instance?.Container ?? AddonZenjectSettingsBinder.MenuContainer;
+        var zenjectContainer = AddonZenjectSettingsBinder.MenuContainer ?? ProjectContext.Instance?.Container;
         if (zenjectContainer == null)
             return;
 

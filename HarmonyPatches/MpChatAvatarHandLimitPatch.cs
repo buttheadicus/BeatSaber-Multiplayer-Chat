@@ -5,6 +5,8 @@ using HarmonyLib;
 using MultiplayerChat.Settings;
 using UnityEngine;
 
+// this entire file was written by grok, it worked so i rolled with it. (lowkey surprised i didnt have to change anything)
+
 namespace MultiplayerChat.HarmonyPatches;
 
 // MPEX DisableAvatarConstraints skips RestrictPose then still clamps hands via

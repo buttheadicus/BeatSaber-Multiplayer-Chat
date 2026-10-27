@@ -6,6 +6,8 @@ using MultiplayerChat.UI;
 using UnityEngine;
 using Zenject;
 
+// this needs a refresh, this approach kinda sucks.
+
 namespace MultiplayerChat.Core;
 
 public class VoiceHotMicManager : MonoBehaviour, IInitializable
@@ -55,6 +57,8 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
     private const float RawControllerBindingsLogIntervalSec = 1f;
     private float _nextRawControllerBindingsLogTime;
+
+    private bool _lastDeafenBindHeld;
 
     private const int PttInputPollIntervalFrames = 24;
 
@@ -231,6 +235,7 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
 
         MaybeLogRawControllerBindings();
         TryRefreshThrottledPushToTalkInput();
+        TryPollPushToToggleDeafen();
         UpdateLocalPushToTalkBubbleAndMaybeWarn();
 
         if (!CanCaptureHotMic())
@@ -262,6 +267,21 @@ public class VoiceHotMicManager : MonoBehaviour, IInitializable
         var keyboardPtt = Input.GetKey(KeyCode.Space) && !VrPttInput.HasAnyHandDeviceValid();
         VoiceDynamicTransmitGate.NotifyPushToTalkHeld(vrHeld || keyboardPtt);
         _framesUntilPttInputPoll = PttInputPollIntervalFrames;
+    }
+
+    private void TryPollPushToToggleDeafen()
+    {
+        var idx = ModSettings.PushToToggleDeafenBindingIndex;
+        if (idx <= 0)
+        {
+            _lastDeafenBindHeld = false;
+            return;
+        }
+
+        var held = VrPttInput.IsBindingHeld(idx - 1);
+        if (held && !_lastDeafenBindHeld)
+            VoiceDeafenToggle.ToggleFromUserInput();
+        _lastDeafenBindHeld = held;
     }
 
     private void MaybeLogRawControllerBindings()

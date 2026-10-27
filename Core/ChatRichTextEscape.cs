@@ -1,6 +1,6 @@
 namespace MultiplayerChat.Core;
 
-// TMP rich text treats < as tag syntax. Beat Saber TMP does not reliably parse <noparse>, so use fullwidth glyphs.
+// basucally makes screwy charecters not screwy.
 internal static class ChatRichTextEscape
 {
     private const char LessThanDisplay = '\uFF1C';

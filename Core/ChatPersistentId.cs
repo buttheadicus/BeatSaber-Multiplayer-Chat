@@ -4,6 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using MultiplayerChat.Settings;
 
+// im pretty sure you can steal someones identity if you manage to replicate their id, im not worried about it tho
+// written by grok-i think
+
 namespace MultiplayerChat.Core;
 
 // local player's Chat ID (8-digit or 8-digit + IdGeneratedOfficial). Stored under ChatIdFilePaths.ChatIdFilePath with DPAPI.

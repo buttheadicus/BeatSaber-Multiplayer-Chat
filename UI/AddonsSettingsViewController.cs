@@ -27,4 +27,7 @@ public sealed class AddonsSettingsViewController : BSMLAutomaticViewController
 
     [UIAction("CustomAvatarsClicked")]
     private void OnCustomAvatarsClicked() => AddonClicked?.Invoke(AddonIds.CustomAvatars);
+
+    [UIAction("SpectaplayClicked")]
+    private void OnSpectaplayClicked() => AddonClicked?.Invoke(AddonIds.Spectaplay);
 }

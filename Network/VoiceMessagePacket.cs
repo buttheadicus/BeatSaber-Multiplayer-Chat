@@ -1,6 +1,8 @@
 using System;
 using LiteNetLib.Utils;
 
+// some legacy bullshrimp for the soon to be removed voice message system.
+
 namespace MultiplayerChat.Network;
 
 // encrypted VMSG or hot-mic chunk; DM fills TargetUserId and TargetChatId.

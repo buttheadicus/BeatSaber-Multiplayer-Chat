@@ -1,6 +1,8 @@
 using System;
 using System.Text;
 
+// get your god damn hands off.
+
 namespace MultiplayerChat.Core;
 
 public static class SlzMarkerProof

@@ -330,6 +330,21 @@
     <EmbeddedResource Include="UI\PerformanceSettingsView.bsml">
       <LogicalName>MultiplayerChat.UI.PerformanceSettingsView.bsml</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="UI\ExperimentalWarningView.bsml">
+      <LogicalName>MultiplayerChat.UI.ExperimentalWarningView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\ExperimentalSettingsView.bsml">
+      <LogicalName>MultiplayerChat.UI.ExperimentalSettingsView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\ExperimentalChatSongView.bsml">
+      <LogicalName>MultiplayerChat.UI.ExperimentalChatSongView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\ExperimentalSkinSnatcherView.bsml">
+      <LogicalName>MultiplayerChat.UI.ExperimentalSkinSnatcherView.bsml</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="UI\ExperimentalExtraStatsView.bsml">
+      <LogicalName>MultiplayerChat.UI.ExperimentalExtraStatsView.bsml</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Remove="UI\QuickBindsSettingsView.bsml" />
     <EmbeddedResource Remove="UI\QuickBindsOptionsSettingsView.bsml" />
     <EmbeddedResource Remove="UI\AvatarColoringExtensionsSettingsView.bsml" />

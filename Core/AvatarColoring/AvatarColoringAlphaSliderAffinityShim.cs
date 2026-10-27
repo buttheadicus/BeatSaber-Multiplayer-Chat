@@ -1,5 +1,6 @@
 using BeatSaber.BeatAvatarAdapter.AvatarEditor;
 using BeatSaber.BeatAvatarSDK;
+using HMUI;
 using MultiplayerChat.Core.Addons;
 using SiraUtil.Affinity;
 using UnityEngine;
@@ -11,15 +12,18 @@ internal sealed class AvatarColoringAlphaSliderAffinityShim : IAffinity
     private const string AddonId = "avatarColoring";
     private const string PatcherTypeName = "MultiplayerChat.AvatarColoring.AvatarColoringAlphaSliderPatcher";
 
-    [AffinityPatch(typeof(EditAvatarColorViewController), "DidActivate")]
+    [AffinityPatch(typeof(ViewController), "DidActivate")]
     [AffinityPostfix]
     public void PostfixEditColorDidActivate(
-        EditAvatarColorViewController __instance,
+        ViewController __instance,
         bool firstActivation,
         bool addedToHierarchy,
         bool screenSystemEnabling)
     {
-        var patcher = CreateAlphaSliderPatcher(__instance);
+        if (__instance is not EditAvatarColorViewController colorEditor)
+            return;
+
+        var patcher = CreateAlphaSliderPatcher(colorEditor);
         AddonAffinityShimBridge.InvokeVoidOrNoop(
             patcher,
             "PostfixEditColorDidActivate",
@@ -28,14 +32,17 @@ internal sealed class AvatarColoringAlphaSliderAffinityShim : IAffinity
             screenSystemEnabling);
     }
 
-    [AffinityPatch(typeof(EditAvatarColorViewController), "DidDeactivate")]
+    [AffinityPatch(typeof(ViewController), "DidDeactivate")]
     [AffinityPostfix]
     public void PostfixEditColorDidDeactivate(
-        EditAvatarColorViewController __instance,
+        ViewController __instance,
         bool removedFromHierarchy,
         bool screenSystemDisabling)
     {
-        var patcher = CreateAlphaSliderPatcher(__instance);
+        if (__instance is not EditAvatarColorViewController colorEditor)
+            return;
+
+        var patcher = CreateAlphaSliderPatcher(colorEditor);
         AddonAffinityShimBridge.InvokeVoidOrNoop(
             patcher,
             "PostfixEditColorDidDeactivate",

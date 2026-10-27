@@ -47,7 +47,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
         Screen.HighlightHandle = true;
         Screen.ShowHandle = true;
 
-        // force screen size (in case HMUI/Screen overwrites it)
+        // force screen size (in case HMUI/Screen overwrites it) (you wont believe me, this is NOT a grok comment, i deadass wrote this comment myself)
         Screen.ScreenSize = size;
 
         // force view controller to fill the entire screen - critical for width to take effect
@@ -60,7 +60,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
             vcRect.offsetMax = Vector2.zero;
         }
 
-        // reset view controller transform so content displays flat (like BeatmapScanner)
+        // reset view controller transform so content displays flat (like BeatmapScanner) (thanks grok for over explaining, speaking of over; overriding comments is really gay and amazing)
         _viewController.transform.localScale = Vector3.one;
         _viewController.transform.localEulerAngles = Vector3.zero;
 
@@ -79,7 +79,7 @@ public class FloatingChatScreenCreator : IInitializable, IDisposable
     {
         if (Screen == null) return;
 
-        // prevent going below floor (like BeatmapScanner)
+        // prevent going below floor (like BeatmapScanner) (i already made this joke)
         if (Screen.Handle != null && Screen.Handle.transform.position.y < 0)
         {
             Screen.transform.position += new Vector3(0f, -Screen.Handle.transform.position.y + 0.1f, 0f);

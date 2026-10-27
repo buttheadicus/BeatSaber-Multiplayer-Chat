@@ -1,4 +1,5 @@
 using BeatSaber.BeatAvatarAdapter.AvatarEditor;
+using HMUI;
 using MultiplayerChat.Core.Addons;
 using SiraUtil.Affinity;
 
@@ -10,15 +11,18 @@ internal sealed class AvatarColoringEditorAffinityShim : IAffinity
     private const string AddonId = "avatarColoring";
     private const string PatcherTypeName = "MultiplayerChat.AvatarColoring.AvatarColoringEditorPatcher";
 
-    [AffinityPatch(typeof(BeatAvatarEditorViewController), "DidActivate")]
+    [AffinityPatch(typeof(ViewController), "DidActivate")]
     [AffinityPostfix]
     public void PostfixBeatAvatarEditorDidActivate(
-        BeatAvatarEditorViewController __instance,
+        ViewController __instance,
         bool firstActivation,
         bool addedToHierarchy,
         bool screenSystemEnabling)
     {
-        var patcher = AddonAffinityShimBridge.CreatePatcherOrNull(AddonId, PatcherTypeName, __instance);
+        if (__instance is not BeatAvatarEditorViewController editor)
+            return;
+
+        var patcher = AddonAffinityShimBridge.CreatePatcherOrNull(AddonId, PatcherTypeName, editor);
         AddonAffinityShimBridge.InvokeVoidOrNoop(
             patcher,
             "PostfixBeatAvatarEditorDidActivate",
@@ -27,14 +31,17 @@ internal sealed class AvatarColoringEditorAffinityShim : IAffinity
             screenSystemEnabling);
     }
 
-    [AffinityPatch(typeof(BeatAvatarEditorViewController), "DidDeactivate")]
+    [AffinityPatch(typeof(ViewController), "DidDeactivate")]
     [AffinityPostfix]
     public void PostfixBeatAvatarEditorDidDeactivate(
-        BeatAvatarEditorViewController __instance,
+        ViewController __instance,
         bool removedFromHierarchy,
         bool screenSystemDisabling)
     {
-        var patcher = AddonAffinityShimBridge.CreatePatcherOrNull(AddonId, PatcherTypeName, __instance);
+        if (__instance is not BeatAvatarEditorViewController editor)
+            return;
+
+        var patcher = AddonAffinityShimBridge.CreatePatcherOrNull(AddonId, PatcherTypeName, editor);
         AddonAffinityShimBridge.InvokeVoidOrNoop(
             patcher,
             "PostfixBeatAvatarEditorDidDeactivate",

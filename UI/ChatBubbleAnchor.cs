@@ -11,6 +11,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using Zenject;
 
+// im too terrified to touch this code, or even restore my old comments
+
 namespace MultiplayerChat.UI;
 
 // nametag row: [custom avatars?][chat][MPEX][name]. Mod users also get mic/headphone icons centered above the row.

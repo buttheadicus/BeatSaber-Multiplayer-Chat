@@ -1,6 +1,8 @@
 using System;
 using LiteNetLib.Utils;
 
+// written by grok, it worked so i rolled with it. (lowkey surprised i didnt have to change anything)
+
 namespace MultiplayerChat.Network;
 
 // text chat payload; DM mode sets TargetUserId and TargetChatId for routing and decryption scope.

@@ -1,5 +1,7 @@
 namespace MultiplayerChat.Core;
 
+// scawy red text wen yu has an ewwor >w<
+
 public static class ChatSystemErrorMessages
 {
     private const string ErrRed = "#FF4444";

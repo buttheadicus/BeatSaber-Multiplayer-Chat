@@ -1,5 +1,7 @@
 using LiteNetLib.Utils;
 
+// i guess you arnt dming son...
+
 namespace MultiplayerChat.Network;
 
 public class DmStoppedNotifyPacket : MultiplayerCore.Networking.Abstractions.MpPacket

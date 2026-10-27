@@ -12,6 +12,8 @@
 
     <button id="CustomAvatarsButton" text="Custom Avatars" pad="2" min-width="48" on-click="CustomAvatarsClicked"/>
 
+    <button id="SpectaplayButton" text="Spectaplay" pad="2" min-width="48" on-click="SpectaplayClicked"/>
+
   </vertical>
 
 </bg>

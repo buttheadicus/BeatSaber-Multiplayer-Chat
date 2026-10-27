@@ -53,6 +53,15 @@ internal static class AddonReleaseDefinitions
         ReleasesLatestApi = "https://api.github.com/repos/buttheadicus/MPC-addon-QuickBinds/releases/latest"
     };
 
+    internal static AddonReleaseDefinition Spectaplay { get; } = new()
+    {
+        AddonId = "spectaplay",
+        DisplayName = "Spectaplay",
+        DllFileName = "MultiplayerChat.Addon.Spectaplay.dll",
+        ManifestFileName = "MultiplayerChat.Addon.Spectaplay.addon.json",
+        ReleasesLatestApi = "https://api.github.com/repos/buttheadicus/MPC-addon-Spectaplay/releases/latest"
+    };
+
     internal static IReadOnlyList<AddonReleaseDefinition> All { get; } =
-        new[] { QuickBinds, AvatarColoring, CustomAvatars };
+        new[] { QuickBinds, AvatarColoring, CustomAvatars, Spectaplay };
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="8" spacing="5">
+    <text text="SKIN SNATCHER" font-size="5" align="Center"/>
+    <text text="Pick a player, then snatch. Saves their BeatAvatar into Avatar Storage under their name. Does not send any packets." font-size="3.2" align="Center" enable-word-wrapping="true"/>
+    <dropdown-list-setting id="SkinSnatcherPlayerDropdown" text="Player" options="SkinSnatcherPlayerOptions"/>
+    <horizontal spacing="3">
+      <button text="Refresh list" pad="2" min-width="24" on-click="RefreshPlayersClicked"/>
+      <button text="Snatch" pad="2" min-width="24" on-click="SnatchClicked"/>
+    </horizontal>
+    <text id="SkinSnatcherStatus" text="" font-size="3.2" align="Center" enable-word-wrapping="true"/>
+  </vertical>
+</bg>

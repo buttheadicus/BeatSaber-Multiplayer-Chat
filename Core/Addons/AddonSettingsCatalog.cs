@@ -20,7 +20,8 @@ internal static class AddonSettingsCatalog
     {
         AddonIds.QuickBinds,
         AddonIds.AvatarColoring,
-        AddonIds.CustomAvatars
+        AddonIds.CustomAvatars,
+        AddonIds.Spectaplay
     };
 
     internal static IReadOnlyList<AddonSettingsRow> BuildRows()
@@ -42,6 +43,8 @@ internal static class AddonSettingsCatalog
         var rows = new List<AddonSettingsRow>();
         foreach (var id in ids.OrderBy(id => ResolveDisplayName(id, onDisk), StringComparer.OrdinalIgnoreCase))
         {
+            if (AddonEnablement.IsUnwired(id))
+                continue;
             onDisk.TryGetValue(id, out var entry);
             loaded.TryGetValue(id, out var loadedInfo);
             var enabled = AddonEnablement.IsEnabled(id);

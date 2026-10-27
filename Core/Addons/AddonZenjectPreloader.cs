@@ -24,6 +24,9 @@ internal static class AddonZenjectPreloader
 
         foreach (var entry in AddonCatalog.Scan())
         {
+            if (AddonEnablement.IsUnwired(entry.Manifest.Id))
+                continue;
+
             try
             {
                 var asm = AddonLoadContext.LoadFromFile(entry.DllPath);

@@ -2,6 +2,8 @@ using System;
 using System.Reflection;
 using HarmonyLib;
 
+// this entire file was written by grok, it worked so i rolled with it. (lowkey surprised i didnt have to change anything)
+
 namespace MultiplayerChat.HarmonyPatches;
 
 // SteamVR / system dashboard steals VR input focus and user presence; Beat Saber

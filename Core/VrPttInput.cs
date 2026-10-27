@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR;
 
+// just push to talk logic. i think grok wrote this, this was a while ago, dont rember
+
 namespace MultiplayerChat.Core;
 
 public static class VrPttInput

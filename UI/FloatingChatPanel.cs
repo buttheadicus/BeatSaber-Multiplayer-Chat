@@ -9,6 +9,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using Zenject;
 
+//completed btw, doesnt ever need to be touched again, its amazing and perfect and will never need to be changed
+
 namespace MultiplayerChat.UI;
 
 public class FloatingChatPanel : MonoBehaviour, IInitializable, IDisposable

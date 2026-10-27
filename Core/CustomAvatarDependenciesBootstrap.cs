@@ -13,6 +13,8 @@ using Newtonsoft.Json.Linq;
 using UnityEngine;
 using IPALogger = IPA.Logging.Logger;
 
+// YAY! THIS IS OBSOLETE AS OF 0.3.8!
+
 namespace MultiplayerChat.Core;
 
 // when lobby custom avatars are enabled, ensure DynamicBone, Custom Avatars, and Final IK are present.
@@ -128,7 +130,7 @@ public static class CustomAvatarDependenciesBootstrap
         return true;
     }
 
-    // download every missing dependency first, install together, then exit once (no one-at-a-time restarts).
+    // download every missing dependency first, install together, then exit once (no one at a time restarts-thats a one way ticket to people uninstalling this mod lmao).
     private static bool TryBatchInstallMissingDependencies(
         IPALogger log,
         string installRoot,

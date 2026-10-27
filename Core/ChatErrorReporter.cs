@@ -1,5 +1,7 @@
 using System;
 
+// written by grok 
+
 namespace MultiplayerChat.Core;
 
 public static class ChatErrorReporter

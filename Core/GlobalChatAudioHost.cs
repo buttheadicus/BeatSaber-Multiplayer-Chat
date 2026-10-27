@@ -26,6 +26,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     private const float SilenceBeforeUnduckSec = 0.85f;
     private const float DuckSmoothTimeSec = 0.12f;
     private const float SourceRefreshIntervalSec = 2f;
+    private const float MinCapturedBaselineVolume = 0.05f;
 
     private float _smoothDuckMul = 1f;
     private float _duckSmoothVel;
@@ -50,8 +51,6 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
     }
 
     private readonly Dictionary<int, DuckSourceEntry> _duckGameSourceBaselines = new(256);
-
-    private readonly HashSet<int> _duckSeenSourceIdsScratch = new(256);
 
     private readonly List<int> _baselineDeadSweep = new(32);
 
@@ -93,6 +92,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        InvalidateDuckSnapshotForSceneChange();
         MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
         MpChatLobbyDiagnostics.LogVoipTransition($"OnSceneLoaded:{scene.name}", $"mode={mode}");
         if (string.Equals(scene.name, "GameCore", System.StringComparison.Ordinal))
@@ -108,6 +108,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
     private void OnSceneUnloaded(Scene scene)
     {
+        InvalidateDuckSnapshotForSceneChange();
         MpChatLobbyDiagnostics.LogVoipTransition($"OnSceneUnloaded:{scene.name}", null);
         if (!string.Equals(scene.name, "GameCore", System.StringComparison.Ordinal))
             return;
@@ -117,6 +118,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
     private void OnActiveSceneChanged(Scene oldScene, Scene newScene)
     {
+        InvalidateDuckSnapshotForSceneChange();
         MpChatLobbyDiagnostics.InvalidateSceneHeuristicCaches();
         MpChatLobbyDiagnostics.LogVoipTransition("OnActiveSceneChanged",
             $"old={oldScene.name} new={newScene.name}");
@@ -290,11 +292,15 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         if (nowRl >= _nextCachedAudioListenerCheckTime)
         {
             _nextCachedAudioListenerCheckTime = nowRl + 0.75f;
-            _duckHasCachedAudioListener = UnityEngine.Object.FindObjectOfType<AudioListener>() != null;
+            _duckHasCachedAudioListener = FindAnyAudioListener();
         }
 
+        // missing listener is normal during a scene swap; do not keep stomping source volumes.
         if (!_duckHasCachedAudioListener)
+        {
+            ReleaseAppliedDuckVolumes(restoreListener: false);
             return;
+        }
 
         var dt = Time.unscaledDeltaTime;
         var audible = IsIncomingVoiceAudibleNow();
@@ -320,7 +326,7 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
         if (!wantDuck && _smoothDuckMul > 0.999f)
         {
-            ReleaseAppliedDuckVolumes();
+            ReleaseAppliedDuckVolumes(restoreListener: true);
             return;
         }
 
@@ -332,23 +338,36 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
     private void ReleaseDuckingIfNeeded()
     {
-        ReleaseAppliedDuckVolumes();
+        ReleaseAppliedDuckVolumes(restoreListener: true);
         _smoothDuckMul = 1f;
         _duckSmoothVel = 0f;
         _duckLatched = false;
         _silenceAfterVoiceSec = 0f;
     }
 
-    private void ReleaseAppliedDuckVolumes()
+    // drop per-source stomps before the new scene's UI audio exists. do not write the old listener volume onto the new listener.
+    private void InvalidateDuckSnapshotForSceneChange()
+    {
+        ReleaseAppliedDuckVolumes(restoreListener: false);
+        HealAnySilencedUiClickSources();
+        _nextCachedAudioListenerCheckTime = 0f;
+        _nextSourceRefreshTime = 0f;
+    }
+
+    private void ReleaseAppliedDuckVolumes(bool restoreListener)
     {
         if (!_duckVolumesApplied)
             return;
 
-        AudioListener.volume = _baselineListenerVolume;
+        if (restoreListener)
+            AudioListener.volume = _baselineListenerVolume;
+
         foreach (var kv in _duckGameSourceBaselines)
         {
             var e = kv.Value;
             if (e.Source == null || !e.Source)
+                continue;
+            if (e.BaselineVolume < MinCapturedBaselineVolume)
                 continue;
             e.Source.volume = e.BaselineVolume;
         }
@@ -356,6 +375,20 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         _duckGameSourceBaselines.Clear();
         _duckVolumesApplied = false;
         _nextSourceRefreshTime = 0f;
+        HealAnySilencedUiClickSources();
+    }
+
+    private static bool FindAnyAudioListener()
+    {
+        foreach (var obj in Resources.FindObjectsOfTypeAll<AudioListener>())
+        {
+            if (obj == null)
+                continue;
+            if (obj.isActiveAndEnabled)
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsModChatOrProtectedUiSound(AudioSource s)
@@ -371,6 +404,63 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
         }
 
         return false;
+    }
+
+    // PlayOneShot clicks use this source volume; pinning it to 0 after a scene reload mutes the whole menu.
+    private static bool IsGameUiClickAudioSource(AudioSource s)
+    {
+        if (s == null)
+            return false;
+        if (s.GetComponentInParent<BasicUIAudioManager>(true) != null)
+            return true;
+
+        for (var t = s.transform; t != null; t = t.parent)
+        {
+            var n = t.name;
+            if (n.IndexOf("UIAudio", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                n.IndexOf("ButtonClick", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void HealSilencedUiClickSource(AudioSource s)
+    {
+        if (s.volume < MinCapturedBaselineVolume)
+            s.volume = 1f;
+    }
+
+    private static void HealAnySilencedUiClickSources()
+    {
+        foreach (var s in EnumerateSceneHierarchyAudioSources())
+        {
+            if (s == null)
+                continue;
+            if (IsGameUiClickAudioSource(s))
+                HealSilencedUiClickSource(s);
+        }
+    }
+
+    private bool TryCaptureDuckBaseline(AudioSource s, out float baseline)
+    {
+        baseline = 0f;
+        if (s == null || !s.gameObject.activeInHierarchy)
+            return false;
+        if (IsModChatOrProtectedUiSound(s))
+            return false;
+        if (IsGameUiClickAudioSource(s))
+        {
+            HealSilencedUiClickSource(s);
+            return false;
+        }
+
+        var v = s.volume;
+        if (v < MinCapturedBaselineVolume)
+            return false;
+
+        baseline = v;
+        return true;
     }
 
     private static IEnumerable<AudioSource> EnumerateSceneHierarchyAudioSources()
@@ -395,13 +485,11 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
 
         foreach (var s in EnumerateSceneHierarchyAudioSources())
         {
-            if (s == null || !s.gameObject.activeInHierarchy)
-                continue;
-            if (IsModChatOrProtectedUiSound(s))
+            if (!TryCaptureDuckBaseline(s, out var baseline))
                 continue;
             var id = s.GetInstanceID();
             if (!_duckGameSourceBaselines.ContainsKey(id))
-                _duckGameSourceBaselines[id] = new DuckSourceEntry { Source = s, BaselineVolume = s.volume };
+                _duckGameSourceBaselines[id] = new DuckSourceEntry { Source = s, BaselineVolume = baseline };
         }
 
         _duckVolumesApplied = true;
@@ -427,6 +515,19 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
                 continue;
             }
 
+            if (IsGameUiClickAudioSource(e.Source) || IsModChatOrProtectedUiSound(e.Source))
+            {
+                HealSilencedUiClickSource(e.Source);
+                _baselineDeadSweep.Add(id);
+                continue;
+            }
+
+            if (e.BaselineVolume < MinCapturedBaselineVolume)
+            {
+                _baselineDeadSweep.Add(id);
+                continue;
+            }
+
             e.Source.volume = Mathf.Clamp(e.BaselineVolume * mul, 0f, 3f);
         }
 
@@ -438,30 +539,16 @@ public sealed class GlobalChatAudioHost : MonoBehaviour
             return;
 
         _nextSourceRefreshTime = Time.realtimeSinceStartup + SourceRefreshIntervalSec;
-        _duckSeenSourceIdsScratch.Clear();
 
         foreach (var s in EnumerateSceneHierarchyAudioSources())
         {
-            if (s == null || !s.gameObject.activeInHierarchy)
-                continue;
-            if (IsModChatOrProtectedUiSound(s))
+            if (!TryCaptureDuckBaseline(s, out var baseline))
                 continue;
 
             var id = s.GetInstanceID();
-            _duckSeenSourceIdsScratch.Add(id);
             if (!_duckGameSourceBaselines.ContainsKey(id))
-                _duckGameSourceBaselines[id] = new DuckSourceEntry { Source = s, BaselineVolume = s.volume };
+                _duckGameSourceBaselines[id] = new DuckSourceEntry { Source = s, BaselineVolume = baseline };
         }
-
-        _baselineDeadSweep.Clear();
-        foreach (var kv in _duckGameSourceBaselines)
-        {
-            if (!_duckSeenSourceIdsScratch.Contains(kv.Key))
-                _baselineDeadSweep.Add(kv.Key);
-        }
-
-        foreach (var id in _baselineDeadSweep)
-            _duckGameSourceBaselines.Remove(id);
     }
 
     private bool IsIncomingVoiceAudibleNow()

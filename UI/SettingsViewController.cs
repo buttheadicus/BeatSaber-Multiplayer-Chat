@@ -12,8 +12,8 @@ namespace MultiplayerChat.UI;
 public class SettingsViewController : BSMLAutomaticViewController
 {
     private const string LabelUnlockAvatarHandPositions = "Unlock Avatar Hand Positions";
-    private const string LabelEnableCau = "Enable 'Chat Auto Updater' (CAU)";
-    private const string LabelDebugLogging = "Debug mode (very verbose; will lag; install only)";
+    private const string LabelEnableCau = "Enable 'Chat Auto Updater' ";
+    private const string LabelDebugLogging = "Debug mode (will probably lag, dont use (please))"; // previous string was written by grok, so i changed it to somthing that i actually would rather read instead of its love of semi colons. i know i somtimes use semicolons in my chats; i dont care.
 
     public event EventHandler? ApplyClicked;
 
@@ -26,6 +26,8 @@ public class SettingsViewController : BSMLAutomaticViewController
     public event Action? AddonsClicked;
 
     public event Action? PerformanceClicked;
+
+    public event Action? ExperimentalClicked;
 
     [UIComponent("UnlockAvatarHandPositionsToggle")]
     private ToggleSetting? _unlockAvatarHandPositionsToggle;
@@ -71,6 +73,9 @@ public class SettingsViewController : BSMLAutomaticViewController
 
     [UIAction("PerformanceClicked")]
     private void OnPerformanceClicked() => PerformanceClicked?.Invoke();
+
+    [UIAction("ExperimentalClicked")]
+    private void OnExperimentalClicked() => ExperimentalClicked?.Invoke();
 
     [UIAction("#post-parse")]
     private void PostParse()

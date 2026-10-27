@@ -97,6 +97,8 @@ internal sealed class AddonHost
 
     private bool ShouldLoad(AddonCatalogEntry entry)
     {
+        if (AddonEnablement.IsUnwired(entry.Manifest.Id))
+            return false;
         if (!Version.TryParse(entry.Manifest.MinCoreVersion, out var minCore))
             minCore = new Version(0, 0, 0);
 
@@ -108,8 +110,10 @@ internal sealed class AddonHost
             return false;
         }
 
+        // still load disabled addons so their settings pages can turn the feature on.
+        // gameplay stays gated by AddonEnablement / each addon's own enable check.
         if (!AddonEnablement.IsEnabled(entry.Manifest.Id))
-            return false;
+            MpChatLog.Info($"[MPChat][Addons] Loading {entry.Manifest.Id} with feature disabled.");
 
         if (entry.Manifest.Id == AddonIds.CustomAvatars &&
             !CustomAvatarDependenciesBootstrap.SessionDependenciesReady)

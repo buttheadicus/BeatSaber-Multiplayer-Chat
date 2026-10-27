@@ -150,7 +150,7 @@ public class ChatIdConfigStore : IInitializable
         MutedStateChanged?.Invoke();
     }
 
-    // when a peer Chat ID becomes known, promote mute from platformUserId bucket to chatId bucket so it survives ID regeneration.
+    // when a peer Chat ID becomes known, promote mute from platformUserId bucket to chatId bucket so it survives ID regeneration. (i guess this is written by grok too, i forgot)
     public void OnChatIdLearnedForUser(string platformUserId, string chatId)
     {
         if (string.IsNullOrEmpty(platformUserId) || !ChatPersistentId.IsValidFormat(chatId)) return;

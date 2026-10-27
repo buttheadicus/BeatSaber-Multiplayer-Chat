@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<bg xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="https://monkeymanboy.github.io/BSML-Docs/BSMLSchema.xsd">
+  <vertical pad="10" spacing="6">
+    <button text="Chat for non chat players" pad="2" min-width="48" on-click="ChatSongClicked"/>
+    <button text="SKIN SNATCHER" pad="2" min-width="48" on-click="SkinSnatcherClicked"/>
+    <button text="Extra Stats" pad="2" min-width="48" on-click="ExtraStatsClicked"/>
+  </vertical>
+</bg>

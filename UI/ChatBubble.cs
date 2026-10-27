@@ -6,6 +6,8 @@ using UnityEngine.UI;
 
 namespace MultiplayerChat.UI;
 
+// this goddamn bubble chat system took a stupid amount of time to make bugless, it probably still has bugs so blame grok if the bug fixes dont work, i have more important code to write
+
 public class ChatBubble : MonoBehaviour
 {
     private const float DefaultYOffset = 0.35f;

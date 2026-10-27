@@ -43,6 +43,12 @@ internal static class AddonSettingsFlowRegistry
             AddonIds.CustomAvatars,
             "MultiplayerChat.UI.CustomAvatarsSettingsFlowCoordinator",
             "MultiplayerChat.UI.CustomAvatarsSettingsViewController");
+        Register(
+            AddonIds.Spectaplay,
+            "MultiplayerChat.UI.SpectaplaySettingsFlowCoordinator",
+            "MultiplayerChat.UI.SpectaplaySettingsViewController",
+            "MultiplayerChat.UI.SpectaplayOptionsSettingsFlowCoordinator",
+            "MultiplayerChat.UI.SpectaplayOptionsSettingsViewController");
 
         RegisterPresentersFromBindings();
     }

@@ -33,6 +33,9 @@ internal static class AddonCatalog
         {
             var manifestPath = AddonPaths.ManifestPathForDll(dllPath);
             var manifest = ReadManifest(manifestPath, dllPath);
+            if (AddonEnablement.IsUnwired(manifest.Id))
+                continue;
+
             results.Add(new AddonCatalogEntry
             {
                 DllPath = dllPath,
@@ -77,6 +80,7 @@ internal static class AddonCatalog
             "QuickBinds" => AddonIds.QuickBinds,
             "AvatarColoring" => AddonIds.AvatarColoring,
             "CustomAvatars" => AddonIds.CustomAvatars,
+            "Spectaplay" => AddonIds.Spectaplay,
             _ => suffix
         };
 

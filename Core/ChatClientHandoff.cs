@@ -1,5 +1,7 @@
 namespace MultiplayerChat.Core;
 
+// this is bullshrimp for slz mode, your never getting that code. its mine :3 , oh yeah, its written by grok too, i was too busy actually writing the slz mode code, i really should allow myself to chat instead of blocking it-what the hell was i thinking??????????
+
 // exclusive chat-client ownership; when claimed, human UI/input is suppressed
 public static class ChatClientHandoff
 {
